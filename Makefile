@@ -9,7 +9,7 @@
 # --------------------------------------------------------------------------------------------------
 
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c90 -pedantic -g -fopenmp -Iinclude -MMD -MP
+CFLAGS = -Wall -Wextra -std=c11 -pedantic -g -fopenmp -Iinclude -MMD -MP
 LDFLAGS = -fopenmp -lm
 SRC_DIR = src
 OBJ_DIR = build
@@ -39,7 +39,7 @@ clean:
 
 # Make run compiles everything and runs
 run: all
-	./mcprog
+	./mcprog input
 
 # Testing environment. Compiles everything in ./test into one binary and runs
 # This replaces the main() with the one in tests.c

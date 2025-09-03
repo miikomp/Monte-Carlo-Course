@@ -1,0 +1,17 @@
+### Ignore everything related to VS-Code ###
+
+.vscode/**/*
+*.code-workspace
+
+### Ignore all local history files ###
+
+**/.history
+
+### Ignore everything in the build directory but keep ./build ###
+
+build/*
+!build/.keep
+
+### Ignore the executable ###
+
+mcprog

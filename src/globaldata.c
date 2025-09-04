@@ -16,7 +16,6 @@ Tallies initTallies() {
     Tallies ret = {
         .n_tot      = 0ll,
         .n_hits     = 0ll,
-        .dis        = 0.0
     };
 
     return ret;

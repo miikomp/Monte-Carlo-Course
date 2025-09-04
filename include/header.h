@@ -60,17 +60,23 @@ extern runInfo GLOB;
 typedef struct {
     long long   n_tot;
     long long   n_hits;  
-    double      dis;
 } Tallies;
+
+typedef struct {
+    long long n_tot;
+    long long n_hits;
+} PiResult;
 
 /* --- Function declaration --- */
 
 /**
- * @brief Reads an input file and setups data and parameters
+ * @brief Reads an input file and setups data and parameters. Checks for valid keywords 
+ * at the start of each line. When found tries to parse necessary arguments. 
+ * Skips comments from "#" to end of line. Raises errors and warnings when applicable.
  * 
  * @return long – Number of keyword arguments succesfully parsed
  */
-uint64_t readInput();
+long readInput();
 
 /**
  * @brief Initialize an empty Tallies struct
@@ -79,21 +85,23 @@ uint64_t readInput();
  */
 Tallies initTallies();
 
-
-/* --- Inline function declarations --- */
-
-/* Random number generators for seed scrambling and random double */
-/* All based on literature (Not original work) */
+/**
+ * @brief Runs the quarter circle approximation for pi
+ * 
+ * @param out ptr to result struct
+ * @param seeds array of thread private seeds
+ * @return int 0 on success 1 on failure
+ */
+int runCirclePi(PiResult *out, uint64_t *seeds);
 
 /**
- * @brief xorshift* based 53-bit floating point number RNG. Return between [0, 1]
+ * @brief Summarize an array of results by calculating and printing basic statistics
  * 
- * @param s ptr to state (seed)
- * @return double 
+ * @param results ptr to results array with GLOB.n_outer items
  */
-static inline double randd(uint64_t *s) {
-    return (xorShift64(s) >> 11) * (1.0/9007199254740992.0);
-}
+void summarizeResultsArray(const long double *results);
+
+/* --- Inline function declarations --- */
 
 /**
  * @brief Fast thread-safe 64-bit RNG. xorshift* algorithm.
@@ -116,11 +124,24 @@ static inline uint64_t xorShift64(uint64_t *s) {
  * @param x ptr to seed
  * @return uint64_t 
  */
-static inline uint64_t splitmix64(uint64_t x) {
-    x += UINT64_C(0x9E3779B97F4A7C15);
-    x = (x ^ (x >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
-    x = (x ^ (x >> 27)) * UINT64_C(0x94D049BB133111EB);
-    return x ^ (x >> 31);
+static inline uint64_t splitmix64(uint64_t *state) {
+    uint64_t z = (*state += UINT64_C(0x9E3779B97F4A7C15));
+    z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
+    return z ^ (z >> 31);
+}
+
+/* Random number generators for seed scrambling and random double */
+/* All based on literature (Not original work) */
+
+/**
+ * @brief xorshift* based 53-bit floating point number RNG. Return between [0, 1]
+ * 
+ * @param s ptr to state (seed)
+ * @return double 
+ */
+static inline double randd(uint64_t *s) {
+    return (xorShift64(s) >> 11) * (1.0/9007199254740992.0);
 }
 
 #endif

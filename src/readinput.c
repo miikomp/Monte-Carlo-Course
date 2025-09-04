@@ -8,8 +8,8 @@ static int parseUInt(const char *s, uint32_t *out);
 
 static int parseDouble(const char *s, double *out);
 
-uint64_t readInput() {
-    uint64_t np = 0u, lnum = 0u;
+long readInput() {
+    long np = 0u, lnum = 0u;
 
     /* Open file for reading */
     
@@ -22,7 +22,7 @@ uint64_t readInput() {
 
     /* Try to parse keyword arguments and related options */
 
-    fprintf(stdout, "Reading input file \"%s\"...\n", GLOB.fname);
+    fprintf(stdout, "\nReading input file \"%s\"...\n", GLOB.fname);
 
     char line[4096];
     const char DELIMS[] = " \t\r\n";
@@ -55,7 +55,7 @@ uint64_t readInput() {
             char *a1 = strtok(NULL, DELIMS);
             if (!a1) 
             {
-                fprintf(stderr, "[ERROR] Incomplete input on line %ld.", lnum);
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
@@ -79,7 +79,7 @@ uint64_t readInput() {
             char *a2 = strtok(NULL, DELIMS);
             if (!a1 || !a2) 
             {
-                fprintf(stderr, "[ERROR] Incomplete input on line %ld.", lnum);
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
@@ -93,7 +93,12 @@ uint64_t readInput() {
             }
 
             /* Put outer and inner iterations */
-
+            if (n_outer <= 1 || n_inner <= 1) {
+                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            
             GLOB.n_outer = n_outer;
             GLOB.n_inner = n_inner;
             np++;
@@ -103,7 +108,7 @@ uint64_t readInput() {
             char *a1 = strtok(NULL, DELIMS);
             if (!a1) 
             {
-                fprintf(stderr, "[ERROR] Incomplete input on line %ld.", lnum);
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
@@ -132,7 +137,15 @@ uint64_t readInput() {
             GLOB.mode = mode;
             np++;
         }
+        else
+        {
+            /* Some unknown keyword, print warning and continue to next line */
+
+            fprintf(stderr, "[WARNING] Skipping line %ld with unknown keyword argument: \"%s\"...\n", lnum, tok);
+        }
     }
+
+    /* Return number of arguments succesfully parsed */
 
     return np;
 }

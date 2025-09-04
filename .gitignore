@@ -14,6 +14,6 @@ build/*
 
 ### Ignore the executable ###
 
-mcprog
+moca
 
 input

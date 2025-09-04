@@ -13,7 +13,7 @@ CFLAGS = -Wall -Wextra -std=c11 -pedantic -g -fopenmp -Iinclude -MMD -MP
 LDFLAGS = -fopenmp -lm
 SRC_DIR = src
 OBJ_DIR = build
-BIN = mcprog
+BIN = moca
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 SRC_WITHOUT_MAIN := $(filter-out $(SRC_DIR)/main.c, $(wildcard $(SRC_DIR)/*.c))
@@ -39,7 +39,7 @@ clean:
 
 # Make run compiles everything and runs
 run: all
-	./mcprog input
+	./moca -omp 8 input
 
 # Testing environment. Compiles everything in ./test into one binary and runs
 # This replaces the main() with the one in tests.c

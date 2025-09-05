@@ -24,7 +24,9 @@
 #define RUNMODE_BUFFONS_PI  2
 #define RUNMODE_CHECK       3
 
-#define CACHELINE 64
+#define PRG_BAR_WIDTH 50
+
+#define DELIMS " \t\r\n"
 
 /* --- Data structures --- */
 
@@ -47,6 +49,8 @@ typedef struct {
     long        n_kwargs;
     uint64_t    seed;     
     long        mode;
+    double      t0;
+    double      t1;
 } runInfo;
 
 extern runInfo GLOB;
@@ -58,13 +62,13 @@ extern runInfo GLOB;
  * @param n_hits Total number of simulated histories that satisfy a condition
  */
 typedef struct {
-    long long   n_tot;
-    long long   n_hits;  
+    long   n_tot;
+    long   n_hits;  
 } Tallies;
 
 typedef struct {
-    long long n_tot;
-    long long n_hits;
+    long n_tot;
+    long n_hits;
 } PiResult;
 
 /* --- Function declaration --- */
@@ -92,16 +96,36 @@ Tallies initTallies();
  * @param seeds array of thread private seeds
  * @return int 0 on success 1 on failure
  */
-int runCirclePi(PiResult *out, uint64_t *seeds);
+int runCirclePiInner(PiResult *out, uint64_t *seeds);
 
 /**
- * @brief Summarize an array of results by calculating and printing basic statistics
+ * @brief Single threaded outerloop of the quarter pi approximation.
+ * 
+ * @param sm seed for seed scrambler
+ * @param seeds thread private seed storage
+ * @return int 0 on success 1 on failure
+ */
+int runCirclePi(uint64_t sm, uint64_t *seeds);
+
+/**
+ * @brief Summarize an array of results by calculating and printing basic statistics like
+ * mean, standard deviation, 95% confidence interval and figure-of-merit (FOM).
  * 
  * @param results ptr to results array with GLOB.n_outer items
  */
-void summarizeResultsArray(const long double *results);
+void summarizeResultsArray(const double *results);
+
+/**
+ * @brief Process and validate input data stored in GLOB. Raise errors when applicable.
+ * 
+ * @return int 0 on success 1 on failure
+ */
+int processInput();
 
 /* --- Inline function declarations --- */
+
+/* Random number generators for seed scrambling and random double */
+/* All based on literature (Not original work) */
 
 /**
  * @brief Fast thread-safe 64-bit RNG. xorshift* algorithm.
@@ -130,9 +154,6 @@ static inline uint64_t splitmix64(uint64_t *state) {
     z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
     return z ^ (z >> 31);
 }
-
-/* Random number generators for seed scrambling and random double */
-/* All based on literature (Not original work) */
 
 /**
  * @brief xorshift* based 53-bit floating point number RNG. Return between [0, 1]

@@ -1,29 +1,42 @@
 #include "header.h"
 
-void summarizeResultsArray(const long double *results) {
+void summarizeResultsArray(const double *results) {
     const long N = GLOB.n_outer;
 
     /* Calculate mean of results */
     
-    long double sum = 0.0L, sumsq = 0.0L;
+    double sum = 0.0L, sumsq = 0.0L;
     for (long i = 0; i < GLOB.n_outer; i++)
     {
         sum += results[i];
         sumsq += results[i] * results[i];
     }
 
-    long double mean = sum / (long double)N;
+    double mean = sum / (double)N;
 
     /* Standard deviation */
 
-    long double bracket = sumsq - (sum * sum) / (long double)N;
+    double bracket = sumsq - (sum * sum) / (double)N;
 
-    long double sd = sqrtl(bracket / ((long double)N * (N - 1)));
+    double sd = sqrtl(bracket / ((double)N * (N - 1)));
 
     /* 95% confidence interval 1.96 * sd */
 
-    long double lo = mean - 1.96 * sd;
-    long double hi = mean + 1.96 * sd;
+    double lo = mean - 1.96 * sd;
+    double hi = mean + 1.96 * sd;
 
-    fprintf(stdout, "\nmean = %.6Lf +- %.6Lf [%.6Lf, %.6Lf]\n\n", mean, sd, lo, hi);
+    fprintf(stdout, "\n\nMean value = %.6lf +- %.6lf [%.6lf, %.6lf]\n\n", mean, sd, lo, hi);
+
+    /* Figure-of-Merit from relative error */
+
+    double t0 = GLOB.t0;
+    double t1 = omp_get_wtime();
+
+    double rerr = sd / mean;
+
+    /* FOM is scaled to billions */
+
+    double FOM = 1e-9 * (1.0L / (rerr * rerr * (t1 - t0)));
+
+    fprintf(stdout, "FOM = %.2lf\n", FOM);
 }

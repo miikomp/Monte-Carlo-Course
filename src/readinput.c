@@ -16,7 +16,7 @@ long readInput() {
     FILE *fp = fopen(GLOB.fname, "r");
     if (fp == NULL) 
     {
-        fprintf(stderr, "[ERROR] Cannot open file %s", GLOB.fname);
+        fprintf(stderr, "[ERROR] Cannot open file \"%s\".", GLOB.fname);
         exit(EXIT_FAILURE);
     }
 
@@ -25,7 +25,6 @@ long readInput() {
     fprintf(stdout, "\nReading input file \"%s\"...\n", GLOB.fname);
 
     char line[4096];
-    const char DELIMS[] = " \t\r\n";
 
     /* Read lines until end-of-file */
 
@@ -91,14 +90,17 @@ long readInput() {
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
+            
+            /* Check for valid values */
 
-            /* Put outer and inner iterations */
             if (n_outer <= 1 || n_inner <= 1) {
                 fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
             
+            /* Put outer and inner iterations */
+
             GLOB.n_outer = n_outer;
             GLOB.n_inner = n_inner;
             np++;
@@ -127,7 +129,7 @@ long readInput() {
                   (mode == RUNMODE_BUFFONS_PI) || 
                   (mode == RUNMODE_CHECK))) 
             {
-                fprintf(stderr, "[ERROR] Unknown mode identifier \"%ld\" for \"mode\"\n", mode);
+                fprintf(stderr, "[ERROR] Unknown mode identifier \"%ld\" for \"mode\".\n", mode);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }

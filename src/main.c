@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     if (processInput() != 0) 
         return EXIT_FAILURE;
 
-    fprintf(stdout, "DONE. \n[NOTE] %ld keyword arguments succesfully parsed.\n\n", np);
+    fprintf(stdout, "[NOTE] %ld keyword arguments succesfully parsed.\nDONE. \n\n", np);
 
     /* ########################################################################################## */
 
@@ -70,6 +70,10 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Memory allocation error\n");
         return EXIT_FAILURE;
     }
+
+    /* Initialize look-up tables */
+
+    initTrigTables();
 
     /* ########################################################################################## */
 
@@ -99,7 +103,11 @@ int main(int argc, char **argv) {
     }
     case RUNMODE_BUFFONS_PI: 
     {
-        fprintf(stderr, "Mode %ld: \"Buffon's needle\" not yet implemented.\n", GLOB.mode);
+        if (runBuffonsPi(sm, seeds) != 0) {
+            fprintf(stderr, "Computation failed.\n");
+            free(seeds);
+            return EXIT_FAILURE;
+        }
 
         break;
     }

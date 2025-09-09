@@ -15,5 +15,3 @@ build/*
 ### Ignore the executable ###
 
 moca
-
-input

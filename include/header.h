@@ -25,8 +25,15 @@
 #define RUNMODE_CHECK       3
 
 #define PRG_BAR_WIDTH 50
+#define TRIG_LOOKUP_TABLE_SIZE 1000
 
 #define DELIMS " \t\r\n"
+
+#define M_PI 3.14159265358979323846
+
+/* inverse of 32-bit max integer is used when 64-bit random integers are split to two 32-bit ones */
+
+#define INV_INT32_MAX (1.0/(double)UINT32_MAX)
 
 /* --- Data structures --- */
 
@@ -42,6 +49,7 @@
  * @param mode Type of calculation to run
  */
 typedef struct {
+    /* General parameters */
     const char *fname;
     int         n_threads;
     long        n_outer;
@@ -51,6 +59,10 @@ typedef struct {
     long        mode;
     double      t0;
     double      t1;
+
+    /* Buffon's needle specific parameters */
+    double      needle_length;
+    double      line_spacing;
 } runInfo;
 
 extern runInfo GLOB;
@@ -90,6 +102,12 @@ long readInput();
 Tallies initTallies();
 
 /**
+ * @brief Initialize trigonometric lookup tables for sin and cos
+ * 
+ */
+void initTrigTables();
+
+/**
  * @brief Runs the quarter circle approximation for pi
  * 
  * @param out ptr to result struct
@@ -99,6 +117,15 @@ Tallies initTallies();
 int runCirclePiInner(PiResult *out, uint64_t *seeds);
 
 /**
+ * @brief Runs the specified number of outer iterations for Buffon's Needle
+ * 
+ * @param out ptr to result struct
+ * @param seeds array of thread private seeds
+ * @return int 0 on success 1 on failure
+ */
+int runBuffonsPiInner(PiResult *out, uint64_t *seeds);
+
+/**
  * @brief Single threaded outerloop of the quarter pi approximation.
  * 
  * @param sm seed for seed scrambler
@@ -106,6 +133,15 @@ int runCirclePiInner(PiResult *out, uint64_t *seeds);
  * @return int 0 on success 1 on failure
  */
 int runCirclePi(uint64_t sm, uint64_t *seeds);
+
+/**
+ * @brief Single threaded outerloop of Buffon's needle simulation.
+ * 
+ * @param sm seed for seed scrambler
+ * @param seeds thread private seed storage
+ * @return int 0 on success 1 on failure
+ */
+int runBuffonsPi(uint64_t sm, uint64_t *seeds);
 
 /**
  * @brief Summarize an array of results by calculating and printing basic statistics like
@@ -166,3 +202,8 @@ static inline double randd(uint64_t *s) {
 }
 
 #endif
+
+/* Look-up tables etc. */
+
+extern double sin_table[TRIG_LOOKUP_TABLE_SIZE];
+extern double cos_table[TRIG_LOOKUP_TABLE_SIZE];

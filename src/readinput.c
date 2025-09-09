@@ -9,7 +9,7 @@ static int parseUInt(const char *s, uint32_t *out);
 static int parseDouble(const char *s, double *out);
 
 long readInput() {
-    long np = 0u, lnum = 0u;
+    long np = 0l, lnum = 0l;
 
     /* Open file for reading */
     
@@ -22,7 +22,7 @@ long readInput() {
 
     /* Try to parse keyword arguments and related options */
 
-    fprintf(stdout, "\nReading input file \"%s\"...\n", GLOB.fname);
+    fprintf(stdout, "\nReading input file \"%s\"...\n\n", GLOB.fname);
 
     char line[4096];
 
@@ -138,6 +138,65 @@ long readInput() {
             
             GLOB.mode = mode;
             np++;
+        }
+        else if (!strcmp(tok, "set"))
+        {
+            /* Read the  following keyword */
+
+            char *subkey = strtok(NULL, DELIMS);
+            if (!subkey) 
+            {
+                fprintf(stderr, "[ERROR] Missing specifier keyword for \"set\" on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Read the first value */
+
+            char *value = strtok(NULL, DELIMS);
+            if (!value) 
+            {
+                fprintf(stderr, "[ERROR] Missing value for \"set %s\" on line %ld.\n", subkey, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Handle the specifier keywords */
+
+            if (!strcmp(subkey, "needle")) 
+            {
+                double needle_length;
+                if (!parseDouble(value, &needle_length)) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid value for \"set needle\" on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                /* Put needle length */
+
+                GLOB.needle_length = needle_length;
+                np++;
+            }
+            else if (!strcmp(subkey, "lines")) 
+            {
+                double line_spacing;
+                if (!parseDouble(value, &line_spacing)) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid value for \"set lines\" on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                /* Put line spacing */
+
+                GLOB.line_spacing = line_spacing;
+                np++;
+            }
+            else 
+            {
+                fprintf(stderr, "[WARNING] Unknown sub-keyword \"%s\" for \"set\" on line %ld. Skipping...\n", subkey, lnum);
+            }
         }
         else
         {

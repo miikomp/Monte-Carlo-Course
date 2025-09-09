@@ -25,7 +25,7 @@
 #define RUNMODE_CHECK       3
 
 #define PRG_BAR_WIDTH 50
-#define TRIG_LOOKUP_TABLE_SIZE 1000
+#define TRIG_LOOKUP_TABLE_SIZE 10000
 
 #define DELIMS " \t\r\n"
 
@@ -83,6 +83,10 @@ typedef struct {
     long n_hits;
 } PiResult;
 
+typedef struct {
+    uint64_t s[4];
+} xoshiro256ss_state;
+
 /* --- Function declaration --- */
 
 /**
@@ -114,7 +118,7 @@ void initTrigTables();
  * @param seeds array of thread private seeds
  * @return int 0 on success 1 on failure
  */
-int runCirclePiInner(PiResult *out, uint64_t *seeds);
+int runCirclePiInner(PiResult *out, xoshiro256ss_state *state);
 
 /**
  * @brief Runs the specified number of outer iterations for Buffon's Needle
@@ -123,7 +127,7 @@ int runCirclePiInner(PiResult *out, uint64_t *seeds);
  * @param seeds array of thread private seeds
  * @return int 0 on success 1 on failure
  */
-int runBuffonsPiInner(PiResult *out, uint64_t *seeds);
+int runBuffonsPiInner(PiResult *out, xoshiro256ss_state *state);
 
 /**
  * @brief Single threaded outerloop of the quarter pi approximation.
@@ -132,7 +136,7 @@ int runBuffonsPiInner(PiResult *out, uint64_t *seeds);
  * @param seeds thread private seed storage
  * @return int 0 on success 1 on failure
  */
-int runCirclePi(uint64_t sm, uint64_t *seeds);
+int runCirclePi(uint64_t sm, xoshiro256ss_state *state);
 
 /**
  * @brief Single threaded outerloop of Buffon's needle simulation.
@@ -141,7 +145,7 @@ int runCirclePi(uint64_t sm, uint64_t *seeds);
  * @param seeds thread private seed storage
  * @return int 0 on success 1 on failure
  */
-int runBuffonsPi(uint64_t sm, uint64_t *seeds);
+int runBuffonsPi(uint64_t sm, xoshiro256ss_state *state);
 
 /**
  * @brief Summarize an array of results by calculating and printing basic statistics like
@@ -161,29 +165,32 @@ int processInput();
 /* --- Inline function declarations --- */
 
 /* Random number generators for seed scrambling and random double */
-/* All based on literature (Not original work) */
 
-/**
- * @brief Fast thread-safe 64-bit RNG. xorshift* algorithm.
- * 
- * @param s ptr to state (seed)
- * @return uint64_t 
- */
-static inline uint64_t xorShift64(uint64_t *s) {
-    uint64_t x = *s ? *s : UINT64_C(0x106689D45497FDB5);
-    x ^= x >> 12;
-    x ^= x << 25;
-    x ^= x >> 27;
-    *s = x;
-    return x * UINT64_C(2685821657736338717);
+static inline uint64_t rotl(const uint64_t x, int k) {
+    return (x << k) | (x >> (64 - k));
 }
 
-/**
- * @brief 64-bit scrambler for seeding other RNGs
- * 
- * @param x ptr to seed
- * @return uint64_t 
- */
+static inline uint64_t xoshiro256ss(xoshiro256ss_state *state) {
+    const uint64_t result = rotl(state->s[1] * 5, 7) * 9;
+    const uint64_t t = state->s[1] << 17;
+
+    state->s[2] ^= state->s[0];
+    state->s[3] ^= state->s[1];
+    state->s[1] ^= state->s[2];
+    state->s[0] ^= state->s[3];
+
+    state->s[2] ^= t;
+    state->s[3] = rotl(state->s[3], 45);
+
+    return result;
+}
+
+// Uniform double in [0,1]
+static inline double randd(xoshiro256ss_state *state) {
+    return (xoshiro256ss(state) >> 11) * (1.0 / 9007199254740992.0);
+}
+
+/* splitmix64 for seeding xoshiro256** */
 static inline uint64_t splitmix64(uint64_t *state) {
     uint64_t z = (*state += UINT64_C(0x9E3779B97F4A7C15));
     z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
@@ -191,19 +198,16 @@ static inline uint64_t splitmix64(uint64_t *state) {
     return z ^ (z >> 31);
 }
 
-/**
- * @brief xorshift* based 53-bit floating point number RNG. Return between [0, 1]
- * 
- * @param s ptr to state (seed)
- * @return double 
- */
-static inline double randd(uint64_t *s) {
-    return (xorShift64(s) >> 11) * (1.0/9007199254740992.0);
+/* Simple seeding for xoshiro256** */
+static inline void xoshiro256ss_seed(xoshiro256ss_state *state, uint64_t seed) {
+    uint64_t x = seed;
+    for (int i = 0; i < 4; ++i)
+        state->s[i] = splitmix64(&x);
 }
-
-#endif
 
 /* Look-up tables etc. */
 
 extern double sin_table[TRIG_LOOKUP_TABLE_SIZE];
 extern double cos_table[TRIG_LOOKUP_TABLE_SIZE];
+
+#endif

@@ -2,55 +2,47 @@
 
 void updateProgressBar(long current, long total);
 
-int runCirclePi(uint64_t sm, uint64_t *seeds) {
-
-    /* Run the specified number of outer iterations and approximate pi */
-    /* Outer loop is single threaded and discpatched inner loops are multihreaded */
-
-    fprintf(stdout, "Approximating pi uisng the 1/4 circle method with %ld outer, and %ld inner iterations...\n\n", GLOB.n_outer, GLOB.n_inner);
+int runCirclePi(uint64_t sm, xoshiro256ss_state *states) {
+    /* Run the specified number of outer iterations for the quarter circle approximation of pi */
+    
+    fprintf(stdout, "Approximating pi using the 1/4 circle method with %ld outer, and %ld inner iterations...\n\n", GLOB.n_outer, GLOB.n_inner);
 
     /* Allocate for results array */
 
     double *results = calloc(GLOB.n_outer, sizeof(double));
     if (!results)
     {
-        fprintf(stderr, "Memory allocation error.\n");
-        free(seeds);
+        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+        free(states);
         return EXIT_FAILURE;
     }
+
+    /* Seed thread PRNG states */
+
+    for (long i = 0; i < GLOB.n_threads; i++)
+        xoshiro256ss_seed(&states[i], sm + i * 0x9E3779B97F4A7C15ULL);
     
     /* Run outer loop */
 
     for (long m = 0; m < GLOB.n_outer; m++)
     {
-
         /* Update progress bar */
 
         updateProgressBar(m+1, GLOB.n_outer);
 
-
-        /* Derive seeds for run */
-
-        for (long i = 0; i < GLOB.n_threads; i++) 
-        {
-            seeds[i] = splitmix64(&sm);
-            if (!seeds[i]) 
-                seeds[i] = 0x9E3779B97F4A7C15ULL;
-        }
-
         /* Run inner loop */
 
         PiResult res = {0,0};
-        
-        if (runCirclePiInner(&res, seeds) != 0)
+        if (runCirclePiInner(&res, states) != 0)
         {
-            fprintf(stderr, "Failed at outer iteration %ld.\n", m);
-            free(seeds); 
+            fprintf(stderr, "[ERROR] Failed at outer iteration %ld.\n", m);
+            free(states); 
             free(results);
             return EXIT_FAILURE;
         }
 
         /* Calculate the estimate for pi */
+
         if (res.n_hits == 0) 
             results[m] = 0.0;
         else 
@@ -68,7 +60,7 @@ int runCirclePi(uint64_t sm, uint64_t *seeds) {
     return 0;
 }
 
-int runBuffonsPi(uint64_t sm, uint64_t *seeds) {
+int runBuffonsPi(uint64_t sm, xoshiro256ss_state *states) {
     /* Run the specified number of outer iterations for Buffon's Needle */
 
     fprintf(stdout, "Approximating pi using Buffon's Needle with %ld outer, and %ld inner iterations...\n\n", GLOB.n_outer, GLOB.n_inner);
@@ -77,40 +69,34 @@ int runBuffonsPi(uint64_t sm, uint64_t *seeds) {
 
     double *results = calloc(GLOB.n_outer, sizeof(double));
     if (!results) {
-        fprintf(stderr, "Memory allocation error.\n");
-        free(seeds);
+        fprintf(stderr, "[ERROR Memory allocation failed.\n");
+        free(states);
         return EXIT_FAILURE;
     }
+
+    /* Seed thread PRNG states */
+
+    for (long i = 0; i < GLOB.n_threads; i++)
+        xoshiro256ss_seed(&states[i], sm + i * 0x9E3779B97F4A7C15ULL);
 
     /* Outer loop */
 
     for (long m = 0; m < GLOB.n_outer; m++) 
     {
-
         /* Update progress bar */
 
         updateProgressBar(m + 1, GLOB.n_outer);
 
-        /* Derive seeds for this run */
-
-        for (long i = 0; i < GLOB.n_threads; i++) 
-        {
-            seeds[i] = splitmix64(&sm);
-            if (!seeds[i]) 
-                seeds[i] = 0x9E3779B97F4A7C15ULL;
-        }
-
         /* Run inner loop */
 
         PiResult res = {0, 0};
-        if (runBuffonsPiInner(&res, seeds) != 0) 
+        if (runBuffonsPiInner(&res, states) != 0) 
         {
-            fprintf(stderr, "Failed at outer iteration %ld.\n", m);
-            free(seeds);
+            fprintf(stderr, "[WARNING] Failed at outer iteration %ld.\n", m);
+            free(states);
             free(results);
             return EXIT_FAILURE;
         }
-
         /* Calculate the estimate for pi */
 
         if (res.n_hits == 0) 

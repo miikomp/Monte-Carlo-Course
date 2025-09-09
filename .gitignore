@@ -15,3 +15,7 @@ build/*
 ### Ignore the executable ###
 
 moca
+
+### Ignore profiling output files ###
+
+callgrind.out.*

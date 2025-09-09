@@ -1,8 +1,6 @@
 #include "header.h"
 
 int main(int argc, char **argv) {
-    uint64_t np;
-
     /* ########################################################################################## */
 
     /* Check for valid usage of executable */
@@ -40,7 +38,7 @@ int main(int argc, char **argv) {
 
     /* Read input file */
     
-    np = readInput();
+    long np = readInput();
     GLOB.n_kwargs = np;
 
     /* Process input data */
@@ -64,10 +62,10 @@ int main(int argc, char **argv) {
 
     /* Allocate memory for thread-private seeds */
     
-    uint64_t *seeds = calloc(nt, sizeof(uint64_t));
-    if (!seeds)
+    xoshiro256ss_state *states = calloc(nt, sizeof(xoshiro256ss_state));;
+    if (!states)
     {
-        fprintf(stderr, "Memory allocation error\n");
+        fprintf(stderr, "[ERROR] Memory allocation failed\n");
         return EXIT_FAILURE;
     }
 
@@ -92,10 +90,10 @@ int main(int argc, char **argv) {
     switch (GLOB.mode) {
     case RUNMODE_CIRCLE_PI: 
     {
-        if (runCirclePi(sm, seeds) != 0)
+        if (runCirclePi(sm, states) != 0)
         {
-            fprintf(stderr, "Computation failed.\n");
-            free(seeds);
+            fprintf(stderr, "[ERROR] Computation failed.\n");
+            free(states);
             return EXIT_FAILURE;
         }
 
@@ -103,9 +101,9 @@ int main(int argc, char **argv) {
     }
     case RUNMODE_BUFFONS_PI: 
     {
-        if (runBuffonsPi(sm, seeds) != 0) {
-            fprintf(stderr, "Computation failed.\n");
-            free(seeds);
+        if (runBuffonsPi(sm, states) != 0) {
+            fprintf(stderr, "[ERROR] Computation failed.\n");
+            free(states);
             return EXIT_FAILURE;
         }
 
@@ -113,8 +111,8 @@ int main(int argc, char **argv) {
     }
     default: 
     {
-        fprintf(stderr, "Mode %ld not implemented.\n", GLOB.mode);
-        free(seeds);
+        fprintf(stderr, "[ERROR] Mode %ld not implemented.\n", GLOB.mode);
+        free(states);
         return EXIT_FAILURE;
     }
     }
@@ -133,7 +131,7 @@ int main(int argc, char **argv) {
 
     /* Prepare for termination */
 
-    free(seeds);
+    free(states);
 
     /* Exit */
 

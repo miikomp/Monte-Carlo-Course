@@ -25,15 +25,18 @@ int main(void) {
     int i = 0;
 
     /* Test pRNGs */
+    
     i += test_xoshiro256ss_uniformity();
     i += test_xoshiro256ss_independence();
     i += test_splitmix64_distribution();
 
     /* Test initializers */
+    
     i += test_initTrigTables();
     i += test_initTallies();
 
     /* Final result */
+
     if (i != 0) {
         printf("%d test(s) failed\n", i);
         return 1;
@@ -92,7 +95,7 @@ int test_splitmix64_distribution() {
     double sum = 0.0, sumsq = 0.0;
     for (int i = 0; i < N; ++i) {
         uint64_t r = splitmix64(&state);
-        double d = (double)(r >> 11) * (1.0 / 9007199254740992.0); // mimic randd
+        double d = (double)(r >> 11) * (1.0 / 9007199254740992.0);
         sum += d;
         sumsq += d * d;
     }

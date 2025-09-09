@@ -1,27 +1,23 @@
 #include "header.h"
 
-int runCirclePiInner(PiResult *out, uint64_t *seeds)
+int runCirclePiInner(PiResult *out, xoshiro256ss_state *states)
 {
     long n_tot = 0, n_hits = 0;
 
     #pragma omp parallel default(none) \
-            shared(GLOB, seeds) \
+            shared(GLOB, states) \
             reduction(+:n_tot, n_hits)
     {
         int id = omp_get_thread_num();
-        uint64_t rs = seeds[id];
+        xoshiro256ss_state *state = &states[id];
 
-        #pragma omp for schedule(static)
+        #pragma omp for schedule(dynamic, 32000)
         for (long m = 0; m < GLOB.n_inner; ++m) {
             
             /* Generate a random point */
 
-            uint64_t rand64 = xorShift64(&rs);
-
-            /* Split into two random doubles */
-            
-            double x = (double)(rand64 >> 32) * INV_INT32_MAX;
-            double y = (double)(rand64 & 0xFFFFFFFF) * INV_INT32_MAX;
+            double x = randd(state);
+            double y = randd(state);
 
             n_tot++;
 
@@ -40,7 +36,7 @@ int runCirclePiInner(PiResult *out, uint64_t *seeds)
     return 0;
 }
 
-int runBuffonsPiInner(PiResult *out, uint64_t *seeds) {
+int runBuffonsPiInner(PiResult *out, xoshiro256ss_state *states) {
     long n_tot = 0, n_hits = 0;
 
     /* Precompute constant values */
@@ -48,23 +44,19 @@ int runBuffonsPiInner(PiResult *out, uint64_t *seeds) {
     const double half_line_spacing = GLOB.line_spacing / 2.0;
 
     #pragma omp parallel default(none) \
-            shared(GLOB, seeds, sin_table, stderr, half_line_spacing) \
+            shared(GLOB, states, sin_table, stderr, half_line_spacing) \
             reduction(+:n_tot, n_hits)
     {
         int id = omp_get_thread_num();
-        uint64_t rs = seeds[id];
+        xoshiro256ss_state *state = &states[id];
 
-        #pragma omp for schedule(static)
+        #pragma omp for schedule(auto) 
         for (long m = 0; m < GLOB.n_inner; ++m)
         {
             /* Generate random center position and angle */
 
-            uint64_t rand64 = xorShift64(&rs);
-
-            /* Split into two random doubles */
-
-            double center_dist = (double)(rand64 >> 32) * INV_INT32_MAX * half_line_spacing;
-            double angle = (double)(rand64 & 0xFFFFFFFF) * INV_INT32_MAX * M_PI;;
+            double center_dist = randd(state) * half_line_spacing;
+            double angle = randd(state) * M_PI;
 
             n_tot++;
 

@@ -4,10 +4,10 @@
 seed 12165467978
 
 # Set number of outer and inner iterations
-pop 1000 1000000
+pop 1000 10000000
 
 # Set calculation mode, 1: Quarter circle pi, 2: Buffon's needle, 3: Check
-mode 2
+mode 1
 
 # Set some parameters for the Buffon's needle mode
 # Length of needle

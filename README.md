@@ -2,14 +2,14 @@
 This project implements my personal Monte Carlo particle transport simulation code as part of a course held at Aalto University.
 
 ## Requirements
-- **Compiler**: GCC with OpenMP support.
+- **Compiler**: GCC with Open-MP support.
 - **Operating System**: Linux (tested on WSL system).
 - **Libraries**: Standard C99 libraries.
 
 ---
 
 ## Features
-- **Multi-threading**: Parallelized inner loops using OpenMP.
+- **Multi-threading**: Parallelisation using Open-MP.
 - **Configurable Input**: Parameters are set via an input file.
 - **Progress Bar**: Displays progress during simulations.
 

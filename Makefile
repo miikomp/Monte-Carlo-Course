@@ -1,9 +1,9 @@
-# Makefile for project in ./src directory
+# Makefile for project in ./src directory and header files in ./include
 # Compiles everything into ./build
 # Includes depend on make options
 # --------------------------------------------------------------------------------------------------
 # make all: Compiles everything
-# make clean: Cleans up build files
+# make clean: Cleans up all build files
 # make run: Compiles everything and runs executable
 # make test: Compiles everything into test environment and runs test executable
 # --------------------------------------------------------------------------------------------------
@@ -25,7 +25,7 @@ all: $(BIN)
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-	@echo "Monte Carlo application compiled OK"
+	@echo "Monte Carlo application 'moca' compiled OK"
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@

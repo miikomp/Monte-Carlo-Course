@@ -11,6 +11,9 @@ static int parseDouble(const char *s, double *out);
 long readInput() {
     long np = 0l, lnum = 0l;
 
+    /* Avoid compiler warning */
+    parseUInt("\0", NULL);
+
     /* Open file for reading */
     
     FILE *fp = fopen(GLOB.fname, "r");
@@ -19,6 +22,8 @@ long readInput() {
         fprintf(stderr, "[ERROR] Cannot open file \"%s\".", GLOB.fname);
         exit(EXIT_FAILURE);
     }
+
+    /* ########################################################################################## */
 
     /* Try to parse keyword arguments and related options */
 
@@ -46,9 +51,13 @@ long readInput() {
 
         if (!tok)
             continue;
-        
-        /* --- Parse line --- */
+            
+    /* ########################################################################################## */
+    /* --- Handle keywords --- */
 
+        /* ###################################################################################### */
+        /* --- seed --- */
+    
         if (!strcmp(tok, "seed")) 
         {
             char *a1 = strtok(NULL, DELIMS);
@@ -72,6 +81,10 @@ long readInput() {
             GLOB.seed = seed;
             np++;
         }
+
+        /* ###################################################################################### */
+        /* --- pop --- */
+
         else if (!strcmp(tok, "pop")) 
         {
             char *a1 = strtok(NULL, DELIMS);
@@ -83,8 +96,8 @@ long readInput() {
                 exit(EXIT_FAILURE);
             }
 
-            long n_outer, n_inner;
-            if (!parseLong(a1, &n_outer) || !parseLong(a2, &n_inner)) 
+            long n_particles, n_generations;
+            if (!parseLong(a1, &n_particles) ||!parseLong(a2, &n_generations)) 
             {
                 fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                 fclose(fp);
@@ -93,7 +106,7 @@ long readInput() {
             
             /* Check for valid values */
 
-            if (n_outer <= 1 || n_inner <= 1) {
+            if (n_generations < 1 || n_particles < 1) {
                 fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
@@ -101,44 +114,14 @@ long readInput() {
             
             /* Put outer and inner iterations */
 
-            GLOB.n_outer = n_outer;
-            GLOB.n_inner = n_inner;
+            GLOB.n_generations = n_generations;
+            GLOB.n_particles = n_particles;
             np++;
         }
-        else if (!strcmp(tok, "mode")) 
-        {
-            char *a1 = strtok(NULL, DELIMS);
-            if (!a1) 
-            {
-                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
 
-            long mode;
-            if (!parseLong(a1, &mode)) 
-            {
-                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
+        /* ###################################################################################### */        
+        /* --- Set --- */
 
-            /* Check mode */
-            
-            if (!((mode == RUNMODE_CIRCLE_PI) || 
-                  (mode == RUNMODE_BUFFONS_PI) || 
-                  (mode == RUNMODE_CHECK))) 
-            {
-                fprintf(stderr, "[ERROR] Unknown mode identifier \"%ld\" for \"mode\".\n", mode);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-            
-            /* Put mode */
-            
-            GLOB.mode = mode;
-            np++;
-        }
         else if (!strcmp(tok, "set"))
         {
             /* Read the  following keyword */
@@ -161,9 +144,36 @@ long readInput() {
                 exit(EXIT_FAILURE);
             }
 
-            /* Handle the specifier keywords */
+            /* ################################################################################## */
+            /* --- Handle the specifier keywords --- */
 
-            if (!strcmp(subkey, "needle")) 
+            if (!strcmp(subkey, "mode")) 
+            {
+                long mode;
+                if (!parseLong(value, &mode)) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                /* Check mode */
+                
+                if (!((mode == RUNMODE_CIRCLE_PI) || 
+                    (mode == RUNMODE_BUFFONS_PI) || 
+                    (mode == RUNMODE_CHECK))) 
+                {
+                    fprintf(stderr, "[ERROR] Unknown mode identifier \"%ld\" for \"mode\".\n", mode);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+                
+                /* Put mode */
+                
+                GLOB.mode = mode;
+                np++;
+            }
+            else if (!strcmp(subkey, "needle")) 
             {
                 double needle_length;
                 if (!parseDouble(value, &needle_length)) 
@@ -198,6 +208,9 @@ long readInput() {
                 fprintf(stderr, "[WARNING] Unknown sub-keyword \"%s\" for \"set\" on line %ld. Skipping...\n", subkey, lnum);
             }
         }
+
+        /* ###################################################################################### */
+    
         else
         {
             /* Some unknown keyword, print warning and continue to next line */
@@ -206,6 +219,7 @@ long readInput() {
         }
     }
 
+    /* ########################################################################################## */
     /* Return number of arguments succesfully parsed */
 
     return np;

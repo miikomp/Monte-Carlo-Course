@@ -20,6 +20,7 @@
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
+#define RUNMODE_TRANSPORT   0
 #define RUNMODE_CIRCLE_PI   1
 #define RUNMODE_BUFFONS_PI  2
 #define RUNMODE_CHECK       3
@@ -30,6 +31,9 @@
 #define DELIMS " \t\r\n"
 
 #define M_PI 3.14159265358979323846
+
+#define DEFAULT_NEEDLE_LENGTH 0.85
+#define DEFAULT_LINE_SPACING  1.0
 
 /* inverse of 32-bit max integer is used when 64-bit random integers are split to two 32-bit ones */
 
@@ -42,8 +46,8 @@
  * 
  * @param fname Input filename
  * @param n_threads Number of n_threads
- * @param n_outer Number of outer iterations
- * @param n_inner Number of inner iterations
+ * @param n_generations Number of outer iterations
+ * @param n_particles Number of inner iterations
  * @param n_kwargs Number of keyword arguments succesfully parsed from the input file
  * @param seed Seed for random number generator
  * @param mode Type of calculation to run
@@ -51,14 +55,19 @@
 typedef struct {
     /* General parameters */
     const char *fname;
-    int         n_threads;
-    long        n_outer;
-    long        n_inner;    
+    const char *outfname;
+    const char *errfname;
     long        n_kwargs;
     uint64_t    seed;     
     long        mode;
     double      t0;
     double      t1;
+    int         n_threads;
+
+    /* Iteration parameters */
+    long        n_generations;
+    long        n_particles;
+    long        n_inactive;    
 
     /* Buffon's needle specific parameters */
     double      needle_length;
@@ -112,31 +121,13 @@ Tallies initTallies();
 void initTrigTables();
 
 /**
- * @brief Runs the quarter circle approximation for pi
- * 
- * @param out ptr to result struct
- * @param seeds array of thread private seeds
- * @return int 0 on success 1 on failure
- */
-int runCirclePiInner(PiResult *out, xoshiro256ss_state *state);
-
-/**
- * @brief Runs the specified number of outer iterations for Buffon's Needle
- * 
- * @param out ptr to result struct
- * @param seeds array of thread private seeds
- * @return int 0 on success 1 on failure
- */
-int runBuffonsPiInner(PiResult *out, xoshiro256ss_state *state);
-
-/**
- * @brief Single threaded outerloop of the quarter pi approximation.
+ * @brief Single threaded outerloop of the quarter circle pi approximation.
  * 
  * @param sm seed for seed scrambler
  * @param seeds thread private seed storage
  * @return int 0 on success 1 on failure
  */
-int runCirclePi(uint64_t sm, xoshiro256ss_state *state);
+int runCirclePi(uint64_t sm);
 
 /**
  * @brief Single threaded outerloop of Buffon's needle simulation.
@@ -145,15 +136,16 @@ int runCirclePi(uint64_t sm, xoshiro256ss_state *state);
  * @param seeds thread private seed storage
  * @return int 0 on success 1 on failure
  */
-int runBuffonsPi(uint64_t sm, xoshiro256ss_state *state);
+int runBuffonsPi(uint64_t sm);
 
 /**
  * @brief Summarize an array of results by calculating and printing basic statistics like
- * mean, standard deviation, 95% confidence interval and figure-of-merit (FOM).
+ * mean, standard deviation, 95% confidence interval and figure-of-merit (FOM). Used for the two
+ * pi estimation methods.
  * 
- * @param results ptr to results array with GLOB.n_outer items
+ * @param results ptr to results array with GLOB.n_generations items
  */
-void summarizeResultsArray(const double *results);
+void summarizePiResultsArray(const double *results);
 
 /**
  * @brief Process and validate input data stored in GLOB. Raise errors when applicable.
@@ -185,10 +177,11 @@ static inline uint64_t xoshiro256ss(xoshiro256ss_state *state) {
     return result;
 }
 
-// Uniform double in [0,1]
+/* Uniform double within [0,1] */
 static inline double randd(xoshiro256ss_state *state) {
     return (xoshiro256ss(state) >> 11) * (1.0 / 9007199254740992.0);
 }
+
 
 /* splitmix64 for seeding xoshiro256** */
 static inline uint64_t splitmix64(uint64_t *state) {
@@ -209,5 +202,6 @@ static inline void xoshiro256ss_seed(xoshiro256ss_state *state, uint64_t seed) {
 
 extern double sin_table[TRIG_LOOKUP_TABLE_SIZE];
 extern double cos_table[TRIG_LOOKUP_TABLE_SIZE];
+extern double tan_table[TRIG_LOOKUP_TABLE_SIZE];
 
 #endif

@@ -6,8 +6,8 @@ double ksTest(const double *data, long size);
 
 int compareDoubles(const void *a, const void *b);
 
-void summarizeResultsArray(const double *results) {
-    const long N = GLOB.n_outer;
+void summarizePiResultsArray(const double *results) {
+    const long N = GLOB.n_generations;
 
     /* Calculate mean of results */
     
@@ -21,17 +21,18 @@ void summarizeResultsArray(const double *results) {
     const double mean = sum / (double)N;
 
     /* Variance and sample standard deviation */
+
     const double ss = sumsq - (sum * sum) / (double)N;
     const double var = ss / (double)(N - 1);
     const double sd_s = sqrt(var);
 
-    /* Standard error of mean (SEM) and 95% CI for the mean*/
+    /* Standard error of mean (SEM) and 95% CI for the mean */
 
     const double sem  = sd_s / sqrt((double)N);
     const double lo   = mean - 1.96 * sem;
     const double hi   = mean + 1.96 * sem;
 
-    fprintf(stdout, "\n\nMean value = %.6lf +- %.6lf [%.6lf, %.6lf]\n\n", mean, sd_s, lo, hi);
+    fprintf(stdout, "\n\nMean value = %.6lf +/- %.6lf [%.6lf, %.6lf]\n\n", mean, sem, lo, hi);
 
     /* Figure-of-Merit from relative error */
 
@@ -63,10 +64,10 @@ void summarizeResultsArray(const double *results) {
     const double lf_crit = 0.886 / sqrt((double)N);
 
     fprintf(stdout, "Kolmogorov-Smirnov test for normality:\n");
-    fprintf(stdout, "         K-S D: %.6f\n", d_max);
-    fprintf(stdout, "  Standard K-S: %.6f: %s\n",
+    fprintf(stdout, "          K-S D: %.6f\n", d_max);
+    fprintf(stdout, "  Standard crit: %.6f: %s\n",
             ks_crit, (d_max < ks_crit ? "TRUE" : "FALSE"));
-    fprintf(stdout, "Lilliefors K-S: %.6f: %s\n\n",
+    fprintf(stdout, "Lilliefors crit: %.6f: %s\n\n",
             lf_crit, (d_max < lf_crit ? "TRUE" : "FALSE"));
 
     free(norm);
@@ -79,10 +80,15 @@ double normalCDF(double x) {
 }
 
 double ksTest(const double *data, long size) {
+    if (size <= 0) {
+        fprintf(stderr, "[ERROR] Invalid size for \"ksTest\".\n");
+        exit(EXIT_FAILURE);
+    }
     /* Sort the data */
+
     double *sorted = malloc(size * sizeof(double));
     if (!sorted) {
-        fprintf(stderr, "Memory allocation error in ksTest.\n");
+        fprintf(stderr, "[ERROR] Memory allocation error in ksTest.\n");
         exit(EXIT_FAILURE);
     }
     memcpy(sorted, data, size * sizeof(double));

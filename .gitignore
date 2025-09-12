@@ -12,6 +12,10 @@
 build/*
 !build/.keep
 
+### Ignore the scripts directory ###
+
+scripts/*
+
 ### Ignore the executable ###
 
 moca
@@ -19,3 +23,10 @@ moca
 ### Ignore profiling output files ###
 
 callgrind.out.*
+
+### Ignore all output, results and error log files ###
+
+*.log
+*.out
+*.err
+*.m

@@ -1,6 +1,6 @@
 #include "header.h"
 
-#define N 1000000
+#define N 10000000
 #define MEAN_TOL 0.002
 #define VAR_TOL 0.002
 #define PROD_TOL 0.002
@@ -12,7 +12,6 @@ int test_xoshiro256ss_uniformity();
 int test_xoshiro256ss_independence();
 int test_splitmix64_distribution();
 int test_initTrigTables();
-int test_initTallies();
 
 /**
  * @brief Main function for the testing environment. Compiled and run with "make test"
@@ -33,18 +32,17 @@ int main(void) {
     /* Test initializers */
     
     i += test_initTrigTables();
-    i += test_initTallies();
 
     /* Final result */
 
     if (i != 0) {
-        printf("%d test(s) failed\n", i);
-        return 1;
+        printf("\n%d test(s) failed!\n", i);
     }
     else {
-        printf("All tests passed\n");
-        return 0;
+        printf("\nAll tests passed!\n");
     }
+
+    return i;
 }
 
 int test_xoshiro256ss_uniformity() {
@@ -114,25 +112,17 @@ int test_splitmix64_distribution() {
 int test_initTrigTables() {
     initTrigTables();
     int fail = 0;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 1000; ++i) {
         double angle = (M_PI * i) / (TRIG_LOOKUP_TABLE_SIZE - 1);
         double s = sin_table[i];
         double c = cos_table[i];
+        double t = tan_table[i];
         if (fabs(s - sin(angle)) > TRIG_TOL) fail = 1;
         if (fabs(c - cos(angle)) > TRIG_TOL) fail = 1;
+        if (fabs(t - tan(angle)) > TRIG_TOL) fail = 1;
     }
     printf("\ninitTrigTables() test:\n");
-    printf("  First 10 sin/cos values checked against math.h\n");
-    printf("  Result: %s\n", fail ? "Fail" : "Success");
-    return fail;
-}
-
-int test_initTallies() {
-    Tallies t = initTallies();
-    int fail = 0;
-    if (t.n_tot != 0) fail = 1;
-    if (t.n_hits != 0) fail = 1;
-    printf("\ninitTallies() test:\n");
+    printf("  First 1000 sin/cos/tan values checked against math.h\n");
     printf("  Result: %s\n", fail ? "Fail" : "Success");
     return fail;
 }

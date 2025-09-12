@@ -4,7 +4,7 @@ int processInput() {
 
     /* Check for valid number of iterations */
 
-    if (GLOB.n_outer < 1 || GLOB.n_inner < 1) {
+    if (GLOB.n_generations < 1 || GLOB.n_particles < 1) {
         fprintf(stderr, "[ERROR] Number of iterations must be > 0.\n");
         return 1;
     }

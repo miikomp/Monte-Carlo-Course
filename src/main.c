@@ -38,6 +38,10 @@ int main(int argc, char **argv) {
 
     /* Read input file */
     
+    fprintf(stdout, "\n------------------------\n");
+    fprintf(stdout, "  Processing input\n");
+    fprintf(stdout, "------------------------\n");
+
     long np = readInput();
     GLOB.n_kwargs = np;
 
@@ -46,7 +50,7 @@ int main(int argc, char **argv) {
     if (processInput() != 0) 
         return EXIT_FAILURE;
 
-    fprintf(stdout, "[NOTE] %ld keyword arguments succesfully parsed.\nDONE. \n\n", np);
+    fprintf(stdout, "\nDONE.\n\n[NOTE] %ld keyword arguments succesfully parsed.\n", np);
 
     /* ########################################################################################## */
 
@@ -59,15 +63,6 @@ int main(int argc, char **argv) {
     /* Disable dynamic teaming to not mess up thread-private seeding */
 
     omp_set_dynamic(0);
-
-    /* Allocate memory for thread-private seeds */
-    
-    xoshiro256ss_state *states = calloc(nt, sizeof(xoshiro256ss_state));;
-    if (!states)
-    {
-        fprintf(stderr, "[ERROR] Memory allocation failed\n");
-        return EXIT_FAILURE;
-    }
 
     /* Initialize look-up tables */
 
@@ -87,13 +82,23 @@ int main(int argc, char **argv) {
     
     /* Dispatch case to correct sub-routine */
 
+    fprintf(stdout, "\n------------------------\n");
+    fprintf(stdout, "  Starting simulation\n");
+    fprintf(stdout, "------------------------\n\n");
+
     switch (GLOB.mode) {
+    case RUNMODE_TRANSPORT:
+    {
+        fprintf(stderr, "[ERROR] Mode %ld not implemented.\n", GLOB.mode);
+        return EXIT_FAILURE;
+
+        break;
+    }
     case RUNMODE_CIRCLE_PI: 
     {
-        if (runCirclePi(sm, states) != 0)
+        if (runCirclePi(sm) != 0)
         {
             fprintf(stderr, "[ERROR] Computation failed.\n");
-            free(states);
             return EXIT_FAILURE;
         }
 
@@ -101,9 +106,8 @@ int main(int argc, char **argv) {
     }
     case RUNMODE_BUFFONS_PI: 
     {
-        if (runBuffonsPi(sm, states) != 0) {
+        if (runBuffonsPi(sm) != 0) {
             fprintf(stderr, "[ERROR] Computation failed.\n");
-            free(states);
             return EXIT_FAILURE;
         }
 
@@ -112,7 +116,6 @@ int main(int argc, char **argv) {
     default: 
     {
         fprintf(stderr, "[ERROR] Mode %ld not implemented.\n", GLOB.mode);
-        free(states);
         return EXIT_FAILURE;
     }
     }
@@ -130,8 +133,6 @@ int main(int argc, char **argv) {
     fprintf(stdout, "------------------------\n\n");
 
     /* Prepare for termination */
-
-    free(states);
 
     /* Exit */
 

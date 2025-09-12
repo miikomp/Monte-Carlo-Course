@@ -1,5 +1,5 @@
 # Monte Carlo Particle Transport code course project
-This project implements my personal Monte Carlo particle transport simulation code as part of a course held at Aalto University.
+This project implements my personal Monte Carlo particle transport simulation code as part of a course held at Aalto University. The current implementation includes the groundwork and two methods for estimating pi. 
 
 ## Requirements
 - **Compiler**: GCC with Open-MP support.

@@ -44,13 +44,12 @@ int main(int argc, char **argv) {
 
     long np = readInput();
     GLOB.n_kwargs = np;
-
+    fprintf(stdout, "\nDONE.\n\n[NOTE] %ld keyword arguments succesfully parsed.\n\n", np);
+    
     /* Process input data */
 
     if (processInput() != 0) 
         return EXIT_FAILURE;
-
-    fprintf(stdout, "\nDONE.\n\n[NOTE] %ld keyword arguments succesfully parsed.\n", np);
 
     /* ########################################################################################## */
 

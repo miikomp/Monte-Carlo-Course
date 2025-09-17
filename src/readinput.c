@@ -8,6 +8,12 @@ static int parseUInt(const char *s, uint32_t *out);
 
 static int parseDouble(const char *s, double *out);
 
+/* small growable array for components while parsing */
+typedef struct {
+    MaterialNuclide *v;
+    size_t n, cap;
+} CompVec;
+
 long readInput() {
     long np = 0l, lnum = 0l;
 
@@ -116,6 +122,212 @@ long readInput() {
 
             GLOB.n_generations = n_generations;
             GLOB.n_particles = n_particles;
+            np++;
+        }
+
+        /* ###################################################################################### */
+        /* --- xslibpath --- */
+        
+        else if (!strcmp(tok, "xslibpath"))
+        {
+            char *path = strtok(NULL, DELIMS);
+
+            if (!path) {
+                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Check for valid length */
+
+            size_t len = strlen(path);
+            if (len >= MAX_STR_LEN) {
+                fprintf(stderr, "[ERROR] Cross section library path too long on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Put to GLOB */
+
+            snprintf(GLOB.xslibpath, MAX_STR_LEN, "%s", path);
+            np++;
+        }
+
+        /* ###################################################################################### */
+        /* --- material --- */
+        else if (!strcmp(tok, "mat"))
+        {
+            /* Try to get the material specifications from the same line */
+
+            const char *nameTok = strtok(NULL, DELIMS);
+            const char *densTok = strtok(NULL, DELIMS);
+            const char *tempTok = strtok(NULL, DELIMS);
+
+            /* Parse material block */
+
+            Material M;
+            memset(&M, 0, sizeof M);
+
+            /* Check for valid header */
+
+            snprintf(M.name, sizeof M.name, "%s", nameTok);
+            if (!parseDouble(densTok, &M.density))
+            {
+                fprintf(stderr, "[ERROR] Bad density for material \"%s\" (line %ld).\n", M.name, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            if (!parseDouble(tempTok, &M.temp)) 
+            {
+                fprintf(stderr, "[ERROR] Bad temperature for material \"%s\" (line %ld).\n", M.name, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Read ZA + fraction pairs until empty line or comment */
+
+            CompVec cv = {0};
+
+            for (;;) {
+                
+                /* If EOF reached break loop */
+
+                if (!fgets(line, sizeof line, fp)) 
+                    break;
+                lnum++;
+
+                /* Remove leading whitespace */
+
+                char *s = line; 
+                while (isspace((unsigned char)*s)) 
+                    s++;
+                
+                /* Stop at empty line or comment */
+
+                if (*s == '\0' || *s == '#') 
+                    break;
+
+                /* Parse ZA and fraction */
+
+                char *tokZA = strtok(s, DELIMS);
+                char *tokFr = strtok(NULL, DELIMS);
+                if (!tokZA || !tokFr) 
+                {
+                    fprintf(stderr, "[ERROR] Expected \"ZA fraction\" (line %ld) in material \"%s\".\n", lnum, M.name);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                long ZA;
+                if (!parseLong(tokZA, &ZA)) 
+                {
+                    fprintf(stderr, "[ERROR] Bad ZA \"%s\" on line %ld.\n", tokZA, lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                double frac;
+                if (!parseDouble(tokFr, &frac)) 
+                {
+                    fprintf(stderr, "[ERROR] Bad fraction \"%s\" on line %ld.\n", tokFr, lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                if (frac == 0.0) 
+                {
+                    fprintf(stderr, "[ERROR] Zero fraction is not allowed on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                /* Initialize a new material nuclide */
+
+                MaterialNuclide mnuc;
+                memset(&mnuc, 0, sizeof mnuc);
+                mnuc.ZA = (int)ZA;
+                mnuc.N_i = 0.0;
+
+                /* val > 0 -> atomic count, val < 0 -> mass fraction */
+
+                if (frac > 0.0) 
+                {
+                    mnuc.atom_frac = frac;
+                    mnuc.mass_frac = 0.0;
+                }
+                else 
+                {
+                    mnuc.atom_frac = 0.0;
+                    mnuc.mass_frac = -frac;
+                }
+
+                if (cv.n == cv.cap) 
+                {
+                    cv.cap = cv.cap ? cv.cap * 2 : 4;
+                    cv.v = (MaterialNuclide*)realloc(cv.v, cv.cap * sizeof *cv.v);
+                    if (!cv.v) 
+                    { 
+                        fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
+                        fclose(fp);
+                        exit(EXIT_FAILURE); 
+                    }
+                }
+                cv.v[cv.n++] = mnuc;
+            }
+
+            if (cv.n == 0) 
+            {
+                fprintf(stderr, "[ERROR] Material \"%s\" has no components (line %ld).\n", M.name, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Normalize fractions the sum that ends up above 0 is the type in which values were given */
+
+            double sum_atoms = 0.0, sum_w = 0.0;
+            for (size_t i = 0; i < cv.n; ++i) 
+            { 
+                sum_atoms += cv.v[i].atom_frac; 
+                sum_w += cv.v[i].mass_frac; 
+            }
+            if (sum_atoms > 0.0) 
+            {
+                for (size_t i = 0; i < cv.n; ++i) 
+                    cv.v[i].atom_frac /= sum_atoms;
+            } 
+            else 
+            {
+                for (size_t i = 0; i < cv.n; ++i) 
+                    cv.v[i].mass_frac /= sum_w;    
+            }
+
+            /* Move into global DATA */
+
+            M.n_nucs = cv.n;
+            M.nucs   = cv.v;
+
+            /* Append to DATA.mats by reallocating the array */
+
+            DATA.mats = (Material*)realloc(DATA.mats, (DATA.n_mats + 1) * sizeof *DATA.mats);
+            if (!DATA.mats) 
+            { 
+                fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
+                exit(EXIT_FAILURE); 
+            }
+
+            /* Put in array and increment counter */
+
+            DATA.mats[DATA.n_mats++] = M;
+
+            /* Print summary for successfully parsed material*/
+
+            fprintf(stdout, "[NOTE] Parsed material \"%s\" with %.3f g/cm^3 at %.1f K with %zu nuclide(s).\n", 
+                    M.name, 
+                    M.density, 
+                    M.temp, 
+                    M.n_nucs
+                );
             np++;
         }
 

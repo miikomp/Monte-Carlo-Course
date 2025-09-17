@@ -6,6 +6,7 @@ runInfo GLOB = {
     .fname          = NULL,
     .outfname       = NULL,
     .errfname       = NULL,
+    .xslibpath      = {0},
     .n_threads      = 1,
     .n_generations  = 0l,
     .n_particles    = 0l,
@@ -18,14 +19,10 @@ runInfo GLOB = {
     .line_spacing   = 0.0,
 };
 
-Tallies initTallies() {
-    Tallies ret = {
-        .n_tot      = 0ul,
-        .n_hits     = 0ul,
-    };
-
-    return ret;
-}
+runData DATA = { 
+    .n_mats = 0ul,
+    .mats   = NULL,
+};
 
 double sin_table[TRIG_LOOKUP_TABLE_SIZE];
 double cos_table[TRIG_LOOKUP_TABLE_SIZE];

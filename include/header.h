@@ -14,6 +14,11 @@
 #include <errno.h>
 #include <time.h>
 #include <stdalign.h>
+#include <unistd.h>
+#include <limits.h>
+
+/* Other headers */
+#include "data.h"
 
 /* --- Constants --- */
 
@@ -28,12 +33,20 @@
 #define PRG_BAR_WIDTH 50
 #define TRIG_LOOKUP_TABLE_SIZE 10000
 
+#define UNION_ENERGY_GRID_SIZE 500
+#define UNION_ENERGY_MIN 1e-11
+#define UNION_ENERGY_MAX 20.0
+
 #define DELIMS " \t\r\n"
 
 #define M_PI 3.14159265358979323846
+#define NA 6.02214076e23
 
 #define DEFAULT_NEEDLE_LENGTH 0.85
 #define DEFAULT_LINE_SPACING  1.0
+
+#define MAX_STR_LEN 1024
+#define MAX_PATH 4096
 
 /* inverse of 32-bit max integer is used when 64-bit random integers are split to two 32-bit ones */
 
@@ -57,6 +70,7 @@ typedef struct {
     const char *fname;
     const char *outfname;
     const char *errfname;
+    char        xslibpath[MAX_STR_LEN];
     long        n_kwargs;
     uint64_t    seed;     
     long        mode;
@@ -75,17 +89,6 @@ typedef struct {
 } runInfo;
 
 extern runInfo GLOB;
-
-/**
- * @brief Used for storing tallies collected during the simulation
- * 
- * @param n_tot Total number of simulated histories or points
- * @param n_hits Total number of simulated histories that satisfy a condition
- */
-typedef struct {
-    long   n_tot;
-    long   n_hits;  
-} Tallies;
 
 typedef struct {
     long n_tot;
@@ -106,13 +109,6 @@ typedef struct {
  * @return long – Number of keyword arguments succesfully parsed
  */
 long readInput();
-
-/**
- * @brief Initialize an empty Tallies struct
- * 
- * @return Tallies 
- */
-Tallies initTallies();
 
 /**
  * @brief Initialize trigonometric lookup tables for sin and cos
@@ -153,6 +149,13 @@ void summarizePiResultsArray(const double *results);
  * @return int 0 on success 1 on failure
  */
 int processInput();
+
+/**
+ * @brief Process cross section library data from given file path and resolve data for all materials
+ * 
+ * @return int 0 on success 1 on failure
+ */
+int processXsData(void);
 
 /* --- Inline function declarations --- */
 
@@ -196,6 +199,52 @@ static inline void xoshiro256ss_seed(xoshiro256ss_state *state, uint64_t seed) {
     uint64_t x = seed;
     for (int i = 0; i < 4; ++i)
         state->s[i] = splitmix64(&x);
+}
+
+/* Compare two doubles, used for quicksort */
+static inline int cmpDouble(const void *a, const void *b) {
+    double da = *(const double*)a, db = *(const double*)b;
+    return (da < db) ? -1 : (da > db);
+}
+
+/* Linear–linear interpolation on one segment [E1, E2].
+   Returns xs(E) from (E1, xs1) and (E2, xs2).
+   Assumes energies in MeV, cross sections in barns. */
+static inline double linlin(double E1, double sigma1,
+                            double E2, double sigma2,
+                            double E)
+{
+    /* Handle degenerate/unsorted input */
+    if (E2 == E1) 
+        return 0.5*(sigma1 + sigma2);
+    if (E2 <  E1) 
+    {
+        double tE=E1; E1=E2; E2=tE;
+        double ts=sigma1; sigma1=sigma2; sigma2=ts;
+    }
+    const double t = (E - E1) / (E2 - E1);
+    return sigma1 + t * (sigma2 - sigma1);
+}
+
+/* Same as above, but clamps outside the segment:
+   E <= E1 -> xs1,  E >= E2 -> xs2. */
+static inline double linlin_clamp(double E1, double sigma1,
+                                  double E2, double sigma2,
+                                  double E)
+{
+    if (E2 == E1) 
+        return 0.5*(sigma1 + sigma2);
+    if (E2 <  E1) 
+    {
+        double tE=E1; E1=E2; E2=tE;
+        double ts=sigma1; sigma1=sigma2; sigma2=ts;
+    }
+    if (E <= E1) 
+        return sigma1;
+    if (E >= E2) 
+        return sigma2;
+    const double t = (E - E1) / (E2 - E1);
+    return sigma1 + t * (sigma2 - sigma1);
 }
 
 /* Look-up tables etc. */

@@ -3,16 +3,18 @@
 # Set the seed (if not set a random seed is used)
 seed 12165467978
 
-# Set number of inner and outer iterations, or number of histories in a 
-pop 10000000 10000
+# Set number of neutrons in a generation and number of generations
+pop 1000 100
 
-# Set parameters. All are optional
-# Set calculation mode, 1: Quarter circle pi, 2: Buffon's needle, 3: Check, default 0: Transport
-set mode 2
+# Specify cross section library path
+xslibpath ./xsdata/xsdata.lib
 
-# Length of needle
-set needle 1.0
+# Define material(s)
+mat WATER 0.997 300
+1001 2
+8016 1
 
-# Distance between lines
-set lines 1.0
+mat NAT_U 19.1 600
+92235 0.0072
+92238 0.9928
 

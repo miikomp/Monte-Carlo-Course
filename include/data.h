@@ -49,16 +49,17 @@ typedef struct {
     double  AW;
     double  atom_frac;
     double  mass_frac;
-    double  N_i;
-    double  N_tot;
+    double  N_i;    // 1/cm^3
+    double  N_tot;  // 1/cm^3
     Nuclide data;
 } MaterialNuclide;
 
 // Struct for material data
 typedef struct {
     char     name[128];
-    double   density;   // g/cm3
-    double   temp;      // K
+    double   mdens;   // g/cm3
+    double   adens;   // 1/b*cm2
+    double   temp;    // K
     size_t   n_nucs;
     MaterialNuclide *nucs;
 } Material;

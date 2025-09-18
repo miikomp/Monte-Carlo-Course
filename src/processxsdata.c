@@ -197,7 +197,7 @@ int processXsData(void) {
         /* Print summary line */
 
         fprintf(stdout,
-            "[NOTE] Parsed xsdata: ZA=%ld (%s), T=%.1f K, AW=%.3f, nubar=%s, MTs=%d, MT=1 with %zu points.\n",
+            "Parsed xsdata: ZA=%ld (%s), T=%.1f K, AW=%.3f, nubar=%s, MTs=%d, MT=1 with %zu points.\n",
             ZA, N->name,
             var.temp,
             N->AW,
@@ -269,15 +269,305 @@ int processXsData(void) {
             }
         }
         fclose(m);
-        fprintf(stdout, "[NOTE] Wrote all MT tables (and nubar) to \"%s\".\n", mpath);
+        fprintf(stdout, "\nWrote all MT tables (and nubar) to \"%s\".\n", mpath);
     }
 
     /* ########################################################################################## */
-    /* Resolve all materials */    
+    /* Resolve all materials */
+    /* This means copying the required xsdata, by picking closest temperature variant */
+    /* Computes missing fractions/densities */
 
-    fprintf(stdout, "\nResolving materials...\n\n");
+    fprintf(stdout, "\nProcessing materials...\n");
 
-    /* Free everything */
+    for (size_t im = 0; im < DATA.n_mats; ++im) 
+    {
+        Material *M = &DATA.mats[im];
+        fprintf(stdout, "\n\nResolving material \"%s\" with %zu nuclide(s).\n",
+                M->name, (size_t)M->n_nucs);
+
+        /* First pass: map ZA to lib entry, copy identity (name, AW), pick temperature */
+
+        for (size_t c = 0; c < M->n_nucs; ++c) 
+        {
+            MaterialNuclide *mc = &M->nucs[c];
+            int Z = mc->ZA / 1000;
+            int A = mc->ZA % 1000;
+
+            /* find matching nuclide in library */
+
+            const NuclideData *N = NULL;
+            for (size_t i = 0; i < nlib; ++i) 
+            {
+                if (lib[i].Z == Z && lib[i].A == A) 
+                { 
+                    N = &lib[i]; 
+                    break; 
+                }
+            }
+            if (!N) 
+            {
+                fprintf(stderr, "[ERROR] Material \"%s\" references ZA=%d which is not in the XS library.\n",
+                        M->name, mc->ZA);
+                exit(EXIT_FAILURE);
+            }
+
+            snprintf(mc->name, sizeof mc->name, "%s", N->name);
+            mc->AW = N->AW;
+
+            if (N->n_var == 0) 
+            {
+                fprintf(stderr, "[ERROR] No temperature variants found for ZA=%d.\n", mc->ZA);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Choose closest temperature variant (tie choose higher T) */
+            /* No temperature adjustments are made */
+
+            size_t vbest = 0;
+            double dbest = fabs(N->var[0].temp - M->temp);
+            for (size_t v = 1; v < N->n_var; ++v) 
+            {
+                double d = fabs(N->var[v].temp - M->temp);
+                if (d < dbest || (d == dbest && N->var[v].temp > N->var[vbest].temp)) {
+                    dbest = d; vbest = v;
+                }
+            }
+            const Nuclide *src = &N->var[vbest];
+
+            /* deep-copy the chosen variant into material nuclide data */
+
+            mc->data.temp   = src->temp;
+            mc->data.n_xs     = src->n_xs;
+            mc->data.xs       = (XsTable*)malloc(src->n_xs * sizeof *mc->data.xs);
+            mc->data.has_nubar = src->has_nubar;
+            mc->data.nubar.n   = 0;
+            mc->data.nubar.E   = NULL;
+            mc->data.nubar.nu  = NULL;
+            if (!mc->data.xs) 
+            { 
+                fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
+                exit(EXIT_FAILURE); 
+            }
+
+            for (size_t k = 0; k < src->n_xs; ++k) 
+            {
+                const XsTable *ts = &src->xs[k];
+                XsTable *td = &mc->data.xs[k];
+                td->mt = ts->mt;
+                td->Q  = ts->Q;
+                td->n  = ts->n;
+                td->E  = (double*)malloc(ts->n * sizeof(double));
+                td->xs = (double*)malloc(ts->n * sizeof(double));
+                if (!td->E || !td->xs) 
+                { 
+                    fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
+                    exit(EXIT_FAILURE); 
+                }
+                memcpy(td->E,  ts->E,  ts->n * sizeof(double));
+                memcpy(td->xs, ts->xs, ts->n * sizeof(double));
+            }
+            if (src->has_nubar && src->nubar.n > 0) 
+            {
+                mc->data.has_nubar = 1;
+                mc->data.nubar.n   = src->nubar.n;
+                mc->data.nubar.E   = (double*)malloc(src->nubar.n * sizeof(double));
+                mc->data.nubar.nu  = (double*)malloc(src->nubar.n * sizeof(double));
+                if (!mc->data.nubar.E || !mc->data.nubar.nu) 
+                { 
+                    fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
+                    exit(EXIT_FAILURE); 
+                }
+                memcpy(mc->data.nubar.E,  src->nubar.E,  src->nubar.n * sizeof(double));
+                memcpy(mc->data.nubar.nu, src->nubar.nu, src->nubar.n * sizeof(double));
+            }
+
+            /* Print per-nuclide summary */
+            
+            size_t n_modes = (mc->data.n_xs > 0 ? mc->data.n_xs - 1 : 0);
+            fprintf(stdout, "  %d - %s with %zu reaction modes (%.1fK data linked).\n",
+                    mc->ZA, mc->name, n_modes, mc->data.temp);
+        }
+
+        /* Second pass: compute fractions and number densities using AW and mdens */
+
+        double sum_atoms = 0.0, sum_w = 0.0;
+        for (size_t c = 0; c < M->n_nucs; ++c) 
+        { 
+            sum_atoms += M->nucs[c].atom_frac; 
+            sum_w += M->nucs[c].mass_frac; 
+        }
+
+        const double Ntot_target = (M->adens > 0.0) ? (M->adens * 1.0e24) : 0.0;
+        
+
+        if (sum_atoms > 0.0) 
+        {
+            /* Atomic counts provided */
+
+            for (size_t c = 0; c < M->n_nucs; ++c) 
+                M->nucs[c].atom_frac /= sum_atoms;
+        
+
+            double Abar = 0.0;
+            for (size_t c = 0; c < M->n_nucs; ++c) 
+                Abar += M->nucs[c].atom_frac * M->nucs[c].AW;
+
+            if (M->mdens > 0.0 && Abar > 0.0) 
+            {
+                /* Use mass density to set absolute scale */
+
+                const double Ntot = (M->mdens * NA) / Abar;  /* atoms/cm^3 */
+
+                for (size_t c = 0; c < M->n_nucs; ++c) 
+                {
+                    M->nucs[c].N_i = M->nucs[c].atom_frac * Ntot;
+                    M->nucs[c].mass_frac = (M->nucs[c].atom_frac * M->nucs[c].AW) / Abar;
+                }
+            } 
+            else if (M->adens > 0.0) 
+            {
+                /* Use atomic density atoms/b·cm */
+
+                const double Ntot = Ntot_target;
+                for (size_t c = 0; c < M->n_nucs; ++c) 
+                    M->nucs[c].N_i = M->nucs[c].atom_frac * Ntot;
+        
+                /* Derive mass fractions from x_i and Abar */
+
+                for (size_t c = 0; c < M->n_nucs; ++c)
+                    M->nucs[c].mass_frac = (M->nucs[c].atom_frac * M->nucs[c].AW) / Abar;
+            } 
+            else
+            {
+                /* No absolute density use relative scale */
+
+                for (size_t c = 0; c < M->n_nucs; ++c) M->nucs[c].N_i = M->nucs[c].atom_frac;
+
+                /* mass_frac from relative N_i */
+
+                double Wsum = 0.0;
+                for (size_t c = 0; c < M->n_nucs; ++c) 
+                    Wsum += M->nucs[c].N_i * M->nucs[c].AW;
+                for (size_t c = 0; c < M->n_nucs; ++c)
+                    M->nucs[c].mass_frac = (Wsum > 0.0) ? (M->nucs[c].N_i * M->nucs[c].AW / Wsum) : 0.0;
+            }
+        } 
+        else 
+        {
+            /* Mass fractions provided: w_i already normalized */
+
+            if (M->mdens > 0.0) 
+            {
+                /* Convert w_i + rho to absolute N_i */
+
+                for (size_t c = 0; c < M->n_nucs; ++c)
+                    M->nucs[c].N_i = (M->mdens * M->nucs[c].mass_frac / M->nucs[c].AW) * NA;
+
+                /* Derive atomic fractions */
+
+                double Nsum = 0.0;
+                for (size_t c = 0; c < M->n_nucs; ++c) 
+                    Nsum += M->nucs[c].N_i;
+                for (size_t c = 0; c < M->n_nucs; ++c) 
+                    M->nucs[c].atom_frac = (Nsum > 0.0) ? (M->nucs[c].N_i / Nsum) : 0.0;
+
+            } 
+            else if (M->adens > 0.0) 
+            {
+                /* Use mdens to set total atoms */
+            
+                double denom = 0.0;
+                for (size_t c = 0; c < M->n_nucs; ++c) 
+                    denom += (M->nucs[c].AW > 0.0) ? (M->nucs[c].mass_frac / M->nucs[c].AW) : 0.0;
+                if (denom <= 0.0) 
+                {
+                    for (size_t c = 0; c < M->n_nucs; ++c) 
+                        M->nucs[c].N_i = (M->nucs[c].mass_frac / fmax(M->nucs[c].AW, 1e-300));
+                } 
+                else 
+                {
+                    for (size_t c = 0; c < M->n_nucs; ++c) 
+                    {
+                        double xi = (M->nucs[c].mass_frac / M->nucs[c].AW) / denom;
+                        M->nucs[c].atom_frac = xi;
+                        M->nucs[c].N_i = xi * Ntot_target;
+                    }
+                }
+            } 
+            else 
+            {
+                for (size_t c = 0; c < M->n_nucs; ++c)
+                    M->nucs[c].N_i = (M->nucs[c].mass_frac / fmax(M->nucs[c].AW, 1e-300));
+
+                /* Derive atomic fractions */
+
+                double Nsum = 0.0; 
+                for (size_t c = 0; c < M->n_nucs; ++c) 
+                    Nsum += M->nucs[c].N_i;
+
+                for (size_t c = 0; c < M->n_nucs; ++c) 
+                    M->nucs[c].atom_frac = (Nsum > 0.0) ? (M->nucs[c].N_i / Nsum) : 0.0;
+            }
+        }
+
+        /* Print summary of material */
+
+        double xsum = 0.0, wsum = 0.0, Nsum = 0.0, mass_sum = 0.0, Abar_sum = 0.0;
+
+        for (size_t c = 0; c < M->n_nucs; ++c) 
+        {
+            xsum     += M->nucs[c].atom_frac;
+            wsum     += M->nucs[c].mass_frac;
+            Nsum     += M->nucs[c].N_i;
+            mass_sum += M->nucs[c].N_i * M->nucs[c].AW;
+            Abar_sum += M->nucs[c].atom_frac * M->nucs[c].AW;
+        }
+
+        /* Compute derived densities for verification */
+
+        const double rho_calc   = mass_sum / NA;        /* g/cm^3 */
+        const double ndens_calc = Nsum * 1.0e-24;       /* atoms/barn·cm */
+
+        fprintf(stdout,
+            "\nSummary for material \"%s\":\n"
+            "  dens=%.6E %s, T=%.1fK\n"
+            "  components=%zu, sum(x)=%.6f, sum(w)=%.6f\n"
+            "  Abar=%.6f g/mol/atom, N_tot=%.6e 1/cm^3\n"
+            "  mdens_calc=%.6E g/cm^3, adens_calc=%.6E atoms/b*cm\n\n"
+            "  Nuclides:\n",
+            
+            M->name,
+            (M->adens > 0.0) ? M->adens : M->mdens,
+            (M->adens > 0.0) ? "atoms/b*cm" : "g/cm3",
+            M->temp,
+            M->n_nucs, 
+            xsum, 
+            wsum,
+            Abar_sum, 
+            Nsum, 
+            rho_calc, 
+            ndens_calc
+        );
+
+        for (size_t c = 0; c < M->n_nucs; ++c) 
+        {
+            const MaterialNuclide *mc = &M->nucs[c];
+            size_t n_modes = (mc->data.n_xs > 0 ? mc->data.n_xs - 1 : 0);
+            fprintf(stdout,
+                "  %5d - %5s : AW=%10.6f  afrac=%.6f  mfrac=%.6f  N_i=%.6e atoms/b*cm  (MTs=%2zu, T=%.1fK)\n",
+                mc->ZA, 
+                mc->name, 
+                mc->AW, 
+                mc->atom_frac, 
+                mc->mass_frac, 
+                mc->N_i * 1e-24, 
+                n_modes, 
+                mc->data.temp);
+        }
+    }
+
+    /* ########################################################################################## */
+    /* Free the parsed temporary library */
 
     for (size_t i = 0; i < nlib; ++i) {
         for (size_t v = 0; v < lib[i].n_var; ++v) 
@@ -302,6 +592,7 @@ int processXsData(void) {
     return EXIT_SUCCESS;
 }
 
+/* ############################################################################################## */
 /**
  * @brief Parse one xs data file into a Nuclide variant. Computes MT=1 on a union grid.
  * Returns number of reaction modes parsed and whether nubar was present.

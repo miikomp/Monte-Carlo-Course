@@ -171,12 +171,26 @@ long readInput() {
             /* Check for valid header */
 
             snprintf(M.name, sizeof M.name, "%s", nameTok);
-            if (!parseDouble(densTok, &M.density))
+            double density;
+            if (!parseDouble(densTok, &density) || density == 0.0)
             {
                 fprintf(stderr, "[ERROR] Bad density for material \"%s\" (line %ld).\n", M.name, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
+
+            if (density < 0.0)
+            {
+                M.mdens = -density;
+                M.adens = 0.0;
+            }
+            else
+            {
+                M.mdens = 0.0;
+                M.adens = density;
+            }
+
+             /* Parse temperature */
 
             if (!parseDouble(tempTok, &M.temp)) 
             {
@@ -322,9 +336,10 @@ long readInput() {
 
             /* Print summary for successfully parsed material*/
 
-            fprintf(stdout, "[NOTE] Parsed material \"%s\" with %.3f g/cm^3 at %.1f K with %zu nuclide(s).\n", 
+            fprintf(stdout, "Parsed material \"%s\" at %.6E %s at %.1fK with %zu nuclide(s).\n", 
                     M.name, 
-                    M.density, 
+                    (M.adens > 0.0) ? M.adens : M.mdens,
+                    (M.adens > 0.0) ? "atoms/b*cm" : "g/cm3",
                     M.temp, 
                     M.n_nucs
                 );

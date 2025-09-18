@@ -1,20 +1,35 @@
 # Example input file for the "moca" Monte Carlo code
 
-# Set the seed (if not set a random seed is used)
+# Set the seed (if not set, a random seed is used)
 seed 12165467978
 
 # Set number of neutrons in a generation and number of generations
 pop 1000 100
 
-# Specify cross section library path
-xslibpath ./xsdata/xsdata.lib
-
 # Define material(s)
-mat WATER 0.997 300
+# Positive density/fraction means mass density in g/cm^3 or mass fraction
+# Negative density/fraction means atomic density in atoms/barn-cm or atomic fraction
+# Fractions are normalized to unity in all cases.
+# Temperature is in Kelvin
+# Nuclide identifiers are ZA (e.g. U-235 is 92235, H-1 is 1001, etc.)
+# The code computes the missing units (e.g. if mass fractions are given, atomic fractions
+# and atomic density are computed from the mass density, etc.) These are printed for verification.
+mat WATER -0.997 300
 1001 2
 8016 1
 
-mat NAT_U 19.1 600
-92235 0.0072
-92238 0.9928
+mat IRON -7.87 300
+26056 0.6
+
+mat NAT_U -19.1 600
+92235 -0.0072
+92238 -0.9928
+
+mat UO2 -10.1 880
+92235 -0.02644492
+92238 -0.85505247
+8016  -0.11850261
+
+# Specify cross section library path
+xslibpath ./xsdata/xsdata.lib
 

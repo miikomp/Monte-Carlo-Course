@@ -14,7 +14,7 @@ pop 1000 100
 # Nuclide identifiers are ZA (e.g. U-235 is 92235, H-1 is 1001, etc.)
 # The code computes the missing units (e.g. if mass fractions are given, atomic fractions
 # and atomic density are computed from the mass density, etc.) These are printed for verification.
-mat WATER -0.997 300
+mat WATER 0.1 300
 1001 2
 8016 1
 

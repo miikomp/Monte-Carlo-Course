@@ -8,6 +8,8 @@ int parseXsDataFile(const char *abspath, double Tlist, Nuclide *out,
 
 int processXsData(void) {
 
+    /* Save current working directory */
+
     char oldcwd[MAX_PATH];
     if (!getcwd(oldcwd, sizeof oldcwd)) 
     {
@@ -49,7 +51,7 @@ int processXsData(void) {
         changed_dir = 1;
     }
 
-    /* Open the xslist file */
+    /* Open the xslist file and change working directory */
 
     FILE *list = fopen(list_base, "r");
     if (!list) 
@@ -73,7 +75,8 @@ int processXsData(void) {
     char line[4096];
     long lnum = 0;
 
-    /* Skip first line */
+    /* Skip first line in xslist */
+
     if (!fgets(line, sizeof line, list)) 
     {
         fprintf(stderr, "[ERROR] Empty cross section library file \"%s\".\n", GLOB.xslibpath);
@@ -128,6 +131,7 @@ int processXsData(void) {
         const char *path = tokPth;
 
         /* Find or create the species record by ZA names assumed same, first is kept */
+        /* This way different temperatures of the same nuclide are grouped */
 
         int Z = (int)ZA / 1000;
         int A = (int)ZA % 1000;
@@ -197,16 +201,25 @@ int processXsData(void) {
         /* Print summary line */
 
         fprintf(stdout,
-            "Parsed xsdata: ZA=%ld (%s), T=%.1f K, AW=%.3f, nubar=%s, MTs=%d, MT=1 with %zu points.\n",
+            "Parsed xsdata: ZA = %ld (%s), T = %.1fK, AW = %.3f, nubar = %s, MTs = %d, MT = 1 calculated on union grid.\n",
             ZA, N->name,
             var.temp,
             N->AW,
             has_nubar ? "yes" : "no",
-            nmods,
-            var.xs[0].n);
+            nmods
+        );
+
+        for (size_t k = 0; k < var.n_xs; ++k) 
+        {
+            XsTable *tab = &var.xs[k];
+            fprintf(stdout, "  MT = %3d, Q = %13.4E, points = %zu\n", tab->mt, tab->Q, tab->n);
+        }
+        if (var.has_nubar)
+            fprintf(stdout, "  Nubar grid, points = %zu\n", var.nubar.n);
+        fprintf(stdout, "\n");
     }
 
-    /* Close and restore wrkdir*/
+    /* Close and restore wrkdir */
 
     fclose(list);
     if (changed_dir) 
@@ -282,7 +295,7 @@ int processXsData(void) {
     for (size_t im = 0; im < DATA.n_mats; ++im) 
     {
         Material *M = &DATA.mats[im];
-        fprintf(stdout, "\n\nResolving material \"%s\" with %zu nuclide(s).\n",
+        fprintf(stdout, "\n\nResolving material \"%s\" with %zu nuclide(s):\n",
                 M->name, (size_t)M->n_nucs);
 
         /* First pass: map ZA to lib entry, copy identity (name, AW), pick temperature */
@@ -334,7 +347,7 @@ int processXsData(void) {
             }
             const Nuclide *src = &N->var[vbest];
 
-            /* deep-copy the chosen variant into material nuclide data */
+            /* Copy the chosen variant into material nuclide data */
 
             mc->data.temp   = src->temp;
             mc->data.n_xs     = src->n_xs;
@@ -526,10 +539,10 @@ int processXsData(void) {
         /* Compute derived densities for verification */
 
         const double rho_calc   = mass_sum / NA;        /* g/cm^3 */
-        const double ndens_calc = Nsum * 1.0e-24;       /* atoms/barn·cm */
+        const double ndens_calc = Nsum * 1.0e-24;       /* atoms/b*cm */
 
         fprintf(stdout,
-            "\nSummary for material \"%s\":\n"
+            "\n  Summary for material \"%s\":\n"
             "  dens=%.6E %s, T=%.1fK\n"
             "  components=%zu, sum(x)=%.6f, sum(w)=%.6f\n"
             "  Abar=%.6f g/mol/atom, N_tot=%.6e 1/cm^3\n"
@@ -566,6 +579,45 @@ int processXsData(void) {
         }
     }
 
+    /* Calculate memory usage for DATA */
+
+    size_t mem_bytes = sizeof(DATA);
+
+    /* Loop over everything to count size */
+
+    for (size_t im = 0; im < DATA.n_mats; ++im) 
+    {
+        Material *M = &DATA.mats[im];
+        mem_bytes += sizeof(*M);
+        mem_bytes += M->n_nucs * sizeof(MaterialNuclide);
+        for (size_t c = 0; c < M->n_nucs; ++c) 
+        {
+            MaterialNuclide *mc = &M->nucs[c];
+            mem_bytes += sizeof(*mc);
+
+            /* Add memory for cross section tables */
+
+            mem_bytes += mc->data.n_xs * sizeof(XsTable);
+            for (size_t k = 0; k < mc->data.n_xs; ++k) 
+            {
+                XsTable *tab = &mc->data.xs[k];
+                mem_bytes += tab->n * sizeof(double);
+                mem_bytes += tab->n * sizeof(double);
+            }
+            /* Add memory for nubar if present */
+
+            if (mc->data.has_nubar && mc->data.nubar.n > 0) 
+            {
+                mem_bytes += mc->data.nubar.n * sizeof(double);
+                mem_bytes += mc->data.nubar.n * sizeof(double);
+            }
+        }
+    }
+
+    /* Print memory footprint */
+
+    fprintf(stdout, "\nMemory allocated for XS data: %.2f MB\n", mem_bytes / (1024.0 * 1024.0));
+
     /* ########################################################################################## */
     /* Free the parsed temporary library */
 
@@ -593,6 +645,8 @@ int processXsData(void) {
 }
 
 /* ############################################################################################## */
+/* Functions */
+
 /**
  * @brief Parse one xs data file into a Nuclide variant. Computes MT=1 on a union grid.
  * Returns number of reaction modes parsed and whether nubar was present.
@@ -629,9 +683,11 @@ int parseXsDataFile(const char *abspath, double Tlist,
         fclose(f);
         return -1;
     }
+
     *headerZ = Z; *headerA = A; *headerAW = AW;
 
     /* NNU line */
+
     int NNU = 0;
     if (fscanf(f, "%d", &NNU) != 1) 
     {
@@ -666,7 +722,7 @@ int parseXsDataFile(const char *abspath, double Tlist,
 
     int parsed_modes = 0;
 
-    for (;;) 
+    while(1) 
     {
         int mt = 0, ne = 0;
         double Q = 0.0;

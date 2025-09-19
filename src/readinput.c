@@ -157,7 +157,7 @@ long readInput() {
         /* --- material --- */
         else if (!strcmp(tok, "mat"))
         {
-            /* Try to get the material specifications from the same line */
+            /* Try to get the material parameters from the same line */
 
             const char *nameTok = strtok(NULL, DELIMS);
             const char *densTok = strtok(NULL, DELIMS);
@@ -168,16 +168,18 @@ long readInput() {
             Material M;
             memset(&M, 0, sizeof M);
 
-            /* Check for valid header */
+            /* Check for valid parameters and put into Material */
 
             snprintf(M.name, sizeof M.name, "%s", nameTok);
             double density;
             if (!parseDouble(densTok, &density) || density == 0.0)
             {
-                fprintf(stderr, "[ERROR] Bad density for material \"%s\" (line %ld).\n", M.name, lnum);
+                fprintf(stderr, "[ERROR] Bad density \"%s\" for material \"%s\" (line %ld).\n", densTok, M.name, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
+
+            /* Negative value is mass density g/cm^3 and positive is atomic density atoms/b*cm*/
 
             if (density < 0.0)
             {
@@ -190,7 +192,7 @@ long readInput() {
                 M.adens = density;
             }
 
-             /* Parse temperature */
+             /* Temperature in Kelvin */
 
             if (!parseDouble(tempTok, &M.temp)) 
             {
@@ -199,16 +201,19 @@ long readInput() {
                 exit(EXIT_FAILURE);
             }
 
-            /* Read ZA + fraction pairs until empty line or comment */
+            /* Read ZA + fraction pairs until empty line or comment put into temp struct */
 
             CompVec cv = {0};
 
-            for (;;) {
+            while (1) {
                 
                 /* If EOF reached break loop */
 
                 if (!fgets(line, sizeof line, fp)) 
                     break;
+                
+                /* Increment line number */
+
                 lnum++;
 
                 /* Remove leading whitespace */
@@ -226,6 +231,7 @@ long readInput() {
 
                 char *tokZA = strtok(s, DELIMS);
                 char *tokFr = strtok(NULL, DELIMS);
+
                 if (!tokZA || !tokFr) 
                 {
                     fprintf(stderr, "[ERROR] Expected \"ZA fraction\" (line %ld) in material \"%s\".\n", lnum, M.name);
@@ -263,7 +269,7 @@ long readInput() {
                 mnuc.ZA = (int)ZA;
                 mnuc.N_i = 0.0;
 
-                /* val > 0 -> atomic count, val < 0 -> mass fraction */
+                /* Negative value is mass fractions and positive is atomic fractions */
 
                 if (frac > 0.0) 
                 {
@@ -276,9 +282,11 @@ long readInput() {
                     mnuc.mass_frac = -frac;
                 }
 
+                /* Expand vector */
                 if (cv.n == cv.cap) 
                 {
                     cv.cap = cv.cap ? cv.cap * 2 : 4;
+
                     cv.v = (MaterialNuclide*)realloc(cv.v, cv.cap * sizeof *cv.v);
                     if (!cv.v) 
                     { 
@@ -287,8 +295,13 @@ long readInput() {
                         exit(EXIT_FAILURE); 
                     }
                 }
+
+                /* Append to vector and increment counter */
+
                 cv.v[cv.n++] = mnuc;
             }
+
+            /* If no pairs parsed exit */
 
             if (cv.n == 0) 
             {
@@ -297,26 +310,47 @@ long readInput() {
                 exit(EXIT_FAILURE);
             }
 
-            /* Normalize fractions the sum that ends up above 0 is the type in which values were given */
+            /* Normalize fractions */
+            /*the sum that ends up above 0 is the type in which values were given */
 
             double sum_atoms = 0.0, sum_w = 0.0;
+
             for (size_t i = 0; i < cv.n; ++i) 
             { 
                 sum_atoms += cv.v[i].atom_frac; 
                 sum_w += cv.v[i].mass_frac; 
             }
+
+            /* Check for mismatch in fraction types */
+            if (sum_atoms > 0.0 && sum_w > 0.0) 
+            {
+                fprintf(stderr, "[ERROR] Mixed fraction types in material \"%s\" (line %ld).\n", M.name, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Normalize */
+
             if (sum_atoms > 0.0) 
             {
                 for (size_t i = 0; i < cv.n; ++i) 
                     cv.v[i].atom_frac /= sum_atoms;
             } 
-            else 
+            else if (sum_w > 0.0)
             {
                 for (size_t i = 0; i < cv.n; ++i) 
                     cv.v[i].mass_frac /= sum_w;    
             }
+            else
+            {
+                /* WTF? should not be here */
 
-            /* Move into global DATA */
+                fprintf(stderr, "[ERROR] Zero fractions in material \"%s\" (line %ld).\n", M.name, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Append temp vector into Material */
 
             M.n_nucs = cv.n;
             M.nucs   = cv.v;

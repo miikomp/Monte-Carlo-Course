@@ -14,11 +14,11 @@ int processInput() {
     if (!GLOB.seed) 
     {
         GLOB.seed = (uint64_t)time(NULL);
-        fprintf(stdout, "[NOTE] Using random seed %lu.\n", GLOB.seed);
+        fprintf(stdout, "Using random seed %lu.\n", GLOB.seed);
     }
     else 
     {
-        fprintf(stdout, "[NOTE] Using provided seed %lu.\n", GLOB.seed);
+        fprintf(stdout, "Using provided seed %lu.\n", GLOB.seed);
     }
 
     /* Check that requirements for running a transport simulation are set */

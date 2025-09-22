@@ -11,7 +11,8 @@ static int parseDouble(const char *s, double *out);
 /* small growable array for components while parsing */
 typedef struct {
     MaterialNuclide *v;
-    size_t n, cap;
+    size_t n;
+    size_t cap;
 } CompVec;
 
 long readInput() {
@@ -33,7 +34,7 @@ long readInput() {
 
     /* Try to parse keyword arguments and related options */
 
-    fprintf(stdout, "\nReading input file \"%s\"...\n\n", GLOB.fname);
+    fprintf(stdout, "\nReading input file \"%s\"...\n", GLOB.fname);
 
     char line[4096];
 
@@ -170,7 +171,8 @@ long readInput() {
 
             /* Check for valid parameters and put into Material */
 
-            snprintf(M.name, sizeof M.name, "%s", nameTok);
+            snprintf(M.name, sizeof(M.name), "%s", nameTok);
+
             double density;
             if (!parseDouble(densTok, &density) || density == 0.0)
             {
@@ -194,12 +196,16 @@ long readInput() {
 
              /* Temperature in Kelvin */
 
-            if (!parseDouble(tempTok, &M.temp)) 
+            if (!parseDouble(tempTok, &M.temp) || M.temp <= 0.0) 
             {
                 fprintf(stderr, "[ERROR] Bad temperature for material \"%s\" (line %ld).\n", M.name, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
+
+            /* Temperature in MeV */
+
+            M.temp_MeV = M.temp * BOLTZMANN;
 
             /* Read ZA + fraction pairs until empty line or comment put into temp struct */
 
@@ -266,8 +272,11 @@ long readInput() {
 
                 MaterialNuclide mnuc;
                 memset(&mnuc, 0, sizeof mnuc);
-                mnuc.ZA = (int)ZA;
-                mnuc.N_i = 0.0;
+                mnuc.N_i   = 0.0;
+                mnuc.N_tot = 0.0;
+                mnuc.nuc_data.ZA = (int)ZA;
+                mnuc.nuc_data.Z  = (int)ZA / 1000;
+                mnuc.nuc_data.A  = (int)ZA % 1000;
 
                 /* Negative value is mass fractions and positive is atomic fractions */
 
@@ -283,6 +292,7 @@ long readInput() {
                 }
 
                 /* Expand vector */
+
                 if (cv.n == cv.cap) 
                 {
                     cv.cap = cv.cap ? cv.cap * 2 : 4;
@@ -322,6 +332,7 @@ long readInput() {
             }
 
             /* Check for mismatch in fraction types */
+
             if (sum_atoms > 0.0 && sum_w > 0.0) 
             {
                 fprintf(stderr, "[ERROR] Mixed fraction types in material \"%s\" (line %ld).\n", M.name, lnum);
@@ -368,20 +379,160 @@ long readInput() {
 
             DATA.mats[DATA.n_mats++] = M;
 
-            /* Print summary for successfully parsed material*/
+            if (VERBOSITY >= 2) 
+            {
+                /* Print summary for successfully parsed material*/
 
-            fprintf(stdout, "Parsed material \"%s\" at %.6E %s at %.1fK with %zu nuclide(s).\n", 
-                    M.name, 
-                    (M.adens > 0.0) ? M.adens : M.mdens,
-                    (M.adens > 0.0) ? "atoms/b*cm" : "g/cm3",
-                    M.temp, 
-                    M.n_nucs
-                );
+                fprintf(stdout, "Parsed material \"%s\" at %.6E %s at %.1fK with %zu nuclide(s).\n", 
+                        M.name, 
+                        (M.adens > 0.0) ? M.adens : M.mdens,
+                        (M.adens > 0.0) ? "atoms/b*cm" : "g/cm3",
+                        M.temp, 
+                        M.n_nucs
+                    );
+            }
+            np++;
+        }
+
+        /* ###################################################################################### */
+        /* --- src --- */
+        else if (!strcmp(tok, "src"))
+        {
+            /* Read input parameters */
+
+            char *a1 = strtok(NULL, DELIMS);
+            char *a2 = strtok(NULL, DELIMS);
+            char *a3 = strtok(NULL, DELIMS);
+            char *a4 = strtok(NULL, DELIMS);
+            char *a5 = strtok(NULL, DELIMS);
+            if (!a1 || !a2 || !a3 || !a4 || !a5) 
+            {
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            uint32_t src_type;
+            double x, y, z, E;
+            if (!parseUInt(a1, &src_type) ||!parseDouble(a2, &x) ||!parseDouble(a3, &y) ||!parseDouble(a4, &z) ||!parseDouble(a5, &E)) 
+            {
+                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            
+            /* Check for valid values. For now only type 1, monoenergetic point source is supported */
+
+            if (src_type < 1 || E <= 0.0) 
+            {
+                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            if (DATA.src == NULL) 
+            {
+                DATA.src = (SourceDefinition*)malloc(sizeof(SourceDefinition));
+                if (!DATA.src) 
+                { 
+                    fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
+                    fclose(fp);
+                    exit(EXIT_FAILURE); 
+                }
+            }
+
+            /* Put source data */
+            DATA.src_type = (int)src_type;
+
+            /* Monoenergetic point source */
+            if (src_type == 1) 
+            {
+                DATA.src->mono.E = E;
+                DATA.src->mono.x = x;
+                DATA.src->mono.y = y;
+                DATA.src->mono.z = z;
+            } 
+            else 
+            {
+                fprintf(stderr, "[ERROR] Source type %d not implemented (line %ld).\n", src_type, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            if (VERBOSITY >= 2)
+                fprintf(stdout, "Parsed type %d source at (%.2f, %.2f, %.2f) with E=%.2f MeV.\n", src_type, x, y, z, E);
+
             np++;
         }
 
         /* ###################################################################################### */        
-        /* --- Set --- */
+        /* --- det --- */
+        else if (!strcmp(tok, "det"))
+        {
+            /* Read input parameters */
+
+            char *a1 = strtok(NULL, DELIMS);
+            char *a2 = strtok(NULL, DELIMS);
+            if (!a1 || !a2) 
+            {
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            const char *name = a2;
+            uint32_t det_type;
+            if (!parseUInt(a1, &det_type)) 
+            {
+                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+        
+            /* Check for valid values */
+
+            if (det_type < 1) 
+            {
+                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            if (DATA.detector == NULL) 
+            {
+                DATA.detector = (DetectorDefinition*)malloc(sizeof(DetectorDefinition));
+                if (!DATA.detector) 
+                { 
+                    fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
+                    fclose(fp);
+                    exit(EXIT_FAILURE); 
+                }
+            }
+
+            /* Put detector data */
+
+            DATA.detector_type = det_type;
+
+            /* Reaction rate detector */
+
+            if (det_type == 1) 
+            {
+                ReactionRateDetector *det = &DATA.detector->rr;
+                memset(det, 0, sizeof(ReactionRateDetector));
+
+                snprintf(det->name, sizeof(det->name), "%s", name);
+
+            }
+            else 
+            {
+                fprintf(stderr, "[ERROR] Detector type %d not implemented (line %ld).\n", det_type, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            if (VERBOSITY >= 2)
+                fprintf(stdout, "Parsed a type %d detector named \"%s\".\n", det_type, a2);
+        }
+
+        /* ###################################################################################### */        
+        /* --- set --- */
 
         else if (!strcmp(tok, "set"))
         {
@@ -432,6 +583,21 @@ long readInput() {
                 /* Put mode */
                 
                 GLOB.mode = mode;
+                np++;
+            }
+            else if (!strcmp(subkey, "ecut"))
+            {
+                double ecut;
+                if (!parseDouble(value, &ecut) || ecut < 0.0) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid value for \"set ecut\" on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                /* Put energy cutoff */
+
+                GLOB.energy_cutoff = ecut;
                 np++;
             }
             else if (!strcmp(subkey, "needle")) 

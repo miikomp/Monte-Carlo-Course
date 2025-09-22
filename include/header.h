@@ -16,9 +16,14 @@
 #include <stdalign.h>
 #include <unistd.h>
 #include <limits.h>
+#include <stdbool.h>
 
 /* Other headers */
+#include "rng.h"
 #include "data.h"
+
+/* Verbosity level: 0 = standard output, 1 = increased output, 2 = all the output */
+extern int VERBOSITY;
 
 /* --- Constants --- */
 
@@ -41,63 +46,26 @@
 
 #define M_PI 3.14159265358979323846
 #define NA 6.02214076e23
+#define BOLTZMANN 8.617333262145e-11   /* MeV/K */
+
+#define BARN_TO_CM2 1.0e-24
+#define NT_FISSION 1.2895              /* MeV Nuclear temperature of U235 fission */
 
 #define DEFAULT_NEEDLE_LENGTH 0.85
 #define DEFAULT_LINE_SPACING  1.0
+#define MIN_BANK_SIZE 1000
 
-#define MAX_STR_LEN 1024
-#define MAX_PATH 4096
+enum SRC_TYPES{
+    SRC_MONO_POINT = 1
+};
 
-/* inverse of 32-bit max integer is used when 64-bit random integers are split to two 32-bit ones */
+enum DET_TYPES{
+    DET_REACTION_RATE = 1
+};
+
+/* inverse of 32-bit max integer */
 
 #define INV_INT32_MAX (1.0/(double)UINT32_MAX)
-
-/* --- Data structures --- */
-
-/**
- * @brief Global struct for general information and pointers to other data
- * 
- * @param fname Input filename
- * @param n_threads Number of n_threads
- * @param n_generations Number of outer iterations
- * @param n_particles Number of inner iterations
- * @param n_kwargs Number of keyword arguments succesfully parsed from the input file
- * @param seed Seed for random number generator
- * @param mode Type of calculation to run
- */
-typedef struct {
-    /* General parameters */
-    const char *fname;
-    const char *outfname;
-    const char *errfname;
-    char        xslibpath[MAX_STR_LEN];
-    long        n_kwargs;
-    uint64_t    seed;     
-    long        mode;
-    double      t0;
-    double      t1;
-    int         n_threads;
-
-    /* Iteration parameters */
-    long        n_generations;
-    long        n_particles;
-    long        n_inactive;    
-
-    /* Buffon's needle specific parameters */
-    double      needle_length;
-    double      line_spacing;
-} runInfo;
-
-extern runInfo GLOB;
-
-typedef struct {
-    long n_tot;
-    long n_hits;
-} PiResult;
-
-typedef struct {
-    uint64_t s[4];
-} xoshiro256ss_state;
 
 /* --- Function declaration --- */
 
@@ -157,49 +125,27 @@ int processInput();
  */
 int processXsData(void);
 
-/* --- Inline function declarations --- */
+/**
+ * @brief Compute macroscopic cross sections for all resolved materials.
+ *
+ * @return int 0 on success, 1 on failure
+ */
+int computeMacroXs(void);
 
-/* Random number generators for seed scrambling and random double */
+/**
+ * @brief Samples a source and fills the neutron bank with initial neutrons corresponding to 
+ * the number of neutrons per generation.
+ * 
+ * @return long 0 on succesful source sampling, or -1 on failure
+ */
+long sampleInitialSource(void);
 
-static inline uint64_t rotl(const uint64_t x, int k) {
-    return (x << k) | (x >> (64 - k));
-}
-
-static inline uint64_t xoshiro256ss(xoshiro256ss_state *state) {
-    const uint64_t result = rotl(state->s[1] * 5, 7) * 9;
-    const uint64_t t = state->s[1] << 17;
-
-    state->s[2] ^= state->s[0];
-    state->s[3] ^= state->s[1];
-    state->s[1] ^= state->s[2];
-    state->s[0] ^= state->s[3];
-
-    state->s[2] ^= t;
-    state->s[3] = rotl(state->s[3], 45);
-
-    return result;
-}
-
-/* Uniform double within [0,1] */
-static inline double randd(xoshiro256ss_state *state) {
-    return (xoshiro256ss(state) >> 11) * (1.0 / 9007199254740992.0);
-}
-
-
-/* splitmix64 for seeding xoshiro256** */
-static inline uint64_t splitmix64(uint64_t *state) {
-    uint64_t z = (*state += UINT64_C(0x9E3779B97F4A7C15));
-    z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
-    z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
-    return z ^ (z >> 31);
-}
-
-/* Simple seeding for xoshiro256** */
-static inline void xoshiro256ss_seed(xoshiro256ss_state *state, uint64_t seed) {
-    uint64_t x = seed;
-    for (int i = 0; i < 4; ++i)
-        state->s[i] = splitmix64(&x);
-}
+/**
+ * @brief Run the transport simulation.
+ * 
+ * @return int 0 on success 1 on failure
+ */
+int runTransport(void);
 
 /* Compare two doubles, used for quicksort */
 static inline int cmpDouble(const void *a, const void *b) {

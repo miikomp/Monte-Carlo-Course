@@ -6,6 +6,18 @@ int parseXsDataFile(const char *abspath, double Tlist, Nuclide *out,
                     int *headerZ, int *headerA, double *headerAW,
                     int *has_nubar, int *n_react_modes);
 
+/* Temporary data struct for used when parsing nuclide data at multiple temperatures */
+/* The reason is that in the future interpolation could be applied to temperature adjust */
+/* nuclides but as of now just the closest match is linked to a material */
+typedef struct {
+    char            name[16];
+    int             Z;
+    int             A;
+    double          AW;
+    size_t          n_var;
+    Nuclide        *var;
+} NuclideData;
+
 int processXsData(void) {
 
     /* Save current working directory */
@@ -56,7 +68,7 @@ int processXsData(void) {
     FILE *list = fopen(list_base, "r");
     if (!list) 
     {
-        fprintf(stderr, "[ERROR] Could not open cross section library file at \"%s\".\n",
+        fprintf(stderr, "[ERROR] Could not open XS-library file at \"%s\".\n",
                 GLOB.xslibpath);
         if (changed_dir) 
             if (chdir(oldcwd) != 0)
@@ -65,9 +77,9 @@ int processXsData(void) {
     }
 
     /* ########################################################################################## */
-    /* First parse all the xsdata into a temporary library */
+    /* First parse all needed the xsdata into a temporary library */
 
-    fprintf(stdout, "\nProcessing cross section library \"%s\"...\n\n", GLOB.xslibpath);
+    fprintf(stdout, "\nReading cross section library \"%s\"...\n", GLOB.xslibpath);
 
     NuclideData *lib = NULL;
     size_t nlib = 0;
@@ -79,7 +91,7 @@ int processXsData(void) {
 
     if (!fgets(line, sizeof line, list)) 
     {
-        fprintf(stderr, "[ERROR] Empty cross section library file \"%s\".\n", GLOB.xslibpath);
+        fprintf(stderr, "[ERROR] Empty XS-library file \"%s\".\n", GLOB.xslibpath);
         fclose(list);
         return EXIT_FAILURE;
     }
@@ -120,6 +132,28 @@ int processXsData(void) {
             fclose(list);
             return 1;
         }
+
+        /* Check if the nuclide is included in any materials */
+
+        bool used = false;
+        for (size_t m = 0; m < DATA.n_mats; m++)
+        {
+            Material *mat = &DATA.mats[m];
+            for (size_t c = 0; c < mat->n_nucs; c++) 
+            {
+                if (mat->nucs[c].nuc_data.ZA == ZA) 
+                { 
+                    used = true; 
+                    break; 
+                }
+            }
+            if (used) 
+                break;
+        }
+
+        if (!used)
+            continue;
+
         double Tlist = strtod(tokT, &end);
         if (!end || *end) 
         {
@@ -164,7 +198,7 @@ int processXsData(void) {
             fprintf(stderr, "[ERROR] Failed parsing \"%s\" (xslist line %ld).\n", path, lnum);
             fclose(list);
 
-            /* Free everything */
+            /* If failed, free everything and return */
             
             for (size_t i = 0; i < nlib; ++i) 
             {
@@ -198,25 +232,31 @@ int processXsData(void) {
         N->var = (Nuclide*)xrealloc(N->var, (N->n_var + 1) * sizeof *N->var);
         N->var[N->n_var++] = var;
 
-        /* Print summary line */
-
-        fprintf(stdout,
-            "Parsed xsdata: ZA = %ld (%s), T = %.1fK, AW = %.3f, nubar = %s, MTs = %d, MT = 1 calculated on union grid.\n",
-            ZA, N->name,
-            var.temp,
-            N->AW,
+        if (VERBOSITY >= 1) 
+        {
+            /* Print summary line */
+            fprintf(stdout,
+                "Parsed xsdata: ZA = %5ld (%s), T = %.1fK, AW = %.3f, nubar = %s, MTs = %d, MT = 1 calculated on union grid.\n",
+                ZA, N->name,
+                var.temp,
+                N->AW,
             has_nubar ? "yes" : "no",
             nmods
-        );
+            );
 
-        for (size_t k = 0; k < var.n_xs; ++k) 
-        {
-            XsTable *tab = &var.xs[k];
-            fprintf(stdout, "  MT = %3d, Q = %13.4E, points = %zu\n", tab->mt, tab->Q, tab->n);
+            /* Print all MTs */
+            if (VERBOSITY >= 2) 
+            {
+                for (size_t k = 0; k < var.n_xs; ++k) 
+                {
+                    XsTable *tab = &var.xs[k];
+                    fprintf(stdout, "  MT = %3d, Q = %11.4E, points = %zu\n", tab->mt, tab->Q, tab->n);
+                }
+                if (var.has_nubar)
+                    fprintf(stdout, "  Nubar grid, points = %zu\n", var.nubar.n);
+                fprintf(stdout, "\n");
+            }
         }
-        if (var.has_nubar)
-            fprintf(stdout, "  Nubar grid, points = %zu\n", var.nubar.n);
-        fprintf(stdout, "\n");
     }
 
     /* Close and restore wrkdir */
@@ -225,6 +265,8 @@ int processXsData(void) {
     if (changed_dir) 
         if (chdir(oldcwd) != 0) 
             fprintf(stderr, "[ERROR] Failed to restore working directory to \"%s\": %s\n", oldcwd, strerror(errno));
+
+    fprintf(stdout, "DONE.\n\n");
     
     /* ########################################################################################## */
     /* Write all MTs computed/parsed into file for verification */
@@ -282,7 +324,7 @@ int processXsData(void) {
             }
         }
         fclose(m);
-        fprintf(stdout, "\nWrote all MT tables (and nubar) to \"%s\".\n", mpath);
+        fprintf(stdout, "Wrote all microscopic XS tables and nubar to \"%s\".\n", mpath);
     }
 
     /* ########################################################################################## */
@@ -295,16 +337,22 @@ int processXsData(void) {
     for (size_t im = 0; im < DATA.n_mats; ++im) 
     {
         Material *M = &DATA.mats[im];
-        fprintf(stdout, "\n\nResolving material \"%s\" with %zu nuclide(s):\n",
-                M->name, (size_t)M->n_nucs);
+        fprintf(stdout, "\nAdding %zu nuclide(s) to material \"%s\":\n",
+                (size_t)M->n_nucs, M->name);
 
         /* First pass: map ZA to lib entry, copy identity (name, AW), pick temperature */
 
         for (size_t c = 0; c < M->n_nucs; ++c) 
         {
             MaterialNuclide *mc = &M->nucs[c];
-            int Z = mc->ZA / 1000;
-            int A = mc->ZA % 1000;
+            const int ZA = mc->nuc_data.ZA;
+            if (ZA <= 0) 
+            {
+                fprintf(stderr, "[ERROR] Material \"%s\" contains invalid ZA=%d.\n", M->name, ZA);
+                exit(EXIT_FAILURE);
+            }
+            const int Z  = ZA / 1000;
+            const int A  = ZA % 1000;
 
             /* find matching nuclide in library */
 
@@ -320,16 +368,19 @@ int processXsData(void) {
             if (!N) 
             {
                 fprintf(stderr, "[ERROR] Material \"%s\" references ZA=%d which is not in the XS library.\n",
-                        M->name, mc->ZA);
+                        M->name, ZA);
                 exit(EXIT_FAILURE);
             }
 
-            snprintf(mc->name, sizeof mc->name, "%s", N->name);
-            mc->AW = N->AW;
+            snprintf(mc->nuc_data.name, sizeof mc->nuc_data.name, "%s", N->name);
+            mc->nuc_data.Z  = Z;
+            mc->nuc_data.A  = A;
+            mc->nuc_data.ZA = ZA;
+            mc->nuc_data.AW = N->AW;
 
             if (N->n_var == 0) 
             {
-                fprintf(stderr, "[ERROR] No temperature variants found for ZA=%d.\n", mc->ZA);
+                fprintf(stderr, "[ERROR] No temperature variants found for ZA=%d.\n", ZA);
                 exit(EXIT_FAILURE);
             }
 
@@ -349,14 +400,18 @@ int processXsData(void) {
 
             /* Copy the chosen variant into material nuclide data */
 
-            mc->data.temp   = src->temp;
-            mc->data.n_xs     = src->n_xs;
-            mc->data.xs       = (XsTable*)malloc(src->n_xs * sizeof *mc->data.xs);
-            mc->data.has_nubar = src->has_nubar;
-            mc->data.nubar.n   = 0;
-            mc->data.nubar.E   = NULL;
-            mc->data.nubar.nu  = NULL;
-            if (!mc->data.xs) 
+            mc->nuc_data.temp       = src->temp;
+            if (src->AW != 0.0)
+                mc->nuc_data.AW     = src->AW;
+            mc->nuc_data.has_nubar  = src->has_nubar;
+            memcpy(mc->nuc_data.mt_idx, src->mt_idx, sizeof mc->nuc_data.mt_idx);
+
+            mc->nuc_data.n_xs = src->n_xs;
+            mc->nuc_data.xs   = (XsTable*)malloc(src->n_xs * sizeof *mc->nuc_data.xs);
+            mc->nuc_data.nubar.n  = 0;
+            mc->nuc_data.nubar.E  = NULL;
+            mc->nuc_data.nubar.nu = NULL;
+            if (!mc->nuc_data.xs) 
             { 
                 fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
                 exit(EXIT_FAILURE); 
@@ -365,7 +420,7 @@ int processXsData(void) {
             for (size_t k = 0; k < src->n_xs; ++k) 
             {
                 const XsTable *ts = &src->xs[k];
-                XsTable *td = &mc->data.xs[k];
+                XsTable *td = &mc->nuc_data.xs[k];
                 td->mt = ts->mt;
                 td->Q  = ts->Q;
                 td->n  = ts->n;
@@ -381,27 +436,29 @@ int processXsData(void) {
             }
             if (src->has_nubar && src->nubar.n > 0) 
             {
-                mc->data.has_nubar = 1;
-                mc->data.nubar.n   = src->nubar.n;
-                mc->data.nubar.E   = (double*)malloc(src->nubar.n * sizeof(double));
-                mc->data.nubar.nu  = (double*)malloc(src->nubar.n * sizeof(double));
-                if (!mc->data.nubar.E || !mc->data.nubar.nu) 
+                mc->nuc_data.has_nubar = 1;
+                mc->nuc_data.nubar.n   = src->nubar.n;
+                mc->nuc_data.nubar.E   = (double*)malloc(src->nubar.n * sizeof(double));
+                mc->nuc_data.nubar.nu  = (double*)malloc(src->nubar.n * sizeof(double));
+                if (!mc->nuc_data.nubar.E || !mc->nuc_data.nubar.nu) 
                 { 
                     fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
                     exit(EXIT_FAILURE); 
                 }
-                memcpy(mc->data.nubar.E,  src->nubar.E,  src->nubar.n * sizeof(double));
-                memcpy(mc->data.nubar.nu, src->nubar.nu, src->nubar.n * sizeof(double));
+                memcpy(mc->nuc_data.nubar.E,  src->nubar.E,  src->nubar.n * sizeof(double));
+                memcpy(mc->nuc_data.nubar.nu, src->nubar.nu, src->nubar.n * sizeof(double));
             }
 
             /* Print per-nuclide summary */
             
-            size_t n_modes = (mc->data.n_xs > 0 ? mc->data.n_xs - 1 : 0);
-            fprintf(stdout, "  %d - %s with %zu reaction modes (%.1fK data linked).\n",
-                    mc->ZA, mc->name, n_modes, mc->data.temp);
+            size_t n_modes = (mc->nuc_data.n_xs > 0 ? mc->nuc_data.n_xs - 1 : 0);
+            fprintf(stdout, "  %5d - %s with %zu reaction modes (using %.0fK data).\n",
+                    mc->nuc_data.ZA, mc->nuc_data.name, n_modes, mc->nuc_data.temp);
         }
 
         /* Second pass: compute fractions and number densities using AW and mdens */
+        
+        fprintf(stdout, "\n  Calculating densities and fractions:\n");
 
         double sum_atoms = 0.0, sum_w = 0.0;
         for (size_t c = 0; c < M->n_nucs; ++c) 
@@ -423,7 +480,7 @@ int processXsData(void) {
 
             double Abar = 0.0;
             for (size_t c = 0; c < M->n_nucs; ++c) 
-                Abar += M->nucs[c].atom_frac * M->nucs[c].AW;
+                Abar += M->nucs[c].atom_frac * M->nucs[c].nuc_data.AW;
 
             if (M->mdens > 0.0 && Abar > 0.0) 
             {
@@ -434,7 +491,7 @@ int processXsData(void) {
                 for (size_t c = 0; c < M->n_nucs; ++c) 
                 {
                     M->nucs[c].N_i = M->nucs[c].atom_frac * Ntot;
-                    M->nucs[c].mass_frac = (M->nucs[c].atom_frac * M->nucs[c].AW) / Abar;
+                    M->nucs[c].mass_frac = (M->nucs[c].atom_frac * M->nucs[c].nuc_data.AW) / Abar;
                 }
             } 
             else if (M->adens > 0.0) 
@@ -448,7 +505,7 @@ int processXsData(void) {
                 /* Derive mass fractions from x_i and Abar */
 
                 for (size_t c = 0; c < M->n_nucs; ++c)
-                    M->nucs[c].mass_frac = (M->nucs[c].atom_frac * M->nucs[c].AW) / Abar;
+                    M->nucs[c].mass_frac = (M->nucs[c].atom_frac * M->nucs[c].nuc_data.AW) / Abar;
             } 
             else
             {
@@ -460,9 +517,9 @@ int processXsData(void) {
 
                 double Wsum = 0.0;
                 for (size_t c = 0; c < M->n_nucs; ++c) 
-                    Wsum += M->nucs[c].N_i * M->nucs[c].AW;
+                    Wsum += M->nucs[c].N_i * M->nucs[c].nuc_data.AW;
                 for (size_t c = 0; c < M->n_nucs; ++c)
-                    M->nucs[c].mass_frac = (Wsum > 0.0) ? (M->nucs[c].N_i * M->nucs[c].AW / Wsum) : 0.0;
+                    M->nucs[c].mass_frac = (Wsum > 0.0) ? (M->nucs[c].N_i * M->nucs[c].nuc_data.AW / Wsum) : 0.0;
             }
         } 
         else 
@@ -474,7 +531,7 @@ int processXsData(void) {
                 /* Convert w_i + rho to absolute N_i */
 
                 for (size_t c = 0; c < M->n_nucs; ++c)
-                    M->nucs[c].N_i = (M->mdens * M->nucs[c].mass_frac / M->nucs[c].AW) * NA;
+                    M->nucs[c].N_i = (M->mdens * M->nucs[c].mass_frac / M->nucs[c].nuc_data.AW) * NA;
 
                 /* Derive atomic fractions */
 
@@ -491,17 +548,17 @@ int processXsData(void) {
             
                 double denom = 0.0;
                 for (size_t c = 0; c < M->n_nucs; ++c) 
-                    denom += (M->nucs[c].AW > 0.0) ? (M->nucs[c].mass_frac / M->nucs[c].AW) : 0.0;
+                    denom += (M->nucs[c].nuc_data.AW > 0.0) ? (M->nucs[c].mass_frac / M->nucs[c].nuc_data.AW) : 0.0;
                 if (denom <= 0.0) 
                 {
                     for (size_t c = 0; c < M->n_nucs; ++c) 
-                        M->nucs[c].N_i = (M->nucs[c].mass_frac / fmax(M->nucs[c].AW, 1e-300));
+                        M->nucs[c].N_i = (M->nucs[c].mass_frac / fmax(M->nucs[c].nuc_data.AW, 1e-300));
                 } 
                 else 
                 {
                     for (size_t c = 0; c < M->n_nucs; ++c) 
                     {
-                        double xi = (M->nucs[c].mass_frac / M->nucs[c].AW) / denom;
+                        double xi = (M->nucs[c].mass_frac / M->nucs[c].nuc_data.AW) / denom;
                         M->nucs[c].atom_frac = xi;
                         M->nucs[c].N_i = xi * Ntot_target;
                     }
@@ -510,7 +567,7 @@ int processXsData(void) {
             else 
             {
                 for (size_t c = 0; c < M->n_nucs; ++c)
-                    M->nucs[c].N_i = (M->nucs[c].mass_frac / fmax(M->nucs[c].AW, 1e-300));
+                    M->nucs[c].N_i = (M->nucs[c].mass_frac / fmax(M->nucs[c].nuc_data.AW, 1e-300));
 
                 /* Derive atomic fractions */
 
@@ -532,8 +589,8 @@ int processXsData(void) {
             xsum     += M->nucs[c].atom_frac;
             wsum     += M->nucs[c].mass_frac;
             Nsum     += M->nucs[c].N_i;
-            mass_sum += M->nucs[c].N_i * M->nucs[c].AW;
-            Abar_sum += M->nucs[c].atom_frac * M->nucs[c].AW;
+            mass_sum += M->nucs[c].N_i * M->nucs[c].nuc_data.AW;
+            Abar_sum += M->nucs[c].atom_frac * M->nucs[c].nuc_data.AW;
         }
 
         /* Compute derived densities for verification */
@@ -542,14 +599,10 @@ int processXsData(void) {
         const double ndens_calc = Nsum * 1.0e-24;       /* atoms/b*cm */
 
         fprintf(stdout,
-            "\n  Summary for material \"%s\":\n"
             "  dens=%.6E %s, T=%.1fK\n"
             "  components=%zu, sum(x)=%.6f, sum(w)=%.6f\n"
             "  Abar=%.6f g/mol/atom, N_tot=%.6e 1/cm^3\n"
-            "  mdens_calc=%.6E g/cm^3, adens_calc=%.6E atoms/b*cm\n\n"
-            "  Nuclides:\n",
-            
-            M->name,
+            "  mdens_calc=%.6E g/cm^3, adens_calc=%.6E atoms/b*cm\n\n",
             (M->adens > 0.0) ? M->adens : M->mdens,
             (M->adens > 0.0) ? "atoms/b*cm" : "g/cm3",
             M->temp,
@@ -565,58 +618,33 @@ int processXsData(void) {
         for (size_t c = 0; c < M->n_nucs; ++c) 
         {
             const MaterialNuclide *mc = &M->nucs[c];
-            size_t n_modes = (mc->data.n_xs > 0 ? mc->data.n_xs - 1 : 0);
+            size_t n_modes = (mc->nuc_data.n_xs > 0 ? mc->nuc_data.n_xs - 1 : 0);
             fprintf(stdout,
-                "  %5d - %5s : AW=%10.6f  afrac=%.6f  mfrac=%.6f  N_i=%.6e atoms/b*cm  (MTs=%2zu, T=%.1fK)\n",
-                mc->ZA, 
-                mc->name, 
-                mc->AW, 
+                "  %5d - %5s : T=%.0fK, AW=%.6E, afrac=%.6E, mfrac=%.6E, N_i=%.6E atoms/b*cm\n",
+                mc->nuc_data.ZA, 
+                mc->nuc_data.name,
+                mc->nuc_data.temp,
+                mc->nuc_data.AW, 
                 mc->atom_frac, 
                 mc->mass_frac, 
-                mc->N_i * 1e-24, 
-                n_modes, 
-                mc->data.temp);
-        }
-    }
-
-    /* Calculate memory usage for DATA */
-
-    size_t mem_bytes = sizeof(DATA);
-
-    /* Loop over everything to count size */
-
-    for (size_t im = 0; im < DATA.n_mats; ++im) 
-    {
-        Material *M = &DATA.mats[im];
-        mem_bytes += sizeof(*M);
-        mem_bytes += M->n_nucs * sizeof(MaterialNuclide);
-        for (size_t c = 0; c < M->n_nucs; ++c) 
-        {
-            MaterialNuclide *mc = &M->nucs[c];
-            mem_bytes += sizeof(*mc);
-
-            /* Add memory for cross section tables */
-
-            mem_bytes += mc->data.n_xs * sizeof(XsTable);
-            for (size_t k = 0; k < mc->data.n_xs; ++k) 
+                mc->N_i * 1e-24
+                );
+            if (VERBOSITY >= 1) 
             {
-                XsTable *tab = &mc->data.xs[k];
-                mem_bytes += tab->n * sizeof(double);
-                mem_bytes += tab->n * sizeof(double);
-            }
-            /* Add memory for nubar if present */
-
-            if (mc->data.has_nubar && mc->data.nubar.n > 0) 
-            {
-                mem_bytes += mc->data.nubar.n * sizeof(double);
-                mem_bytes += mc->data.nubar.n * sizeof(double);
+                fprintf(stdout, "  %5zu Reaction modes:\n", n_modes);
+                for (size_t k = 0; k < mc->nuc_data.n_xs; ++k) 
+                {
+                    XsTable *tab = &mc->nuc_data.xs[k];
+                    fprintf(stdout, "     MT = %3d, Q = %11.4E, points = %zu\n", tab->mt, tab->Q, tab->n);
+                }
+                if (mc->nuc_data.has_nubar)
+                    fprintf(stdout, "    Nubar grid, points = %zu\n", mc->nuc_data.nubar.n);
+                fprintf(stdout, "\n");
             }
         }
-    }
+    } 
 
-    /* Print memory footprint */
-
-    fprintf(stdout, "\nMemory allocated for XS data: %.2f MB\n", mem_bytes / (1024.0 * 1024.0));
+    fprintf(stdout, "\nDONE.\n");
 
     /* ########################################################################################## */
     /* Free the parsed temporary library */
@@ -696,11 +724,23 @@ int parseXsDataFile(const char *abspath, double Tlist,
         return -1;
     }
 
+    /* Put header info into output struct */
+
+    memset(out, 0, sizeof *out);
+    out->Z   = Z;
+    out->A   = A;
+    out->ZA  = Z * 1000 + A;
+    out->AW  = AW;
     out->temp = Tlist;
+    snprintf(out->name, sizeof out->name, "%s", sym);
+    memset(out->mt_idx, -1, sizeof(out->mt_idx));
+
     out->n_xs   = 0;
     out->xs     = NULL;
     out->has_nubar = (NNU > 0) ? 1 : 0;
     out->nubar.n = 0; out->nubar.E = out->nubar.nu = NULL;
+
+    /* If nubar data is present parse it */
 
     if (NNU > 0) 
     {
@@ -727,11 +767,14 @@ int parseXsDataFile(const char *abspath, double Tlist,
         int mt = 0, ne = 0;
         double Q = 0.0;
 
-        /* Peek next token if EOF break */
+        /* Peek next token if EOF break loop */
 
         int r = fscanf(f, "%d %lf %d", &mt, &Q, &ne);
         if (r == EOF || r == 0) 
-            break;      
+            break;
+        
+        /* Check for valid header block */
+
         if (r != 3) 
         {
             fprintf(stderr, "[ERROR] Bad MT block header in %s (expected: MT Q NE)\n", abspath);
@@ -744,6 +787,8 @@ int parseXsDataFile(const char *abspath, double Tlist,
             fclose(f);
             return -1;
         }
+
+        /* Read energy-xs pairs */
 
         XsTable xt;
         xt.mt = mt; xt.Q = Q; xt.n = (size_t)ne;
@@ -772,10 +817,13 @@ int parseXsDataFile(const char *abspath, double Tlist,
             }
         }
 
-        /* Append */
+        /* Append xs table to output struct */
 
         out->xs = (XsTable*)xrealloc(out->xs, (out->n_xs + 1) * sizeof *out->xs);
-        out->xs[out->n_xs++] = xt;
+        out->xs[out->n_xs] = xt;
+        if (mt != 1 && mt >= 0 && mt < (int)(sizeof(out->mt_idx) / sizeof(out->mt_idx[0])))
+            out->mt_idx[mt] = (int)out->n_xs;
+        out->n_xs++;
         parsed_modes++;
     }
 
@@ -784,7 +832,8 @@ int parseXsDataFile(const char *abspath, double Tlist,
     /* ---- Compute MT=1 store it at xs[0] ---- */
 
     /* Figure out the size of the union grid needed */
-    /* Count all breakspoints in reaction modes */
+    /* Count all points in reaction modes */
+
     size_t total_pts = 0;
     for (size_t k = 0; k < out->n_xs; ++k) 
     {
@@ -793,10 +842,12 @@ int parseXsDataFile(const char *abspath, double Tlist,
         total_pts += out->xs[k].n;
     }
 
-    /* If there are no reaction modes do nothing */
+    /* If there are no reaction mode points do nothing */
+
     if (total_pts > 0) {
         double *Eunion = (double*)xrealloc(NULL, total_pts * sizeof(double));
         size_t m = 0;
+
         for (size_t k = 0; k < out->n_xs; ++k) 
         {
             if (out->xs[k].mt == 1) 
@@ -817,9 +868,14 @@ int parseXsDataFile(const char *abspath, double Tlist,
                 continue; 
             }
 
-            double a = Eunion[i], b = Eunion[u-1];
+            double a = Eunion[i];
+            double b = Eunion[u-1];
             double tol = 1e-12 * fmax(1.0, fmax(fabs(a), fabs(b)));
-            if (fabs(a - b) > tol) Eunion[u++] = a;
+
+            /* Check for duplicate grid points */
+
+            if (fabs(a - b) > tol) 
+                Eunion[u++] = a;
         }
 
         /* Sum partials at each union energy using linear interpolation */
@@ -875,7 +931,8 @@ int parseXsDataFile(const char *abspath, double Tlist,
 
         /* Prepend MT=1 table at index 0 (keep partials after it) */
 
-        XsTable *newxs = (XsTable*)xrealloc(NULL, (out->n_xs + 1) * sizeof *newxs);
+        size_t old_count = out->n_xs;
+        XsTable *newxs = (XsTable*)xrealloc(NULL, (old_count + 1) * sizeof *newxs);
 
         newxs[0].mt = 1;
         newxs[0].Q  = 0.0;
@@ -883,11 +940,31 @@ int parseXsDataFile(const char *abspath, double Tlist,
         newxs[0].E  = Eunion;
         newxs[0].xs = xs_tot;
 
-        for (size_t k = 0; k < out->n_xs; ++k) newxs[k+1] = out->xs[k];
+        for (size_t k = 0; k < old_count; ++k) newxs[k+1] = out->xs[k];
+
+        /* Rebuild MT index mapping with correct ordering */
+        
+        memset(out->mt_idx, -1, sizeof(out->mt_idx));
+
+        /* MT = 1 is always at idx 0 of xs array */
+
+        out->mt_idx[1] = 0;
+
+        /* Other MTs are at their respective numbers as idx */
+        /* eg. MT=15 is at mt_idx[15] which stores the correct idx into the xs array */
+
+        for (size_t idx = 1; idx <= old_count; ++idx) 
+        {
+            int mt = newxs[idx].mt;
+            if (mt == 1)
+                continue;
+            if (mt >= 0 && mt < MAX_MT)
+                out->mt_idx[mt] = (int)idx;
+        }
 
         free(out->xs);
         out->xs   = newxs;
-        out->n_xs = out->n_xs + 1;
+        out->n_xs = old_count + 1;
     }
 
     *has_nubar      = (NNU > 0) ? 1 : 0;

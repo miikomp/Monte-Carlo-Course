@@ -1,5 +1,7 @@
 #include "header.h"
 
+int VERBOSITY = 0;
+
 /* Initialize global data structs */
 
 runInfo GLOB = {
@@ -7,21 +9,38 @@ runInfo GLOB = {
     .outfname       = NULL,
     .errfname       = NULL,
     .xslibpath      = {0},
-    .n_threads      = 1,
-    .n_generations  = 0l,
-    .n_particles    = 0l,
     .n_kwargs       = 0l,
     .mode           = 0l,
     .seed           = 0u,
     .t0             = 0.0,
     .t1             = 0.0,
+    .n_threads      = 1,
+
+    .n_generations  = 0l,
+    .n_particles    = 0l,
+
+    .energy_cutoff  = 0.0,
+
     .needle_length  = 0.0,
     .line_spacing   = 0.0,
 };
 
 runData DATA = { 
+    .generation = 1ul,
     .n_mats = 0ul,
     .mats   = NULL,
+    .n_bank = 0ul,
+    .bank_cap = 0ul,
+    .bank   = NULL,
+    .src = NULL,
+    .src_type = 0,
+    .detector = NULL,
+    .detector_type = 0
+};
+
+ResultsData RES = {
+    .n_generations = 0l,
+    .avg_scores = {0.0, 0.0, 0u, 0u}
 };
 
 double sin_table[TRIG_LOOKUP_TABLE_SIZE];

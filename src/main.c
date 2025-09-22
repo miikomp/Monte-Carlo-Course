@@ -1,6 +1,8 @@
 #include "header.h"
 
 int main(int argc, char **argv) {
+    int val;
+
     /* ########################################################################################## */
 
     /* Check for valid usage of executable */
@@ -31,6 +33,24 @@ int main(int argc, char **argv) {
 
             GLOB.n_threads = (int)fmin((strtol(argv[++i], NULL, 10)), 16);
         }
+        else if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) 
+        {
+            /* Verbosity level defaults to 1 if -v is given and 0 otherwise, 2 is maximum output */
+
+            if (i + 1 >= argc - 1) 
+                val = 1;
+            else
+                val = (int)strtol(argv[++i], NULL, 10);
+
+            /* Set verbosity */
+
+            VERBOSITY = val;
+        }
+        else 
+        {
+            fprintf(stderr, "[ERROR] Unknown commandline argument \"%s\".\n", argv[i]);
+            return EXIT_FAILURE;
+        }
         
     }
 
@@ -44,7 +64,9 @@ int main(int argc, char **argv) {
 
     long np = readInput();
     GLOB.n_kwargs = np;
-    fprintf(stdout, "\nDONE.\n\n%ld keyword arguments succesfully parsed.\n\n", np);
+    fprintf(stdout, "DONE.\n");
+    if (VERBOSITY >= 1)
+        fprintf(stdout, "Succesfully parsed %ld keyword arguments.\n", np);
     
     /* Process input data */
 
@@ -53,13 +75,39 @@ int main(int argc, char **argv) {
 
     /* ########################################################################################## */
 
+    /* If in transport mode read and process the xsdata and resolve all materials */
+
+    if (GLOB.mode == RUNMODE_TRANSPORT || GLOB.mode == RUNMODE_CHECK)
+    {
+        fprintf(stdout, "\n------------------------\n");
+        fprintf(stdout, "  Processing XS-data\n");
+        fprintf(stdout, "------------------------\n");
+
+        /* Read and process the xsdata from the given path and resolve all materials*/
+
+        if (processXsData() != 0) 
+        {
+            fprintf(stderr, "[ERROR] Could not process cross section library file at \"%s\".\n", GLOB.xslibpath);
+            return EXIT_FAILURE;
+        }
+
+        /* Compute macroscopic cross sections for all resolved materials and reaction modes */
+        
+        if (computeMacroXs() != 0)
+        {
+            fprintf(stderr, "[ERROR] Failed to compute macroscopic cross sections.\n");
+            return EXIT_FAILURE;
+        }
+    }
+    /* ########################################################################################## */
+
     /* Set desired number of threads and get actual provided */
 
     omp_set_num_threads(GLOB.n_threads);
     int nt = omp_get_max_threads();
     GLOB.n_threads = nt;
 
-    /* Disable dynamic teaming to not mess up thread-private seeding */
+    /* Disable dynamic teaming to not mess up thread-private things */
 
     omp_set_dynamic(0);
 
@@ -74,10 +122,6 @@ int main(int argc, char **argv) {
     GLOB.t0 = omp_get_wtime();
 
     /* --- Main loop --- */
-
-    /* Get scrambler seed from global seed */
-
-    uint64_t sm = (GLOB.seed << 32) ^ UINT64_C(0x94D049BB133111EB);
     
     /* Dispatch case to correct sub-routine */
 
@@ -88,13 +132,28 @@ int main(int argc, char **argv) {
     switch (GLOB.mode) {
     case RUNMODE_TRANSPORT:
     {
-        fprintf(stderr, "[ERROR] Mode %ld not implemented.\n", GLOB.mode);
-        return EXIT_FAILURE;
+        /* Fill neutron bank with initial source neutrons */
+
+        if (sampleInitialSource() < 0) {
+            fprintf(stderr, "[ERROR] Failed to sample initial source.\n");
+            return EXIT_FAILURE;
+        }
+
+        /* Run the transport simulation */
+
+        if (runTransport() != 0) {
+            fprintf(stderr, "[ERROR] Computation failed.\n");
+            return EXIT_FAILURE;
+        }
 
         break;
     }
     case RUNMODE_CIRCLE_PI: 
     {
+        /* Get scrambler seed from global seed */
+
+        uint64_t sm = (GLOB.seed << 32) ^ UINT64_C(0x94D049BB133111EB);
+
         if (runCirclePi(sm) != 0)
         {
             fprintf(stderr, "[ERROR] Computation failed.\n");
@@ -105,6 +164,11 @@ int main(int argc, char **argv) {
     }
     case RUNMODE_BUFFONS_PI: 
     {
+
+        /* Get scrambler seed from global seed */
+
+        uint64_t sm = (GLOB.seed << 32) ^ UINT64_C(0x94D049BB133111EB);
+
         if (runBuffonsPi(sm) != 0) {
             fprintf(stderr, "[ERROR] Computation failed.\n");
             return EXIT_FAILURE;

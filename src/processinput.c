@@ -14,11 +14,13 @@ int processInput() {
     if (!GLOB.seed) 
     {
         GLOB.seed = (uint64_t)time(NULL);
-        fprintf(stdout, "Using random seed %lu.\n", GLOB.seed);
+        if (VERBOSITY >= 1)
+            fprintf(stdout, "Using random seed %lu.\n", GLOB.seed);
     }
     else 
     {
-        fprintf(stdout, "Using provided seed %lu.\n", GLOB.seed);
+        if (VERBOSITY >= 1)
+            fprintf(stdout, "Using provided seed %lu.\n", GLOB.seed);
     }
 
     /* Check that requirements for running a transport simulation are set */
@@ -39,15 +41,7 @@ int processInput() {
             fprintf(stderr, "[ERROR] No cross section library path provided for transport mode.\n");
             return EXIT_FAILURE;
         }
-
-        /* Try to read and process the xsdata from the given path */
-
-        if (processXsData() != 0) 
-            {
-                fprintf(stderr, "[ERROR] Could not process cross section library file at \"%s\".\n", GLOB.xslibpath);
-                return EXIT_FAILURE;
-            }
-        }
+    }
 
     /* Check Buffon's needle related parameters */
 

@@ -4,7 +4,7 @@
 seed 12165467978
 
 # Set number of neutrons in a generation and number of generations
-pop 1000 100
+pop 1000000 100
 
 # Define material(s)
 # Positive density/fraction means mass density in g/cm^3 or mass fraction
@@ -14,22 +14,32 @@ pop 1000 100
 # Nuclide identifiers are ZA (e.g. U-235 is 92235, H-1 is 1001, etc.)
 # The code computes the missing units (e.g. if mass fractions are given, atomic fractions
 # and atomic density are computed from the mass density, etc.) These are printed for verification.
-mat WATER 0.1 300
-1001 2
-8016 1
-
-mat IRON -7.87 300
-26056 0.6
-
+#mat WATER 0.1 300
+# 1001 2
+# 8016 1
+#
 mat NAT_U -19.1 600
-92235 -0.0072
-92238 -0.9928
+ 92235 -0.0072
+ 92238 -0.9928
+#
+#mat GRAPHITE -1.8 300
+# 6000 1.0
+#
+# 
+#mat UO2 -10.1 880
+# 92235 -0.02644492
+# 92238 -0.85505247
+# 8016  -0.11850261
 
-mat UO2 -10.1 880
-92235 -0.02644492
-92238 -0.85505247
-8016  -0.11850261
+#mat H1 -0.07 300
+# 1001 1.0
 
 # Specify cross section library path
 xslibpath ./xsdata/xsdata.lib
+
+# Specify a monoenergetic neutron source at origo (0,0,0) with 2 MeV neutrons
+src 1 0.0 0.0 0.0 2.0
+
+# Specify a reaction rate detector
+det 1 reactionrate
 

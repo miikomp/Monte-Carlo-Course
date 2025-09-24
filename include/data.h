@@ -1,12 +1,18 @@
 #ifndef DATA_H
 #define DATA_H
 
-#include "header.h"
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #define MAX_MT 200
 #define MAX_STR_LEN 1024
 #define MAX_PATH 4096
-#define MAX_COLLISION_BINS 1000
+#define MAX_COLLISION_BINS 250
+
+typedef struct {
+    uint64_t s[4];
+} xoshiro256ss_state;
 
 /* --- Cross sectional data structures --- */
 
@@ -44,7 +50,7 @@ typedef struct {
     double     AW;      // atomic weight
     int        mt_idx[MAX_MT]; // index for each MT-reaction in xs array, -1 if not present
     size_t     n_xs;
-    XsTable   *xs;      // barns
+    XsTable   *xs;      // barns idx 0 is total
     bool       has_nubar;
     NubarTable nubar;
 } Nuclide;
@@ -70,36 +76,71 @@ typedef struct {
     size_t   n_nucs;
     MaterialNuclide *nucs;
     size_t   n_macro_xs;
-    MacroXsTable *macro_xs;
+    MacroXsTable *macro_xs; // 1/cm idx 0 is total
 } Material;
 
 /* --- Particle data structures --- */
 
 // Neutron data structure
 typedef struct {
-    bool alive;
+    int status;           // 0=alive, 1=dead by fission, 2=dead by capture, 3=dead by leakage   
     uint64_t id;
+    int mat_idx;          // active material idx in DATA.mats, -1 if not set
     double x, y, z;       // position cm
     double u, v, w;       // direction cosines
     double E;             // energy MeV
     uint64_t seed;        // RNG seed
     xoshiro256ss_state state;
     double path_length;   // accumulated path length cm
-    double fission_yield; // fission neutrons produced
+    long fission_yield; // fission neutrons produced
 } Neutron;
 
 /* --- Scoring data structures --- */
 
-// Per generation scoring structure. Scalar to allow #pragma omp reduction
+// Per generation scoring structure. And the accompynying custom reduction clause
 typedef struct {
+    uint64_t n_histories;
     double   total_path_length;
     double   total_fission_yield;
     uint64_t total_collisions;
-    uint64_t total_histories;
+    uint64_t total_captures;
+    uint64_t total_elastic_scatters;
+    uint64_t total_inelastic_scatters;
+    uint64_t total_fissions;
+    uint64_t total_leakages;
+    uint64_t total_unknowns;
     size_t   max_collision_bin;
     double   collision_energy_sum[MAX_COLLISION_BINS];
     uint64_t collision_energy_count[MAX_COLLISION_BINS];
 } GenerationScores;
+
+#ifdef _OPENMP
+static inline void GenerationScoresReduce(GenerationScores *restrict out,
+                                          const GenerationScores *restrict in)
+{
+    out->total_path_length   += in->total_path_length;
+    out->total_fission_yield += in->total_fission_yield;
+    out->total_collisions    += in->total_collisions;
+    out->n_histories     += in->n_histories;
+    out->total_captures      += in->total_captures;
+    out->total_elastic_scatters   += in->total_elastic_scatters;
+    out->total_inelastic_scatters += in->total_inelastic_scatters;
+    out->total_fissions      += in->total_fissions;
+    out->total_leakages      += in->total_leakages;
+    out->total_unknowns      += in->total_unknowns;
+    if (in->max_collision_bin > out->max_collision_bin)
+        out->max_collision_bin = in->max_collision_bin;
+    for (size_t b = 0; b < MAX_COLLISION_BINS; ++b)
+    {
+        out->collision_energy_sum[b]   += in->collision_energy_sum[b];
+        out->collision_energy_count[b] += in->collision_energy_count[b];
+    }
+}
+
+#pragma omp declare reduction(+:GenerationScores: GenerationScoresReduce(&omp_out, &omp_in)) \
+    initializer(omp_priv = (GenerationScores){0})
+#endif
+
 
 // Reaction rate detector structure
 typedef struct {
@@ -147,7 +188,7 @@ typedef struct {
 
 typedef struct {
     int64_t          n_generations;
-    GenerationScores avg_scores;
+    GenerationScores *avg_scores;
 } ResultsData;
 
 // Global struct for general information and pointers to other data
@@ -190,5 +231,17 @@ typedef struct {
     long n_tot;
     long n_hits;
 } PiResult;
+
+/* Temporary data struct for used when parsing nuclide data at multiple temperatures */
+/* The reason is that in the future interpolation could be applied to temperature adjust */
+/* nuclides but as of now just the closest match is linked to a material */
+typedef struct {
+    char            name[16];
+    int             Z;
+    int             A;
+    double          AW;
+    size_t          n_var;
+    Nuclide        *var;
+} TempNucDataLib;
 
 #endif

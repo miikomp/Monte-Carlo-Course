@@ -4,7 +4,7 @@
 seed 12165467978
 
 # Set number of neutrons in a generation and number of generations
-pop 1000000 100
+pop 10000 100
 
 # Define material(s)
 # Positive density/fraction means mass density in g/cm^3 or mass fraction
@@ -18,12 +18,12 @@ pop 1000000 100
 # 1001 2
 # 8016 1
 #
-mat NAT_U -19.1 600
- 92235 -0.0072
- 92238 -0.9928
+#mat NAT_U -19.1 600
+# 92235 -0.0072
+# 92238 -0.9928
 #
-#mat GRAPHITE -1.8 300
-# 6000 1.0
+mat GRAPHITE -1.8 300
+ 6000 1.0
 #
 # 
 #mat UO2 -10.1 880

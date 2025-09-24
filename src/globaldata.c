@@ -40,8 +40,9 @@ runData DATA = {
 
 ResultsData RES = {
     .n_generations = 0l,
-    .avg_scores = {0.0, 0.0, 0u, 0u}
+    .avg_scores = NULL
 };
+
 
 double sin_table[TRIG_LOOKUP_TABLE_SIZE];
 double cos_table[TRIG_LOOKUP_TABLE_SIZE];

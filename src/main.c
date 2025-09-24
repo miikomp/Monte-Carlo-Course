@@ -83,19 +83,44 @@ int main(int argc, char **argv) {
         fprintf(stdout, "  Processing XS-data\n");
         fprintf(stdout, "------------------------\n");
 
-        /* Read and process the xsdata from the given path and resolve all materials*/
+        /* Read and process the xsdata from the given path into a temporary librabry */
+        TempNucDataLib *lib = NULL;
+        size_t nlib = 0;
 
-        if (processXsData() != 0) 
+        if (processXsData(&lib, &nlib) != 0) 
         {
             fprintf(stderr, "[ERROR] Could not process cross section library file at \"%s\".\n", GLOB.xslibpath);
             return EXIT_FAILURE;
         }
+
+        /* Resolve all materials using the temporary nuclide library */
+
+        if (resolveMaterials(lib, nlib) != 0) 
+        {
+            fprintf(stderr, "[ERROR] Could not resolve materials.\n");
+            return EXIT_FAILURE;
+        }
+
+        /* Library freed inside resolveMaterials avoid dangling pointer */
+
+        lib = NULL;
+        nlib = 0;
 
         /* Compute macroscopic cross sections for all resolved materials and reaction modes */
         
         if (computeMacroXs() != 0)
         {
             fprintf(stderr, "[ERROR] Failed to compute macroscopic cross sections.\n");
+            return EXIT_FAILURE;
+        }
+
+        /* Initialize results data struct */
+
+        RES.n_generations = GLOB.n_generations;
+        RES.avg_scores = (GenerationScores*)calloc((size_t)GLOB.n_generations, sizeof(GenerationScores));
+        if (!RES.avg_scores)
+        {
+            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
             return EXIT_FAILURE;
         }
     }
@@ -194,6 +219,17 @@ int main(int argc, char **argv) {
     fprintf(stdout, "\n------------------------\n");
     fprintf(stdout, "  Runtime: %.4lfs\n", GLOB.t1 - GLOB.t0);
     fprintf(stdout, "------------------------\n\n");
+
+    /* ########################################################################################## */
+
+    if (GLOB.mode == RUNMODE_TRANSPORT || GLOB.mode == RUNMODE_CHECK) 
+    {
+        /* Process and output transport results */
+
+        fprintf(stdout, "Processing results...\n");
+
+        processTransportResults();
+    }
 
     /* Prepare for termination */
 

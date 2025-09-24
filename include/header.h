@@ -20,6 +20,7 @@
 
 /* Other headers */
 #include "rng.h"
+#include "endfmts.h"
 #include "data.h"
 
 /* Verbosity level: 0 = standard output, 1 = increased output, 2 = all the output */
@@ -35,6 +36,12 @@ extern int VERBOSITY;
 #define RUNMODE_BUFFONS_PI  2
 #define RUNMODE_CHECK       3
 
+#define NEUTRON_ALIVE 0
+#define NEUTRON_DEAD_FISSION 1
+#define NEUTRON_DEAD_CAPTURE 2
+#define NEUTRON_DEAD_LEAKAGE 3
+#define NEUTRON_DEAD_TERMINATED 4
+
 #define PRG_BAR_WIDTH 50
 #define TRIG_LOOKUP_TABLE_SIZE 10000
 
@@ -47,9 +54,13 @@ extern int VERBOSITY;
 #define M_PI 3.14159265358979323846
 #define NA 6.02214076e23
 #define BOLTZMANN 8.617333262145e-11   /* MeV/K */
+#define AMU_TO_MEV_C2 931.49410242     /* MeV/c^2 */
+#define MASS_NEUTRON 1.00866491588     /* amu */
+#define INV_MASS_NEUTRON (1.0/MASS_NEUTRON)
 
 #define BARN_TO_CM2 1.0e-24
 #define NT_FISSION 1.2895              /* MeV Nuclear temperature of U235 fission */
+#define E_FG_LIMIT 0.0002             /* MeV energy cutoff for free gas model at 200eV */
 
 #define DEFAULT_NEEDLE_LENGTH 0.85
 #define DEFAULT_LINE_SPACING  1.0
@@ -119,11 +130,22 @@ void summarizePiResultsArray(const double *results);
 int processInput();
 
 /**
- * @brief Process cross section library data from given file path and resolve data for all materials
+ * @brief Process cross section library data from given file path into
+ * a temporary nuclide library that is put into the output pointers.
  * 
  * @return int 0 on success 1 on failure
  */
-int processXsData(void);
+int processXsData(TempNucDataLib **outlib, size_t *noutlib);
+
+/**
+ * @brief Resolve material data for all materials using the temporary nuclide library.
+ * Handles freeing the temporary library after use.
+ * 
+ * @param lib Pointer to the temporary nuclide library
+ * @param nlib Number of nuclides in the library
+ * @return int 0 on success 1 on failure
+ */
+int resolveMaterials(TempNucDataLib *lib, size_t nlib);
 
 /**
  * @brief Compute macroscopic cross sections for all resolved materials.
@@ -147,6 +169,63 @@ long sampleInitialSource(void);
  */
 int runTransport(void);
 
+void processTransportResults(void);
+
+/**
+ * @brief Build a fission neutron bank from fission sites.
+ * 
+ * @return int 0 on success, 1 on failure
+ */
+int buildFissionBank(void);
+
+/**
+ * @brief Handle an elastic scatter event between a neutron and a nuclide.
+ * Depending on neutron energy scattering is handled from either
+ *  - Stationary target (E >= 200eV)
+ *  - Free gas model (E < 200eV)
+ *
+ * @param n Pointer to neutron
+ * @param nuc Pointer to nuclide
+ */
+void handleElasticScatter(Neutron *n, Nuclide *nuc);
+
+/**
+ * @brief Get the Total Macroscopic xs for a given material and neutron energy
+ * 
+ * @param E Energy in MeV
+ * @param mat Pointer to material
+ * @return double total macroscopic cross section in 1/cm, or -1.0 on failure
+ */
+double getTotalMacroscopicXS(const double E, Material* mat);
+
+/**
+ * @brief Get the Total Microscopic xs for a given nuclide and neutron energy
+ * 
+ * @param E Energy in MeV
+ * @param nuc Pointer to nuclide
+ * @return double total microscopic cross section in barns, or -1.0 on failure
+ */
+double getTotalMicroscopicXS(const double E, Nuclide* nuc);
+
+/**
+ * @brief Get the Microscopic xs for a given MT reaction and neutron energy
+ * 
+ * @param E Energy in MeV
+ * @param xs_table Pointer to XS table
+ * @return double microscopic cross section in barns, or -1.0 on failure
+ */
+double getMicroscopicXS(const double E, XsTable* xs_table);
+
+/**
+ * @brief Get the Material At Position object
+ * 
+ * @param x X-coordinate in cm
+ * @param y Y-coordinate in cm
+ * @param z Z-coordinate in cm
+ * @return int Material index, or -1 if not found
+ */
+int getMaterialAtPosition(double x, double y, double z);
+
 /* Compare two doubles, used for quicksort */
 static inline int cmpDouble(const void *a, const void *b) {
     double da = *(const double*)a, db = *(const double*)b;
@@ -154,8 +233,7 @@ static inline int cmpDouble(const void *a, const void *b) {
 }
 
 /* Linear–linear interpolation on one segment [E1, E2].
-   Returns xs(E) from (E1, xs1) and (E2, xs2).
-   Assumes energies in MeV, cross sections in barns. */
+   Returns xs(E) from (E1, xs1) and (E2, xs2). */
 static inline double linlin(double E1, double sigma1,
                             double E2, double sigma2,
                             double E)

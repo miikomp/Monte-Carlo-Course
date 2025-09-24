@@ -39,8 +39,9 @@ long sampleInitialSource(void) {
 
             /* Initialize misc. parameters */
 
-            n->alive = true;
+            n->status = NEUTRON_ALIVE;
             n->id = (DATA.generation - 1) * GLOB.n_particles + i;
+            n->mat_idx = -1;
 
             /* Initialize particle private seeding */
 
@@ -49,7 +50,7 @@ long sampleInitialSource(void) {
 
             /* Initial direction is isotropic */
 
-            sampleDirection(&n->u, &n->v, &n->w, &n->state);
+            sampleNeutronDirection(n);
         }   
     }
 

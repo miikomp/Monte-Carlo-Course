@@ -1,7 +1,7 @@
 #include "header.h"
 
-int runTransport(void) {
-
+int runTransport(void) 
+{
     /*
     1) On all but the first generation either:
         a) Build a fission neutron bank from fission sites of last generation
@@ -23,5 +23,146 @@ int runTransport(void) {
     5) Repeat until all generations are done
     */
 
+
+    /* ########################################################################################## */
+
+    /* Loop over generations (single-threaded) */
+
+    for (long g = 1; g <= GLOB.n_generations; g++) 
+    {
+        /* Initialize generation score struct to reduce during parallel run */
+
+        GenerationScores gen_scores;
+        memset(&gen_scores, 0, sizeof(GenerationScores));
+
+        /* On all but the first run, build a fission neutron bank from fission sites of last generation */
+        
+        if (g > 1) 
+        {
+            if (buildFissionBank() != 0) 
+            {
+                fprintf(stderr, "[ERROR] Failed to build fission bank for generation %zu.\n", g);
+                return -1;
+            }
+        }
+
+        fprintf(stdout, "\n--- Generation %ld ---\n"
+                        "Simulating %zu neutrons.\n", g, DATA.n_bank);
+
+
+        /* Loop over all neutrons in bank (parallel) */
+
+        #pragma omp parallel default(none)\
+                shared(DATA, RES, stdout, stderr) \
+                reduction(+:gen_scores)
+        {
+            #pragma omp for schedule(dynamic)
+            for (size_t i = 0; i < DATA.n_bank; i++)
+            {
+                /* Get neutron from bank */
+
+                Neutron *n = &DATA.bank[i];
+                if (n->status != NEUTRON_ALIVE) 
+                    continue;
+
+                gen_scores.n_histories++;
+
+                /* Sample collisions until dead */
+
+                size_t k = 0;
+                while (n->status == NEUTRON_ALIVE) 
+                {
+                    /* Sample distance to next collision */
+
+                    double d = sampleDistanceToCollision(n);
+                    if (d < 0.0)
+                    {
+                        /* Neutron is outside the geometry */
+
+                        n->status = NEUTRON_DEAD_LEAKAGE;
+                        continue;
+                    }
+
+                    /* Move neutron to collision site */
+
+                    n->x += d * n->u;
+                    n->y += d * n->v;
+                    n->z += d * n->w;
+                    n->path_length += d;
+                    gen_scores.total_path_length += d;
+
+                    /* Sample collision nuclide in active material */
+
+                    int nuc_idx = sampleCollisionNuclide(n);
+                    if (nuc_idx < 0)
+                    {
+                        n->status = NEUTRON_DEAD_LEAKAGE;
+                        continue;
+                    }
+
+                    /* Sample interaction type */
+
+                    int mt = sampleInteractionType(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
+                    if (mt < 0)
+                    {
+                        n->status = NEUTRON_DEAD_LEAKAGE;
+                        continue;
+                    }
+
+                    /* Score collision */
+
+                    gen_scores.total_collisions++;
+
+                    gen_scores.collision_energy_sum[k] += n->E;
+                    gen_scores.collision_energy_count[k] += 1;
+                    k++;
+                    if (k > gen_scores.max_collision_bin)
+                        gen_scores.max_collision_bin = k;
+
+                    /* Handle interaction */
+
+                    if (MT_IS_ELASTIC_SCATTER(mt))
+                    {
+                        gen_scores.total_elastic_scatters++;
+                        
+                        handleElasticScatter(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
+                    }
+                    else if (MT_IS_FISSION(mt))
+                    {
+                        gen_scores.total_fissions++;
+                        
+                    }
+                    else if (MT_IS_INELASTIC_SCATTER(mt))
+                    {
+                        gen_scores.total_inelastic_scatters++;
+                        
+                    }
+                    else if (MT_IS_CAPTURE(mt))
+                    {
+                        gen_scores.total_captures++;
+                        
+                    }
+                    else
+                    {
+                        gen_scores.total_unknowns++;
+        
+                    }
+
+                    /* Check if cut-off has been reached */
+                    if (k >= MAX_COLLISION_BINS)
+                    {
+                        n->status = NEUTRON_DEAD_TERMINATED;
+                        continue;
+                    }
+
+                }
+            }
+        }
+        
+        /* Store generation scores */
+        if (g - 1 < RES.n_generations && RES.avg_scores)
+            RES.avg_scores[g - 1] = gen_scores;
+        
+    }
     return 0;
 }

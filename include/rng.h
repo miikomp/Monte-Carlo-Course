@@ -1,15 +1,23 @@
 #ifndef RNG_H
 #define RNG_H
 
-#include "header.h"
+#include <stdint.h>
 
-typedef struct {
-    uint64_t s[4];
-} xoshiro256ss_state;
+#include "data.h"
 
 /* --- Function declarations --- */
 
-void sampleDirection(double *u, double *v, double *w, xoshiro256ss_state *rng);
+void sampleNeutronDirection(Neutron *n);
+
+double sampleDistanceToCollision(Neutron *n);
+
+int sampleCollisionNuclide(Neutron *n);
+
+int sampleInteractionType(Neutron *n, Nuclide *nuc);
+
+double sampleMaxwellianEnergy(Neutron *n, double T);
+
+void sampleIsotropicDirection(xoshiro256ss_state *state, double *u, double *v, double *w);
 
 /* --- Inline function declarations --- */
 

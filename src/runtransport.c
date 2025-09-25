@@ -1,5 +1,7 @@
 #include "header.h"
 
+void combNeutronBank();
+
 int runTransport(void) 
 {
     /*
@@ -28,8 +30,10 @@ int runTransport(void)
 
     /* Loop over generations (single-threaded) */
 
-    for (long g = 1; g <= GLOB.n_generations; g++) 
+    for (long g = 1; g <= GLOB.n_generations + GLOB.n_inactive; g++) 
     {
+        DATA.generation = (uint64_t)g;
+
         /* Initialize generation score struct to reduce during parallel run */
 
         GenerationScores gen_scores;
@@ -46,14 +50,22 @@ int runTransport(void)
             }
         }
 
-        fprintf(stdout, "\n--- Generation %ld ---\n"
-                        "Simulating %zu neutrons.\n", g, DATA.n_bank);
+        combNeutronBank();
 
+        if (g > GLOB.n_inactive)
+        {
+            fprintf(stdout, "\n--- Generation %ld ---\n"
+                            "Simulating %zu neutrons.\n", g - GLOB.n_inactive, DATA.n_bank);
+        }
+        else
+        {
+            fprintf(stdout, "Inactive cycle %2ld/%2ld -", g, GLOB.n_inactive);
+        }
 
         /* Loop over all neutrons in bank (parallel) */
 
         #pragma omp parallel default(none)\
-                shared(DATA, RES, stdout, stderr) \
+                shared(GLOB, DATA, RES, stdout, stderr) \
                 reduction(+:gen_scores)
         {
             #pragma omp for schedule(dynamic)
@@ -113,11 +125,15 @@ int runTransport(void)
 
                     gen_scores.total_collisions++;
 
-                    gen_scores.collision_energy_sum[k] += n->E;
-                    gen_scores.collision_energy_count[k] += 1;
-                    k++;
-                    if (k > gen_scores.max_collision_bin)
-                        gen_scores.max_collision_bin = k;
+                    /* For the first set number of collision score energy */
+                    if (k < MAX_COLLISION_BINS) 
+                    {
+                        gen_scores.collision_energy_sum[k] += n->E;
+                        gen_scores.collision_energy_count[k] += 1;
+                        k++;
+                        if (k > gen_scores.max_collision_bin)
+                            gen_scores.max_collision_bin = k;
+                    }
 
                     /* Handle interaction */
 
@@ -130,6 +146,10 @@ int runTransport(void)
                     else if (MT_IS_FISSION(mt))
                     {
                         gen_scores.total_fissions++;
+
+                        handleFission(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
+
+                        gen_scores.total_fission_yield += n->fission_yield;
                         
                     }
                     else if (MT_IS_INELASTIC_SCATTER(mt))
@@ -140,7 +160,7 @@ int runTransport(void)
                     else if (MT_IS_CAPTURE(mt))
                     {
                         gen_scores.total_captures++;
-                        
+                        n->status = NEUTRON_DEAD_CAPTURE;
                     }
                     else
                     {
@@ -149,20 +169,67 @@ int runTransport(void)
                     }
 
                     /* Check if cut-off has been reached */
-                    if (k >= MAX_COLLISION_BINS)
+                    if (n->E < GLOB.energy_cutoff)
                     {
                         n->status = NEUTRON_DEAD_TERMINATED;
-                        continue;
                     }
 
                 }
             }
         }
         
-        /* Store generation scores */
-        if (g - 1 < RES.n_generations && RES.avg_scores)
-            RES.avg_scores[g - 1] = gen_scores;
+        /* Store generation scores if in active cycle */
+        if (g > GLOB.n_inactive)
+        {
+            if (g - 1 - GLOB.n_inactive < RES.n_generations && RES.avg_scores)
+                RES.avg_scores[g - 1 - GLOB.n_inactive] = gen_scores;
+        }
+
+        /* Calculate k-eff */
+        double k_eff = (gen_scores.n_histories > 0) ? ((double)gen_scores.total_fission_yield / (double)gen_scores.n_histories) : 0.0;
+        
+        if (g > GLOB.n_inactive)
+            fprintf(stdout, "Generation %ld k-eff: %.6f\n", g - GLOB.n_inactive, k_eff);
+        else
+            fprintf(stdout, " keff: %.6lf\n", k_eff);
         
     }
     return 0;
+}
+
+/**
+ * @brief Walks the built fission bank and comb samples it down to target_count neutrons.
+ * 
+ */
+void combNeutronBank()
+{
+    size_t target_count = GLOB.n_particles;
+    size_t bank_size = DATA.n_bank;
+
+    if (bank_size == 0 || target_count == 0)
+    {
+        DATA.n_bank = 0;
+        return;
+    }
+
+    if (bank_size <= target_count)
+        return;
+
+    const double stride = (double)bank_size / (double)target_count;
+
+    double position = randd(&GLOB.rng_state) * stride;
+
+    for (size_t write_idx = 0; write_idx < target_count; write_idx++)
+    {
+        size_t selected_idx = (size_t)position;
+        if (selected_idx >= bank_size)
+            selected_idx = bank_size - 1;
+
+        if (selected_idx != write_idx)
+            DATA.bank[write_idx] = DATA.bank[selected_idx];
+
+        position += stride;
+    }
+
+    DATA.n_bank = target_count;
 }

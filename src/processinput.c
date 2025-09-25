@@ -23,6 +23,10 @@ int processInput() {
             fprintf(stdout, "Using provided seed %lu.\n", GLOB.seed);
     }
 
+    /* Initialize RNG state for global use */
+    
+    xoshiro256ss_seed(&GLOB.rng_state, GLOB.seed);
+
     /* Check that requirements for running a transport simulation are set */
     if (GLOB.mode == RUNMODE_TRANSPORT) 
     {

@@ -89,25 +89,36 @@ int sampleCollisionNuclide(Neutron *n)
 
     Material *mat = &DATA.mats[n->mat_idx];
 
-    /* Sample nuclide in material based on their macroscopic cross sections */
+    /* Sample nuclide in material based on the macroscopic cross sections */
 
-    double xi = randd(&n->state) * mat->adens;
+    double total_macro = getTotalMacroscopicXS(n->E, mat);
+
+    if (total_macro <= 0.0)
+        return -1;
+
+    /* Scale random number with total macroscopic cross section */
+
+    double xi = randd(&n->state) * total_macro;
     double sum = 0.0;
 
+    /* Loop over nuclides until cumulated cross section exceeds scaled random number */
+    
     for (size_t i = 0; i < mat->n_nucs; ++i) 
     {
         MaterialNuclide *mnuc = &mat->nucs[i];
         double xs = getTotalMicroscopicXS(n->E, &mnuc->nuc_data);
         if (xs < 0.0)
             continue;
-        sum += mnuc->atom_frac * xs;
+
+        sum += mnuc->N_i * xs * BARN_TO_CM2;
+
         if (sum >= xi) 
             return (int)i;
     }
 
     /* If we reach here something went wrong */
 
-    return -1;
+    return (mat->n_nucs > 0) ? (int)(mat->n_nucs - 1) : -1;
 }
 
 int sampleInteractionType(Neutron *n, Nuclide *nuc)

@@ -59,7 +59,7 @@ extern int VERBOSITY;
 #define INV_MASS_NEUTRON (1.0/MASS_NEUTRON)
 
 #define BARN_TO_CM2 1.0e-24
-#define NT_FISSION 1.2895              /* MeV Nuclear temperature of U235 fission */
+#define TNUC_FISSION 1.2895              /* MeV Nuclear temperature of U235 fission */
 #define E_FG_LIMIT 0.0002             /* MeV energy cutoff for free gas model at 200eV */
 
 #define DEFAULT_NEEDLE_LENGTH 0.85
@@ -188,6 +188,15 @@ int buildFissionBank(void);
  * @param nuc Pointer to nuclide
  */
 void handleElasticScatter(Neutron *n, Nuclide *nuc);
+
+/**
+ * @brief Handle a fission event. Samples the number of neutrons produced, creation of fission
+ * neutrons is not handled here but when building the fission bank from sampled fission sites.
+ *
+ * @param n Pointer to neutron
+ * @param nuc Pointer to nuclide
+ */
+void handleFission(Neutron *n, Nuclide *nuc);
 
 /**
  * @brief Get the Total Macroscopic xs for a given material and neutron energy

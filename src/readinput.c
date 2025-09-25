@@ -96,6 +96,7 @@ long readInput() {
         {
             char *a1 = strtok(NULL, DELIMS);
             char *a2 = strtok(NULL, DELIMS);
+            char *a3 = strtok(NULL, DELIMS);
             if (!a1 || !a2) 
             {
                 fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
@@ -103,17 +104,19 @@ long readInput() {
                 exit(EXIT_FAILURE);
             }
 
-            long n_particles, n_generations;
+            long n_particles, n_generations, n_inactive;
             if (!parseLong(a1, &n_particles) ||!parseLong(a2, &n_generations)) 
             {
                 fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
-            
+            if (!parseLong(a3, &n_inactive))
+                n_inactive = 0;
+
             /* Check for valid values */
 
-            if (n_generations < 1 || n_particles < 1) {
+            if (n_generations < 1 || n_particles < 1 || n_inactive < 0) {
                 fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
@@ -123,6 +126,7 @@ long readInput() {
 
             GLOB.n_generations = n_generations;
             GLOB.n_particles = n_particles;
+            GLOB.n_inactive = n_inactive;
             np++;
         }
 

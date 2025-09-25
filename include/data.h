@@ -92,7 +92,7 @@ typedef struct {
     uint64_t seed;        // RNG seed
     xoshiro256ss_state state;
     double path_length;   // accumulated path length cm
-    long fission_yield; // fission neutrons produced
+    int fission_yield;   // fission neutrons produced
 } Neutron;
 
 /* --- Scoring data structures --- */
@@ -101,7 +101,7 @@ typedef struct {
 typedef struct {
     uint64_t n_histories;
     double   total_path_length;
-    double   total_fission_yield;
+    long   total_fission_yield;
     uint64_t total_collisions;
     uint64_t total_captures;
     uint64_t total_elastic_scatters;
@@ -121,7 +121,7 @@ static inline void GenerationScoresReduce(GenerationScores *restrict out,
     out->total_path_length   += in->total_path_length;
     out->total_fission_yield += in->total_fission_yield;
     out->total_collisions    += in->total_collisions;
-    out->n_histories     += in->n_histories;
+    out->n_histories         += in->n_histories;
     out->total_captures      += in->total_captures;
     out->total_elastic_scatters   += in->total_elastic_scatters;
     out->total_inelastic_scatters += in->total_inelastic_scatters;
@@ -199,7 +199,8 @@ typedef struct {
     const char *errfname;
     char        xslibpath[MAX_STR_LEN];
     long        n_kwargs;
-    uint64_t    seed;     
+    uint64_t    seed;
+    xoshiro256ss_state rng_state;     
     long        mode;
     double      t0;
     double      t1;
@@ -208,6 +209,7 @@ typedef struct {
     /* Iteration parameters */
     long        n_generations;
     long        n_particles;
+    long        n_inactive;
 
     /* Cutoff parameters */
     double      energy_cutoff; // MeV

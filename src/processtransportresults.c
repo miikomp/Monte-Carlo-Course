@@ -2,8 +2,6 @@
 
 #include "header.h"
 
-#define CI_FACTOR 1.959963984540054
-
 typedef struct {
     const char *label;
     const char *matlab_name;
@@ -74,7 +72,7 @@ static void compute_stats(const double *values, size_t n, double *mean, double *
         var += d * d;
     }
     double sigma = (n > 1) ? sqrt(var / (double)(n - 1)) : 0.0;
-    double ci_hw = (n > 1) ? CI_FACTOR * sigma / sqrt((double)n) : 0.0;
+    double ci_hw = (n > 1) ? CI95_FACTOR * sigma / sqrt((double)n) : 0.0;
 
     if (mean) *mean = mu;
     if (std)  *std  = sigma;
@@ -186,7 +184,7 @@ void processTransportResults(void)
                 double avgE = (cnt > 0)
                     ? ref_gen->collision_energy_sum[b] / (double)cnt
                     : 0.0;
-                fprintf(stdout, "  Collision %-3zu  <E> = %12.6e MeV  samples = %" PRIu64 "\n",
+                fprintf(stdout, "  Collision %-3zu  <E> = %12.6e MeV  samples = %lu\n",
                         b + 1, avgE, cnt);
             }
         } 
@@ -194,8 +192,6 @@ void processTransportResults(void)
             fprintf(stdout, "\nNo collision energy tallies were recorded.\n");
         }
     }
-
-    fprintf(stdout, "DONE.\n");
 
     /* ########################################################################################## */
     /* Write results to MATLAB-compatible .m file */
@@ -241,7 +237,7 @@ void processTransportResults(void)
 
             fprintf(mfile, "ENERGY_SAMPLES_PER_COLLISION = [\n");
             for (size_t b = 0; b < max_bin; ++b)
-                fprintf(mfile, "  %" PRIu64, ref_gen->collision_energy_count[b]);
+                fprintf(mfile, "  %lu", ref_gen->collision_energy_count[b]);
             fprintf(mfile, "];\n\n");
         }
 

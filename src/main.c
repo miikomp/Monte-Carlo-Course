@@ -66,12 +66,15 @@ int main(int argc, char **argv) {
     GLOB.n_kwargs = np;
     fprintf(stdout, "DONE.\n");
     if (VERBOSITY >= 1)
-        fprintf(stdout, "Succesfully parsed %ld keyword arguments.\n", np);
+        fprintf(stdout, "\nSuccesfully parsed %ld keyword arguments.\n", np);
     
     /* Process input data */
+    fprintf(stdout, "\nProcessing input data...\n");
 
     if (processInput() != 0) 
         return EXIT_FAILURE;
+
+    fprintf(stdout, "DONE.\n");
 
     /* ########################################################################################## */
 
@@ -114,7 +117,13 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
 
+        fprintf(stdout, "\n----------------------------\n");
+        fprintf(stdout, "  Preparing simulation\n");
+        fprintf(stdout, "----------------------------\n\n");
+
         /* Initialize results data struct */
+
+        fprintf(stdout, "Clearing results...\n");
 
         RES.n_generations = GLOB.n_generations;
         RES.avg_scores = (GenerationScores*)calloc((size_t)GLOB.n_generations, sizeof(GenerationScores));
@@ -123,10 +132,20 @@ int main(int argc, char **argv) {
             fprintf(stderr, "[ERROR] Memory allocation failed.\n");
             return EXIT_FAILURE;
         }
+
+        fprintf(stdout, "DONE.\n");
+
+        /* Process detectors */
+
+        if (processDetectors() != 0) 
+        {
+            fprintf(stderr, "[ERROR] Could not process detectors.\n");
+            return EXIT_FAILURE;
+        }
     }
     /* ########################################################################################## */
 
-    /* Set desired number of threads and get actual provided */
+    /* Set desired number of threads and put actual number provided */
 
     omp_set_num_threads(GLOB.n_threads);
     int nt = omp_get_max_threads();
@@ -229,6 +248,9 @@ int main(int argc, char **argv) {
         fprintf(stdout, "Processing results...\n");
 
         processTransportResults();
+        processDetectorResults();
+
+        fprintf(stdout, "\nDONE.\n");
     }
 
     /* Prepare for termination */

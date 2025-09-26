@@ -20,6 +20,7 @@ runInfo GLOB = {
     .n_particles    = 0l,
 
     .energy_cutoff  = 0.0,
+    .max_collisions = 1e6l,
 
     .needle_length  = 0.0,
     .line_spacing   = 0.0,
@@ -34,8 +35,7 @@ runData DATA = {
     .bank   = NULL,
     .src = NULL,
     .src_type = 0,
-    .detector = NULL,
-    .detector_type = 0
+    .n_detectors = 0,
 };
 
 ResultsData RES = {

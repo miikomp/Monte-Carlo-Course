@@ -105,7 +105,7 @@ long readInput() {
             }
 
             long n_particles, n_generations, n_inactive;
-            if (!parseLong(a1, &n_particles) ||!parseLong(a2, &n_generations)) 
+            if (!parseLong(a1, &n_particles) || !parseLong(a2, &n_generations)) 
             {
                 fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                 fclose(fp);
@@ -476,63 +476,47 @@ long readInput() {
 
             char *a1 = strtok(NULL, DELIMS);
             char *a2 = strtok(NULL, DELIMS);
+
             if (!a1 || !a2) 
             {
                 fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
-            const char *name = a2;
-            uint32_t det_type;
-            if (!parseUInt(a1, &det_type)) 
+            const char *det_name = a1, *mat_name = a2;
+            
+            if (DATA.n_detectors >= (size_t)MAX_NUM_DETECTORS) 
             {
-                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                fprintf(stderr, "[ERROR] Only %d detectors supported (line %ld).\n", MAX_NUM_DETECTORS, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
-        
-            /* Check for valid values */
 
-            if (det_type < 1) 
-            {
-                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+            /* Create new detector item */
+
+            DATA.detectors[DATA.n_detectors] = (ReactionRateDetector*)malloc(sizeof(ReactionRateDetector));
+            if (!DATA.detectors[DATA.n_detectors]) 
+            { 
+                fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
                 fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-            if (DATA.detector == NULL) 
-            {
-                DATA.detector = (DetectorDefinition*)malloc(sizeof(DetectorDefinition));
-                if (!DATA.detector) 
-                { 
-                    fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
-                    fclose(fp);
-                    exit(EXIT_FAILURE); 
-                }
+                exit(EXIT_FAILURE); 
             }
 
-            /* Put detector data */
+            /* Put detector parameters */
 
-            DATA.detector_type = det_type;
+            ReactionRateDetector *det = DATA.detectors[DATA.n_detectors];
+            memset(det, 0, sizeof(ReactionRateDetector));
 
-            /* Reaction rate detector */
+            snprintf(det->name, sizeof(det->name), "%s", det_name);
+            snprintf(det->material_name, sizeof(det->material_name), "%s", mat_name);
+            det->material_index = -1;
 
-            if (det_type == 1) 
-            {
-                ReactionRateDetector *det = &DATA.detector->rr;
-                memset(det, 0, sizeof(ReactionRateDetector));
-
-                snprintf(det->name, sizeof(det->name), "%s", name);
-
-            }
-            else 
-            {
-                fprintf(stderr, "[ERROR] Detector type %d not implemented (line %ld).\n", det_type, lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
 
             if (VERBOSITY >= 2)
-                fprintf(stdout, "Parsed a type %d detector named \"%s\".\n", det_type, a2);
+                fprintf(stdout, "Parsed a detector named: \"%s\" linked to material: \"%s\".\n", det_name, mat_name);
+
+            DATA.n_detectors++;
+            np++;
         }
 
         /* ###################################################################################### */        
@@ -604,6 +588,21 @@ long readInput() {
                 GLOB.energy_cutoff = ecut;
                 np++;
             }
+            else if (!strcmp(subkey, "ccut"))
+            {
+                long ccut;
+                if (!parseLong(value, &ccut) || ccut < 0) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid value for \"set ccut\" on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                /* Put collision cutoff */
+
+                GLOB.max_collisions = ccut;
+                np++;
+            }
             else if (!strcmp(subkey, "needle")) 
             {
                 double needle_length;
@@ -664,6 +663,8 @@ long readInput() {
  * @return int 0 on failure 1 on success
  */
 static int parseLong(const char *s, long *out) {
+    if (!s || !out)
+        return 0;
     errno = 0;
     char *end = NULL;
     long v = strtol(s, &end, 10);
@@ -681,6 +682,8 @@ static int parseLong(const char *s, long *out) {
  * @return int 0 on failure 1 on success
  */
 static int parseULong(const char *s, uint64_t *out) {
+    if (!s || !out)
+        return 0;
     errno = 0;
     char *end = NULL;
     unsigned long v = strtoul(s, &end, 10);
@@ -697,6 +700,8 @@ static int parseULong(const char *s, uint64_t *out) {
  * @return int 0 on failure 1 on success
  */
 static int parseUInt(const char *s, uint32_t *out) {
+    if (!s || !out)
+        return 0;
     errno = 0;
     char *end = NULL;
     unsigned long v = strtoul(s, &end, 10);
@@ -713,6 +718,8 @@ static int parseUInt(const char *s, uint32_t *out) {
  * @return int 0 on failure 1 on success
  */
 static int parseDouble(const char *s, double *out) {
+    if (!s || !out)
+        return 0;
     errno = 0;
     char *end = NULL;
     double v = strtod(s, &end);

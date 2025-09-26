@@ -51,6 +51,7 @@ extern int VERBOSITY;
 
 #define DELIMS " \t\r\n"
 
+#define CI95_FACTOR 1.959963984540054
 #define M_PI 3.14159265358979323846
 #define NA 6.02214076e23
 #define BOLTZMANN 8.617333262145e-11   /* MeV/K */
@@ -65,6 +66,7 @@ extern int VERBOSITY;
 #define DEFAULT_NEEDLE_LENGTH 0.85
 #define DEFAULT_LINE_SPACING  1.0
 #define MIN_BANK_SIZE 1000
+
 
 enum SRC_TYPES{
     SRC_MONO_POINT = 1
@@ -155,6 +157,20 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib);
 int computeMacroXs(void);
 
 /**
+ * @brief Process detector data and put parameters
+ * 
+ * @return int 0 on success, 1 on failure
+ */
+int processDetectors(void);
+
+
+/**
+ * @brief Process scored detector results and output relevant data into file and stdout.
+ * 
+ */
+void processDetectorResults();
+
+/**
  * @brief Samples a source and fills the neutron bank with initial neutrons corresponding to 
  * the number of neutrons per generation.
  * 
@@ -169,7 +185,17 @@ long sampleInitialSource(void);
  */
 int runTransport(void);
 
+/**
+ * @brief Process transport results and output relevant data into file and stdout.
+ * 
+ */
 void processTransportResults(void);
+
+/**
+ * @brief Process detector tallies gathered during transport and write outputs.
+ *
+ */
+void processDetectorResults(void);
 
 /**
  * @brief Build a fission neutron bank from fission sites.

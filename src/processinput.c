@@ -27,6 +27,7 @@ int processInput() {
     
     xoshiro256ss_seed(&GLOB.rng_state, GLOB.seed);
 
+    /* ########################################################################################## */
     /* Check that requirements for running a transport simulation are set */
     if (GLOB.mode == RUNMODE_TRANSPORT) 
     {
@@ -47,6 +48,7 @@ int processInput() {
         }
     }
 
+    /* ########################################################################################## */
     /* Check Buffon's needle related parameters */
 
     if (GLOB.mode != RUNMODE_BUFFONS_PI) 

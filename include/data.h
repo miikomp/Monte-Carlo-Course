@@ -9,6 +9,7 @@
 #define MAX_STR_LEN 1024
 #define MAX_PATH 4096
 #define MAX_COLLISION_BINS 250
+#define MAX_NUM_DETECTORS 16
 
 typedef struct {
     uint64_t s[4];
@@ -141,23 +142,36 @@ static inline void GenerationScoresReduce(GenerationScores *restrict out,
     initializer(omp_priv = (GenerationScores){0})
 #endif
 
+/* --- Detector structures --- */
 
-// Reaction rate detector structure
+/* Reaction rate detector structures */
+typedef enum {
+    RRDET_MODE_ELASTIC = 0,
+    RRDET_MODE_FISSION,
+    RRDET_MODE_INELASTIC,
+    RRDET_MODE_CAPTURE,
+    RRDET_MODE_COUNT
+} ReactionRateMode;
+
 typedef struct {
-    char     name[128];         // detector name
-    size_t   n_channels;        // number of tracked (nuclide, MT) pairs
-    int     *materials;         // material index per channel
-    int     *nuclides;          // nuclide index within material
-    int     *mt_numbers;        // MT identifiers for each channel
-    double  *sum_counts;        // accumulated reaction counts
-    double  *sum_sq_counts;     // accumulated squared counts for variance
-    double  *sum_weights;       // accumulated particle weights per channel
+    double sum;     // accumulated score
+    double sum_sq;  // accumulated score squared for variance
+} ReactionRateTally;
+
+typedef struct {
+    char  nuclide_name[16];
+    int   nuclide_index;   // index inside the Material.nucs array
+    ReactionRateTally tallies[RRDET_MODE_COUNT];
+} ReactionRateNuclide;
+
+typedef struct {
+    char   name[128];           // detector name from input
+    char   material_name[128];  // tracked material name from input
+    int    material_index;      // resolved material index, -1 if unresolved
+    uint64_t n_histories;       // number of tallied source histories
+    size_t n_nuclides;          // length of the nuclides array
+    ReactionRateNuclide *nuclides;
 } ReactionRateDetector;
-
-typedef union {
-    ReactionRateDetector rr;
-} DetectorDefinition;
-
 
 /* --- Particle source data structures --- */
 
@@ -182,8 +196,8 @@ typedef struct {
     Neutron  *bank;
     SourceDefinition *src;
     uint32_t src_type;
-    DetectorDefinition *detector;
-    uint32_t detector_type;
+    size_t n_detectors;
+    ReactionRateDetector *detectors[MAX_NUM_DETECTORS];
 } runData;
 
 typedef struct {
@@ -213,6 +227,7 @@ typedef struct {
 
     /* Cutoff parameters */
     double      energy_cutoff; // MeV
+    long        max_collisions; // per neutron
 
     /* Allocated memory footprint (bytes)*/
     size_t      mem_xsdata;

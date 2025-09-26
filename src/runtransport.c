@@ -28,6 +28,59 @@ int runTransport(void)
 
     /* ########################################################################################## */
 
+    /* Get pointer to detector array */
+
+    const size_t n_detectors = DATA.n_detectors;
+    ReactionRateDetector **detectors = DATA.detectors;
+
+    /* Initialize detector scoring related variables */
+
+    size_t *detector_offsets = NULL;
+    size_t total_detector_bins = 0;
+    int max_threads = omp_get_max_threads();
+    double *detector_thread_sums = NULL;
+    double *detector_thread_sums_sq = NULL;
+    double *detector_history_counts = NULL;
+
+    /* Create thread local storage for detector scores */
+
+    if (n_detectors > 0)
+    {
+        detector_offsets = (size_t*)malloc(n_detectors * sizeof(size_t));
+        if (!detector_offsets)
+        {
+            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+            free(detector_offsets);
+            free(detector_thread_sums);
+            free(detector_thread_sums_sq);
+            free(detector_history_counts);
+            return EXIT_FAILURE;
+        }
+
+        for (size_t d = 0; d < n_detectors; ++d)
+        {
+            detector_offsets[d] = total_detector_bins;
+            total_detector_bins += detectors[d]->n_nuclides * RRDET_MODE_COUNT;
+        }
+
+        if (total_detector_bins > 0)
+        {
+            size_t per_thread_bytes = (size_t)max_threads * total_detector_bins;
+            detector_thread_sums = (double*)calloc(per_thread_bytes, sizeof(double));
+            detector_thread_sums_sq = (double*)calloc(per_thread_bytes, sizeof(double));
+            detector_history_counts = (double*)calloc(per_thread_bytes, sizeof(double));
+            if (!detector_thread_sums || !detector_thread_sums_sq || !detector_history_counts)
+            {
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                free(detector_offsets);
+                free(detector_thread_sums);
+                free(detector_thread_sums_sq);
+                free(detector_history_counts);
+                return EXIT_FAILURE;
+            }
+        }
+    }
+
     /* Loop over generations (single-threaded) */
 
     for (long g = 1; g <= GLOB.n_generations + GLOB.n_inactive; g++) 
@@ -39,6 +92,16 @@ int runTransport(void)
         GenerationScores gen_scores;
         memset(&gen_scores, 0, sizeof(GenerationScores));
 
+        /* Clear thread-local detector scoring arrays */
+
+        const int do_detectors = (total_detector_bins > 0) && (g > GLOB.n_inactive);
+        if (do_detectors)
+        {
+            size_t total_bins_bytes = (size_t)max_threads * total_detector_bins * sizeof(double);
+            memset(detector_thread_sums, 0, total_bins_bytes);
+            memset(detector_thread_sums_sq, 0, total_bins_bytes);
+        }
+
         /* On all but the first run, build a fission neutron bank from fission sites of last generation */
         
         if (g > 1) 
@@ -46,7 +109,11 @@ int runTransport(void)
             if (buildFissionBank() != 0) 
             {
                 fprintf(stderr, "[ERROR] Failed to build fission bank for generation %zu.\n", g);
-                return -1;
+                free(detector_offsets);
+                free(detector_thread_sums);
+                free(detector_thread_sums_sq);
+                free(detector_history_counts);
+                return EXIT_FAILURE;
             }
         }
 
@@ -65,9 +132,25 @@ int runTransport(void)
         /* Loop over all neutrons in bank (parallel) */
 
         #pragma omp parallel default(none)\
-                shared(GLOB, DATA, RES, stdout, stderr) \
+                shared(GLOB, DATA, RES, stdout, stderr, \
+                       detectors, n_detectors, detector_offsets, \
+                       detector_thread_sums, detector_thread_sums_sq, \
+                       detector_history_counts, total_detector_bins, do_detectors) \
                 reduction(+:gen_scores)
         {
+            ReactionRateMode r_mode = RRDET_MODE_COUNT;
+            const int tid = omp_get_thread_num();
+            double *history_counts = NULL;
+            double *local_sum = NULL;
+            double *local_sq = NULL;
+
+            if (do_detectors)
+            {
+                history_counts = detector_history_counts + (size_t)tid * total_detector_bins;
+                local_sum = detector_thread_sums + (size_t)tid * total_detector_bins;
+                local_sq  = detector_thread_sums_sq + (size_t)tid * total_detector_bins;
+            }
+
             #pragma omp for schedule(dynamic)
             for (size_t i = 0; i < DATA.n_bank; i++)
             {
@@ -78,6 +161,9 @@ int runTransport(void)
                     continue;
 
                 gen_scores.n_histories++;
+
+                if (do_detectors)
+                    memset(history_counts, 0, total_detector_bins * sizeof(double));
 
                 /* Sample collisions until dead */
 
@@ -102,6 +188,10 @@ int runTransport(void)
                     n->z += d * n->w;
                     n->path_length += d;
                     gen_scores.total_path_length += d;
+
+                    /* Get material at position moved to */
+
+                    n->mat_idx = getMaterialAtPosition(n->x, n->y, n->z);
 
                     /* Sample collision nuclide in active material */
 
@@ -142,6 +232,8 @@ int runTransport(void)
                         gen_scores.total_elastic_scatters++;
                         
                         handleElasticScatter(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
+
+                        r_mode = RRDET_MODE_ELASTIC;
                     }
                     else if (MT_IS_FISSION(mt))
                     {
@@ -150,22 +242,41 @@ int runTransport(void)
                         handleFission(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
 
                         gen_scores.total_fission_yield += n->fission_yield;
+
+                        r_mode = RRDET_MODE_FISSION;
                         
                     }
                     else if (MT_IS_INELASTIC_SCATTER(mt))
                     {
                         gen_scores.total_inelastic_scatters++;
-                        
+
+                        r_mode = RRDET_MODE_INELASTIC;
                     }
                     else if (MT_IS_CAPTURE(mt))
                     {
                         gen_scores.total_captures++;
                         n->status = NEUTRON_DEAD_CAPTURE;
+
+                        r_mode = RRDET_MODE_CAPTURE;
                     }
                     else
                     {
                         gen_scores.total_unknowns++;
-        
+                    }
+
+                    /* Score detectors if applicable */
+
+                    if (do_detectors && r_mode != RRDET_MODE_COUNT)
+                    {
+                        for (size_t d = 0; d < n_detectors; ++d)
+                        {
+                            ReactionRateDetector *det = detectors[d];
+                            if (det->material_index == n->mat_idx && (size_t)nuc_idx < det->n_nuclides)
+                            {
+                                size_t bin = detector_offsets[d] + (size_t)nuc_idx * RRDET_MODE_COUNT + (size_t)r_mode;
+                                history_counts[bin] += 1.0;
+                            }
+                        }
                     }
 
                     /* Check if cut-off has been reached */
@@ -175,26 +286,81 @@ int runTransport(void)
                     }
 
                 }
+
+                if (do_detectors)
+                {
+                    for (size_t b = 0; b < total_detector_bins; ++b)
+                    {
+                        double val = history_counts[b];
+                        local_sum[b] += val;
+                        local_sq[b]  += val * val;
+                    }
+                }
             }
         }
-        
+        /* ###################################################################################### */
         /* Store generation scores if in active cycle */
+
         if (g > GLOB.n_inactive)
         {
             if (g - 1 - GLOB.n_inactive < RES.n_generations && RES.avg_scores)
                 RES.avg_scores[g - 1 - GLOB.n_inactive] = gen_scores;
         }
-
-        /* Calculate k-eff */
-        double k_eff = (gen_scores.n_histories > 0) ? ((double)gen_scores.total_fission_yield / (double)gen_scores.n_histories) : 0.0;
         
+        /* Score detectors if in active cycle */
+
+        if (g > GLOB.n_inactive && n_detectors > 0)
+        {
+            uint64_t histories_this_gen = gen_scores.n_histories;
+            for (size_t d = 0; d < n_detectors; ++d)
+                detectors[d]->n_histories += histories_this_gen;
+        }
+
+        if (g > GLOB.n_inactive && total_detector_bins > 0)
+        {
+            for (size_t d = 0; d < n_detectors; ++d)
+            {
+                ReactionRateDetector *det = detectors[d];
+                size_t offset = detector_offsets[d];
+                for (size_t nuc = 0; nuc < det->n_nuclides; ++nuc)
+                {
+                    for (size_t mode = 0; mode < RRDET_MODE_COUNT; ++mode)
+                    {
+                        size_t bin_index = offset + nuc * RRDET_MODE_COUNT + mode;
+                        double sum_val = 0.0;
+                        double sum_sq_val = 0.0;
+                        for (int tid = 0; tid < max_threads; ++tid)
+                        {
+                            size_t base = (size_t)tid * total_detector_bins + bin_index;
+                            sum_val    += detector_thread_sums[base];
+                            sum_sq_val += detector_thread_sums_sq[base];
+                        }
+
+                        ReactionRateTally *tally = &det->nuclides[nuc].tallies[mode];
+                        tally->sum    += sum_val;
+                        tally->sum_sq += sum_sq_val;
+                    }
+                }
+            }
+        }
+
+        /* Print generation summary */
+        
+        double k_eff = (gen_scores.n_histories > 0) ? ((double)gen_scores.total_fission_yield / (double)gen_scores.n_histories) : 0.0;
         if (g > GLOB.n_inactive)
             fprintf(stdout, "Generation %ld k-eff: %.6f\n", g - GLOB.n_inactive, k_eff);
         else
             fprintf(stdout, " keff: %.6lf\n", k_eff);
-        
     }
-    return 0;
+
+
+    /* Return succesfully */
+
+    free(detector_offsets);
+    free(detector_thread_sums);
+    free(detector_thread_sums_sq);
+    free(detector_history_counts);
+    return EXIT_SUCCESS;
 }
 
 /**

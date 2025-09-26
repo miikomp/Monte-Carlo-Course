@@ -60,10 +60,6 @@ double sampleDistanceToCollision(Neutron *n)
         return -1.0;
     }
 
-    /* Store material index for use later to sample interaction type */
-
-    n->mat_idx = mat_idx;
-
     /* Get material */
 
     Material *mat = &DATA.mats[mat_idx];

@@ -103,11 +103,13 @@ int buildFissionBank()
 
                 /* Create a secondary fission neutron */
 
-                Neutron *new_neutron = &new_bank[new_idx++];
+                Neutron *new_neutron = &new_bank[new_idx];
 
                 /* Initialize the neutron */
 
                 initFissionNeutron(&n, new_neutron, new_idx);
+
+                new_idx++;
             }
 
         }

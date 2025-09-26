@@ -215,6 +215,16 @@ int buildFissionBank(void);
  */
 void handleElasticScatter(Neutron *n, Nuclide *nuc);
 
+
+/**
+ * @brief Handle inelastic level scattering.
+ * 
+ * @param n Pointer to neutron
+ * @param nuc Pointer to nuclide
+ * @param mt ENDF reaction mode identifier (For getting Q value etc.)
+ */
+void handleInelasticScatter(Neutron *n, Nuclide *nuc, int mt);
+
 /**
  * @brief Handle a fission event. Samples the number of neutrons produced, creation of fission
  * neutrons is not handled here but when building the fission bank from sampled fission sites.

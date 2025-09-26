@@ -109,6 +109,125 @@ void handleElasticScatter(Neutron *n, Nuclide *nuc)
     n->E = 0.5 * AMU_TO_MEV_C2 * Vn_p * Vn_p;
 }
 
+void handleInelasticScatter(Neutron *n, Nuclide *nuc, int mt)
+{
+    /* Get xsdata for inelastic scattering */
+
+    int xs_idx = nuc->mt_idx[mt];
+    XsTable xstable = nuc->xs[xs_idx];
+
+    /* Check for discrete vs. continuum */
+
+    if (mt == MT_INELASTIC_CONTINUUM)
+    {
+        fprintf(stderr, "[ERROR] Continuum inelastic scattering not implemented.\n");
+        n->status = NEUTRON_DEAD_TERMINATED;
+        return;
+    }
+    
+    /* --- Discrete level inelastic scattering --- */
+    
+    /* Mass ratio */
+    
+    double A = nuc->AW * INV_MASS_NEUTRON;
+    double denom = A + 1.0;
+
+    /* Neutron lab speed */
+
+    double Vn = sqrt(2.0 * n->E / AMU_TO_MEV_C2);
+
+    /* Neutron lab direction vector */
+
+    double vn_x = Vn * n->u;
+    double vn_y = Vn * n->v;
+    double vn_z = Vn * n->w;
+
+    /* CM velocity (assume target stationary) */
+
+    double vcm_x = vn_x / denom;
+    double vcm_y = vn_y / denom;
+    double vcm_z = vn_z / denom;
+
+    /* Neutron velocity in CM */
+
+    double vn_cx = vn_x - vcm_x;
+    double vn_cy = vn_y - vcm_y;
+    double vn_cz = vn_z - vcm_z;
+
+    double Vc = sqrt(vn_cx*vn_cx + vn_cy*vn_cy + vn_cz*vn_cz);
+
+    if (!(Vc > 0.0)) 
+    {
+        /* Invalid, keep direction normalized and zero energy */
+        double norm = sqrt(n->u*n->u + n->v*n->v + n->w*n->w);
+        if (norm > 0.0) 
+        { 
+            n->u/=norm; 
+            n->v/=norm; 
+            n->w/=norm; 
+        }
+        n->E = 0.0;
+        return;
+    }
+
+    /* CM relative kinetic energy */
+
+    double Erel = 0.5 * AMU_TO_MEV_C2 * Vc * Vc * (1.0 + 1.0 / A);
+
+    /* Apply MT Q value to relative energy */
+
+    double Q = xstable.Q;
+    double Erel_p = Erel + Q;
+
+    if (Erel <= 0.0)
+    {
+        /* Invalid, terminate history */
+        n->E = 0.0;
+        n->status = NEUTRON_DEAD_TERMINATED;
+        return;
+    }
+
+    /* Scale neutron speed */
+
+    double Vc_p  = Vc * sqrt(Erel_p / Erel);
+
+
+    /* Sample new direction in CM isotropically */
+    
+    double uc, vc, wc;
+    sampleIsotropicDirection(&n->state, &uc, &vc, &wc);
+
+    /* New neutron velocity in CM */
+    
+    double vn_cx_p = Vc_p * uc;
+    double vn_cy_p = Vc_p * vc;
+    double vn_cz_p = Vc_p * wc;
+    
+    /* Back to lab */
+    
+    double vn_x_p = vn_cx_p + vcm_x;
+    double vn_y_p = vn_cy_p + vcm_y;
+    double vn_z_p = vn_cz_p + vcm_z;
+
+    const double Vn_p = sqrt(vn_x_p*vn_x_p + vn_y_p*vn_y_p + vn_z_p*vn_z_p);
+
+    if (Vn_p <= 0.0) 
+    {
+        n->E = 0.0;
+        sampleIsotropicDirection(&n->state, &n->u, &n->v, &n->w);
+        return;
+    }
+
+    /* Put data in neutron */
+
+    n->u = vn_x_p / Vn_p;
+    n->v = vn_y_p / Vn_p;
+    n->w = vn_z_p / Vn_p;
+    n->E = 0.5 * AMU_TO_MEV_C2 * Vn_p * Vn_p;
+
+    return;
+}
+
 void handleFission(Neutron *n, Nuclide *nuc)
 {
     if (!nuc->has_nubar)

@@ -248,6 +248,8 @@ int runTransport(void)
                     {
                         gen_scores.total_inelastic_scatters++;
 
+                        handleInelasticScatter(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data, mt);
+
                         r_mode = RRDET_MODE_INELASTIC;
                     }
                     else if (MT_IS_CAPTURE(mt))

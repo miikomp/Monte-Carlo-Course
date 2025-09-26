@@ -28,17 +28,27 @@ xslibpath ./xsdata/xsdata.lib
 # 92235 -0.0066096
 # 92238 -0.9230476
 
+mat CRIT_U_WATER -8.39 300
+ 1001  -0.00787
+ 8016  -0.06247
+ 92235 -0.0102
+ 92238 -0.920
+
 #mat NAT_U -19.1 300
 # 92235 -0.0072
 # 92238 -0.9928
 
+#mat CRIT_U -19.1 300
+# 92235 -0.0304
+# 92238 -0.9696
+
 #mat GRAPHITE -1.8 300
 # 6000 1.0
 # 
-mat UO2_NAT -10.97 300
-  8016  -0.118
-  92235 -0.00635
-  92238 -0.87565
+#mat UO2_NAT -10.97 300
+#  8016  -0.118
+#  92235 -0.00635
+#  92238 -0.87565
 
 #mat UO2_U238 -10.97 300
 #  8016  -0.118
@@ -51,9 +61,6 @@ mat UO2_NAT -10.97 300
 src 1 0.0 0.0 0.0 1.0
 
 # Specify a detector for material to score nuclide wise reaction rates
-det detector1 UO2_NAT
-
-# Specify a maximum collision number for cutoffs in heavily non-absorbing systems
-set ccut 1000
+# det detector1 UO2_NAT
 
 

@@ -1,4 +1,5 @@
 #include "header.h"
+#include <inttypes.h>
 
 #define N 10000000
 #define MEAN_TOL 0.002
@@ -12,6 +13,10 @@ int test_xoshiro256ss_uniformity();
 int test_xoshiro256ss_independence();
 int test_splitmix64_distribution();
 int test_initTrigTables();
+int test_rotl_bit_rotation();
+int test_xoshiro256ss_reproducibility();
+int test_splitmix64_known_values();
+int test_randd_bounds();
 
 /**
  * @brief Main function for the testing environment. Compiled and run with "make test"
@@ -28,6 +33,10 @@ int main(void) {
     i += test_xoshiro256ss_uniformity();
     i += test_xoshiro256ss_independence();
     i += test_splitmix64_distribution();
+    i += test_rotl_bit_rotation();
+    i += test_xoshiro256ss_reproducibility();
+    i += test_splitmix64_known_values();
+    i += test_randd_bounds();
 
     /* Test initializers */
     
@@ -123,6 +132,72 @@ int test_initTrigTables() {
     }
     printf("\ninitTrigTables() test:\n");
     printf("  First 1000 sin/cos/tan values checked against math.h\n");
+    printf("  Result: %s\n", fail ? "Fail" : "Success");
+    return fail;
+}
+
+int test_rotl_bit_rotation() {
+    printf("\nrotl() bit rotation test:\n");
+    int fail = 0;
+    uint64_t v1 = rotl(UINT64_C(1), 1);
+    uint64_t v2 = rotl(UINT64_C(0x8000000000000000), 1);
+    uint64_t v3 = rotl(UINT64_C(0x0123456789ABCDEF), 16);
+    printf("  rotl(1,1) -> 0x%016" PRIx64 " (expected 0x0000000000000002)\n", v1);
+    printf("  rotl(0x8000...0,1) -> 0x%016" PRIx64 " (expected 0x0000000000000001)\n", v2);
+    printf("  rotl(0x0123456789ABCDEF,16) -> 0x%016" PRIx64 "\n", v3);
+    if (v1 != UINT64_C(0x2)) fail = 1;
+    if (v2 != UINT64_C(0x1)) fail = 1;
+    if (v3 != UINT64_C(0x456789ABCDEF0123)) fail = 1;
+    printf("  Result: %s\n", fail ? "Fail" : "Success");
+    return fail;
+}
+
+int test_xoshiro256ss_reproducibility() {
+    printf("\nxoshiro256ss() reproducibility test:\n");
+    xoshiro256ss_state a, b;
+    xoshiro256ss_seed(&a, 0xDEADBEEFCAFEBABEULL);
+    xoshiro256ss_seed(&b, 0xDEADBEEFCAFEBABEULL);
+
+    int fail = 0;
+    for (int i = 0; i < 8; ++i) {
+        uint64_t ra = xoshiro256ss(&a);
+        uint64_t rb = xoshiro256ss(&b);
+        if (ra != rb) fail = 1;
+        printf("  draw[%d] = 0x%016" PRIx64 "\n", i, ra);
+    }
+
+    printf("  Result: %s\n", fail ? "Fail" : "Success");
+    return fail;
+}
+
+int test_splitmix64_known_values() {
+    printf("\nsplitmix64() known value test:\n");
+    uint64_t state = 0;
+    uint64_t first = splitmix64(&state);
+    uint64_t second = splitmix64(&state);
+    printf("  first  = 0x%016" PRIx64 "\n", first);
+    printf("  second = 0x%016" PRIx64 "\n", second);
+    int fail = 0;
+    if (first != UINT64_C(0xE220A8397B1DCDAF)) fail = 1;
+    if (second != UINT64_C(0x6E789E6AA1B965F4)) fail = 1;
+    printf("  Result: %s\n", fail ? "Fail" : "Success");
+    return fail;
+}
+
+int test_randd_bounds() {
+    printf("\nrandd() bounds test:\n");
+    xoshiro256ss_state state;
+    xoshiro256ss_seed(&state, 0x123456789ABCDEF0ULL);
+    int fail = 0;
+    double min = 1.0, max = 0.0;
+    const int samples = 1000000;
+    for (int i = 0; i < samples; ++i) {
+        double r = randd(&state);
+        if (r < min) min = r;
+        if (r > max) max = r;
+        if (r < 0.0 || r >= 1.0) fail = 1;
+    }
+    printf("  min = %.12f, max = %.12f\n", min, max);
     printf("  Result: %s\n", fail ? "Fail" : "Success");
     return fail;
 }

@@ -1,5 +1,7 @@
 #include "header.h"
 
+void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx);
+
 int buildFissionBank()
 {   
     /* Count fission neutrons */
@@ -25,116 +27,110 @@ int buildFissionBank()
             Neutron *n = &DATA.bank[i];
             n->status = NEUTRON_ALIVE;
         }
+        fprintf(stdout, "\n[WARNING] No fission events. Re-using previous generation\n");
         return EXIT_SUCCESS;
     }
 
-    /* Build fission bank */
+    /* Build fission bank large enough to hold the next generation */
 
-    Neutron *new_bank = (Neutron *)calloc(n_fission_neutrons, sizeof(Neutron));
+    size_t new_bank_size = GLOB.n_particles * 1.2;
+    Neutron *new_bank = (Neutron *)calloc(new_bank_size, sizeof(Neutron));
     if (!new_bank)
     {
         fprintf(stderr, "[ERROR] Memory allocation failed.\n");
         return EXIT_FAILURE;
     }
 
+    size_t new_idx = 0;
+
     if (VERBOSITY >= 2)
         fprintf(stdout, "Building fission bank with %zu neutrons from %zu fission sites...\n", 
             n_fission_neutrons, n_fission_sites);
 
-    /* Fill fission bank by creating new neutrons according to sampled fission yield at each fission site */
+    /* Fill fission bank by walking the fission sites. Depending on if the system is 
+       sub or supercritical, we may need to duplicate neutrons or skip sites altogether
+       This is done by calculating the number of guaranteed repeats and the chance for 
+       an additional repeat. For a subcritical system this means an N number of repeats and
+       a possible additional repeat. For a supercritical system this means 0 guaranteed repeats
+       and a chance to include that site */
 
-    size_t new_idx = 0;
-    for (size_t parent_idx = 0; parent_idx < DATA.n_bank; parent_idx++)
+    double factor = (double)GLOB.n_particles / (double)n_fission_neutrons;
+    long repeats = (int)factor;
+    double a = factor - repeats;
+
+    /* Loop over sites */
+    for (size_t i = 0; i < DATA.n_bank; i++)
     {
-        Neutron *parent = &DATA.bank[parent_idx];
-        if (parent->status != NEUTRON_DEAD_FISSION || parent->fission_yield <= 0)
+        /* Get neutron from bank */
+
+        Neutron n = DATA.bank[i];
+
+        /* Check if neutron caused a fission */
+
+        if (n.status != NEUTRON_DEAD_FISSION)
             continue;
 
-        for (int k = 0; k < parent->fission_yield; ++k)
+        /* Sample if an additional repeat is performed */
+
+        double xi = randd(&n.state);
+        long reps = repeats;
+        if (xi < a)
+            reps++;
+
+        /* Loop over guaranteed repeats */
+
+        for (long j = 0; j < reps; j++)
         {
-            if (new_idx >= n_fission_neutrons)
-                break;
+            /* Loop over fission yield */
 
-            Neutron *new_neutron = &new_bank[new_idx];
+            for (int k = 0; k < n.fission_yield; k++)
+            {
+                /* Check if bank is full */
 
-            new_neutron->status = NEUTRON_ALIVE;
-            new_neutron->id = (DATA.generation - 1) * GLOB.n_particles + new_idx;
-            new_neutron->mat_idx = -1;
-            new_neutron->x = parent->x;
-            new_neutron->y = parent->y;
-            new_neutron->z = parent->z;
-            new_neutron->fission_yield = 0;
-            new_neutron->path_length = 0.0;
+                if (new_idx >= new_bank_size)
+                {
+                    size_t expanded_size = new_bank_size * 1.2;
+                    Neutron *tmp = (Neutron *)realloc(new_bank, expanded_size * sizeof(Neutron));
+                    if (!tmp)
+                    {
+                        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                        free(new_bank);
+                        return EXIT_FAILURE;
+                    }
+                    new_bank = tmp;
+                    new_bank_size = expanded_size;
+                }
 
-            new_neutron->seed = GLOB.seed + new_neutron->id;
-            xoshiro256ss_seed(&new_neutron->state, new_neutron->seed);
+                /* Create a secondary fission neutron */
 
-            sampleNeutronDirection(new_neutron);
+                Neutron *new_neutron = &new_bank[new_idx++];
 
-            new_neutron->E = sampleMaxwellianEnergy(new_neutron, TNUC_FISSION);
+                /* Initialize the neutron */
 
-            ++new_idx;
+                initFissionNeutron(&n, new_neutron, new_idx);
+            }
+
         }
-
-        if (new_idx >= n_fission_neutrons)
-            break;
     }
+    if (VERBOSITY >= 2)
+        fprintf(stdout, "Sampled bank size: %zu neutrons.\n", new_idx);
 
-    /* Reallocate bank if needed */
-
-    if (n_fission_neutrons > DATA.bank_cap)
+    /* Update global bank */
+    if (new_idx > DATA.bank_cap)
     {
-        Neutron *tmp = (Neutron *)realloc(DATA.bank, n_fission_neutrons * sizeof(Neutron));
+        Neutron *tmp = (Neutron *)realloc(DATA.bank, new_idx * sizeof(Neutron));
         if (!tmp)
         {
             fprintf(stderr, "[ERROR] Memory allocation failed.\n");
             free(new_bank);
-            return 1;
+            return EXIT_FAILURE;
         }
         DATA.bank = tmp;
-        DATA.bank_cap = n_fission_neutrons;
+        DATA.bank_cap = new_idx;
     }
 
-    /* Copy fission bank into neutron bank in DATA */
-
-    memcpy(DATA.bank, new_bank, n_fission_neutrons * sizeof(Neutron));
-
-    DATA.n_bank = n_fission_neutrons;
-
-    /* For subcritical system expand the bank via duplication */
-
-    if (DATA.n_bank < (size_t)GLOB.n_particles)
-    {
-        size_t base_count = GLOB.n_particles;
-        size_t missing = 1 + base_count - DATA.n_bank;
-
-        size_t expanded_size = base_count + missing;
-
-        if (expanded_size > DATA.bank_cap)
-        {
-            Neutron *tmp = (Neutron *)realloc(DATA.bank, expanded_size * sizeof(Neutron));
-            if (!tmp)
-            {
-                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
-                return 1;
-            }
-            DATA.bank = tmp;
-            DATA.bank_cap = expanded_size;
-        }
-
-        DATA.n_bank = expanded_size;
-
-        /* Randomly sample neutrons to duplicate */
-
-        for (size_t i = 0; i < missing; ++i)
-        {
-            size_t src_idx = randd(&GLOB.rng_state) * base_count;
-            DATA.bank[base_count + i] = DATA.bank[src_idx];
-        }
-
-        if (VERBOSITY >= 2)
-            fprintf(stdout, "Expanded neutron bank to %zu neutrons\n", DATA.n_bank);
-    }
+    DATA.n_bank = new_idx;
+    memcpy(DATA.bank, new_bank, new_idx * sizeof(Neutron));
 
     if (VERBOSITY >= 2)
         fprintf(stdout, "DONE.\n");
@@ -145,3 +141,52 @@ int buildFissionBank()
 
     return 0;
 }
+
+void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx)
+{
+    /* Initialize misc. parameters */
+
+    new_neutron->status = NEUTRON_ALIVE;
+    new_neutron->id = (DATA.generation - 1) * GLOB.n_particles + idx;
+    new_neutron->mat_idx = -1;
+    new_neutron->fission_yield = 0;
+    new_neutron->path_length = 0.0;
+
+    /* Inherit location of fission site */
+
+    new_neutron->x = parent->x;
+    new_neutron->y = parent->y;
+    new_neutron->z = parent->z;
+
+    /* Inherit seed */
+
+    new_neutron->seed = parent->seed + idx;
+
+    /* Derive rng state */
+
+    xoshiro256ss_seed(&new_neutron->state, new_neutron->seed);
+
+    /* Isotropic initial direction */
+
+    sampleNeutronDirection(new_neutron);
+
+    /* Energy from Watts distribution */
+
+    new_neutron->E = sampleMaxwellianEnergy(new_neutron, TNUC_FISSION);
+}
+
+/*
+
+
+if (expanded_size > DATA.bank_cap)
+{
+    Neutron *tmp = (Neutron *)realloc(DATA.bank, expanded_size * sizeof(Neutron));
+    if (!tmp)
+    {
+        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+        return 1;
+    }
+    DATA.bank = tmp;
+    DATA.bank_cap = expanded_size;
+}
+*/

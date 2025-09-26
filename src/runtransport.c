@@ -117,8 +117,6 @@ int runTransport(void)
             }
         }
 
-        combNeutronBank();
-
         if (g > GLOB.n_inactive)
         {
             fprintf(stdout, "\n--- Generation %ld ---\n"

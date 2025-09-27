@@ -472,19 +472,6 @@ long readInput() {
         /* --- det --- */
         else if (!strcmp(tok, "det"))
         {
-            /* Read input parameters */
-
-            char *a1 = strtok(NULL, DELIMS);
-            char *a2 = strtok(NULL, DELIMS);
-
-            if (!a1 || !a2) 
-            {
-                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-            const char *det_name = a1, *mat_name = a2;
-            
             if (DATA.n_detectors >= (size_t)MAX_NUM_DETECTORS) 
             {
                 fprintf(stderr, "[ERROR] Only %d detectors supported (line %ld).\n", MAX_NUM_DETECTORS, lnum);
@@ -492,32 +479,231 @@ long readInput() {
                 exit(EXIT_FAILURE);
             }
 
-            /* Create new detector item */
-
-            DATA.detectors[DATA.n_detectors] = (ReactionRateDetector*)malloc(sizeof(ReactionRateDetector));
-            if (!DATA.detectors[DATA.n_detectors]) 
-            { 
-                fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
+            Detector *det = (Detector*)malloc(sizeof(Detector));
+            if (!det)
+            {
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
                 fclose(fp);
-                exit(EXIT_FAILURE); 
+                exit(EXIT_FAILURE);
+            }
+            memset(det, 0, sizeof(Detector));
+
+            /* Read detector name */
+
+            char *name_tok = strtok(NULL, DELIMS);
+            snprintf(det->name, sizeof(det->name), "%s", name_tok);
+
+            /* Read options */
+
+            bool has_dr = false;
+            bool dr_all = false;
+            bool has_dm = false;
+            char mat_name_buf[128] = {0};
+            bool has_de = false;
+            double e_min = 0.0, e_max = 0.0;
+            uint64_t n_bins = 0;
+            EnergyBinSpacing energy_spacing = ENERGY_BIN_SPACING_LINEAR;
+
+            char *opt = NULL;
+            while ((opt = strtok(NULL, DELIMS)) != NULL)
+            {
+                if (!strcmp(opt, "dr"))
+                {
+                    char *resp_tok = strtok(NULL, DELIMS);
+                    if (!resp_tok)
+                    {
+                        fprintf(stderr, "[ERROR] Missing detector response after 'dr' (line %ld).\n", lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+                    has_dr = true;
+                    if (!strcmp(resp_tok, "all"))
+                    {
+                        dr_all = true;
+                    }
+                    else
+                    {
+                        fprintf(stderr, "[ERROR] Unsupported detector response '%s' (line %ld).\n", resp_tok, lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                else if (!strcmp(opt, "dm"))
+                {
+                    char *mat_tok = strtok(NULL, DELIMS);
+                    if (!mat_tok)
+                    {
+                        fprintf(stderr, "[ERROR] Missing material name after 'dm' (line %ld).\n", lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+                    snprintf(mat_name_buf, sizeof(mat_name_buf), "%s", mat_tok);
+                    has_dm = true;
+                }
+                else if (!strcmp(opt, "de"))
+                {
+                    char *emin_tok = strtok(NULL, DELIMS);
+                    char *emax_tok = strtok(NULL, DELIMS);
+                    char *nbins_tok = strtok(NULL, DELIMS);
+                    char *spacing_tok = strtok(NULL, DELIMS);
+                    if (!emin_tok || !emax_tok || !nbins_tok)
+                    {
+                        fprintf(stderr, "[ERROR] Incomplete energy grid specification on line %ld.\n", lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (!spacing_tok)
+                        spacing_tok = "1";
+
+                    if (!parseDouble(emin_tok, &e_min) || !parseDouble(emax_tok, &e_max))
+                    {
+                        fprintf(stderr, "[ERROR] Invalid energy bounds on line %ld.\n", lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (!parseULong(nbins_tok, &n_bins) || n_bins == 0)
+                    {
+                        fprintf(stderr, "[ERROR] Invalid bin count in detector energy grid (line %ld).\n", lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    long spacing_val = 0;
+                    if (!parseLong(spacing_tok, &spacing_val))
+                    {
+                        fprintf(stderr, "[ERROR] Invalid grid spacing flag in detector energy grid (line %ld).\n", lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (spacing_val == 0)
+                        energy_spacing = ENERGY_BIN_SPACING_LOG;
+                    else if (spacing_val == 1)
+                        energy_spacing = ENERGY_BIN_SPACING_LINEAR;
+                    else
+                    {
+                        fprintf(stderr, "[ERROR] Grid spacing flag must be 0 (log) or 1 (lin) on line %ld.\n", lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (e_max <= e_min)
+                    {
+                        fprintf(stderr, "[ERROR] Detector energy max must exceed min (line %ld).\n", lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+                    if (energy_spacing == ENERGY_BIN_SPACING_LOG && e_min <= 0.0)
+                    {
+                        fprintf(stderr, "[ERROR] Logarithmic energy bins require Emin > 0 (line %ld).\n", lnum);
+                        free(det);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    has_de = true;
+                }
+                else
+                {
+                    fprintf(stderr, "[ERROR] Unknown detector option '%s' (line %ld).\n", opt, lnum);
+                    free(det);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
             }
 
-            /* Put detector parameters */
+            /* If detector response defined create a reaction rate detector */
 
-            ReactionRateDetector *det = DATA.detectors[DATA.n_detectors];
-            memset(det, 0, sizeof(ReactionRateDetector));
+            if (has_dr)
+            {
+                if (!dr_all)
+                {
+                    fprintf(stderr, "[ERROR] Only 'dr all' is supported currently (line %ld).\n", lnum);
+                    free(det);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+                if (!has_dm)
+                {
+                    fprintf(stderr, "[ERROR] Reaction rate detectors require a material (use 'dm <name>') (line %ld).\n", lnum);
+                    free(det);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
 
-            snprintf(det->name, sizeof(det->name), "%s", det_name);
-            snprintf(det->material_name, sizeof(det->material_name), "%s", mat_name);
-            det->material_index = -1;
+                det->type = DETECTOR_TYPE_REACTION_RATE;
+                ReactionRateDetector *rr = &det->data.reaction_rate;
+                memset(rr, 0, sizeof(*rr));
+                snprintf(rr->material_name, sizeof(rr->material_name), "%s", mat_name_buf);
+                rr->material_index = -1;
+                rr->energy_grid.enabled = has_de;
+                if (has_de)
+                {
+                    rr->energy_grid.enabled = true;
+                    rr->energy_grid.n_bins = (size_t)n_bins;
+                    rr->energy_grid.E_min = e_min;
+                    rr->energy_grid.E_max = e_max;
+                    rr->energy_grid.spacing = energy_spacing;
+                }
+                else
+                    rr->energy_grid.enabled = false;
 
+                if (VERBOSITY >= 2)
+                {
+                    fprintf(stdout, "Parsed reaction-rate detector '%s' (material: %s)%s.\n",
+                            det->name, rr->material_name, has_de ? " with energy grid" : "");
+                }
+            }
+            /* Otherwise create an energy spectrum detector */
 
-            if (VERBOSITY >= 2)
-                fprintf(stdout, "Parsed a detector named: \"%s\" linked to material: \"%s\".\n", det_name, mat_name);
+            else
+            {
+                det->type = DETECTOR_TYPE_ENERGY_SPECTRUM;
+                EnergySpectrumDetector *es = &det->data.energy_spectrum;
+                memset(es, 0, sizeof(*es));
+                es->material_index = -1;
+                es->has_material_filter = has_dm;
+                if (has_dm)
+                    snprintf(es->material_name, sizeof(es->material_name), "%s", mat_name_buf);
 
+                if (!has_de)
+                {
+                    fprintf(stderr, "[ERROR] Energy spectrum detectors require an energy grid ('de').\n");
+                    free(det);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                es->grid.enabled = true;
+                es->grid.n_bins = (size_t)n_bins;
+                es->grid.E_min = e_min;
+                es->grid.E_max = e_max;
+                es->grid.spacing = energy_spacing;
+
+                if (VERBOSITY >= 2)
+                {
+                    const char *mat_desc = es->has_material_filter ? es->material_name : "all materials";
+                    fprintf(stdout, "Parsed energy-spectrum detector '%s' (%s) with %zu bins between %E - %E\n",
+                            det->name, mat_desc, es->grid.n_bins, es->grid.E_min, es->grid.E_max);
+                }
+            }
+
+            DATA.detectors[DATA.n_detectors] = det;
             DATA.n_detectors++;
             np++;
         }
+
 
         /* ###################################################################################### */        
         /* --- set --- */
@@ -590,8 +776,8 @@ long readInput() {
             }
             else if (!strcmp(subkey, "ccut"))
             {
-                long ccut;
-                if (!parseLong(value, &ccut) || ccut < 0) 
+                double ccut;
+                if (!parseDouble(value, &ccut) || ccut < 0) 
                 {
                     fprintf(stderr, "[ERROR] Invalid value for \"set ccut\" on line %ld.\n", lnum);
                     fclose(fp);
@@ -600,7 +786,7 @@ long readInput() {
 
                 /* Put collision cutoff */
 
-                GLOB.max_collisions = ccut;
+                GLOB.max_collisions = (long)ccut;
                 np++;
             }
             else if (!strcmp(subkey, "needle")) 

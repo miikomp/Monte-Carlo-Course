@@ -155,23 +155,64 @@ typedef enum {
 
 typedef struct {
     double sum;     // accumulated score
-    double sum_sq;  // accumulated score squared for variance
+    double sum_sq;  // accumulated score squared
 } ReactionRateTally;
 
 typedef struct {
     char  nuclide_name[16];
     int   nuclide_index;   // index inside the Material.nucs array
-    ReactionRateTally tallies[RRDET_MODE_COUNT];
+    size_t n_energy_bins;  // number of energy bins (>=1)
+    ReactionRateTally *tallies; // flattened array [n_energy_bins][RRDET_MODE_COUNT]
 } ReactionRateNuclide;
 
+typedef enum {
+    ENERGY_BIN_SPACING_LOG = 0,
+    ENERGY_BIN_SPACING_LINEAR = 1
+} EnergyBinSpacing;
+
 typedef struct {
-    char   name[128];           // detector name from input
+    bool   enabled;
+    size_t n_bins;
+    double E_min;
+    double E_max;
+    EnergyBinSpacing spacing;
+    double *edges;            // energy bin edges, length n_bins + 1
+} EnergyGrid;
+
+typedef struct {
     char   material_name[128];  // tracked material name from input
     int    material_index;      // resolved material index, -1 if unresolved
-    uint64_t n_histories;       // number of tallied source histories
     size_t n_nuclides;          // length of the nuclides array
     ReactionRateNuclide *nuclides;
+    EnergyGrid energy_grid;
+    size_t n_energy_bins;       // number of bins used for tallying (1 if grid disabled)
 } ReactionRateDetector;
+
+typedef struct {
+    bool   has_material_filter;   // true if material filter requested
+    char   material_name[128];    // tracked material name from input (empty if global)
+    int    material_index;        // resolved material index, -1 if unresolved or unused
+    EnergyGrid grid;        // energy bin specification
+    double *track_length_sum;     // accumulated track-length tallies per bin
+    double *track_length_sum_sq;  // accumulated squared tallies
+} EnergySpectrumDetector;
+
+/* General detector structures */
+typedef enum {
+    DETECTOR_TYPE_REACTION_RATE = 0,
+    DETECTOR_TYPE_ENERGY_SPECTRUM,
+    DETECTOR_TYPE_COUNT
+} DetectorType;
+
+typedef struct {
+    DetectorType type;
+    char   name[128];           // detector name from input
+    uint64_t n_histories;       // number of tallied source histories
+    union {
+        ReactionRateDetector reaction_rate;
+        EnergySpectrumDetector energy_spectrum;
+    } data;
+} Detector;
 
 /* --- Particle source data structures --- */
 
@@ -197,7 +238,7 @@ typedef struct {
     SourceDefinition *src;
     uint32_t src_type;
     size_t n_detectors;
-    ReactionRateDetector *detectors[MAX_NUM_DETECTORS];
+    Detector *detectors[MAX_NUM_DETECTORS];
 } runData;
 
 typedef struct {

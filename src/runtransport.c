@@ -1,6 +1,6 @@
 #include "header.h"
 
-void combNeutronBank();
+inline size_t energyGridBinIndex(const EnergyGrid *grid, double energy);
 
 int runTransport(void) 
 {
@@ -31,11 +31,12 @@ int runTransport(void)
     /* Get pointer to detector array */
 
     const size_t n_detectors = DATA.n_detectors;
-    ReactionRateDetector **detectors = DATA.detectors;
+    Detector **detectors = DATA.detectors;
 
     /* Initialize detector scoring related variables */
 
     size_t *detector_offsets = NULL;
+    size_t *detector_bin_counts = NULL;
     size_t total_detector_bins = 0;
     int max_threads = omp_get_max_threads();
     double *detector_thread_sums = NULL;
@@ -47,10 +48,12 @@ int runTransport(void)
     if (n_detectors > 0)
     {
         detector_offsets = (size_t*)malloc(n_detectors * sizeof(size_t));
-        if (!detector_offsets)
+        detector_bin_counts = (size_t*)calloc(n_detectors, sizeof(size_t));
+        if (!detector_offsets || !detector_bin_counts)
         {
             fprintf(stderr, "[ERROR] Memory allocation failed.\n");
             free(detector_offsets);
+            free(detector_bin_counts);
             free(detector_thread_sums);
             free(detector_thread_sums_sq);
             free(detector_history_counts);
@@ -60,7 +63,22 @@ int runTransport(void)
         for (size_t d = 0; d < n_detectors; ++d)
         {
             detector_offsets[d] = total_detector_bins;
-            total_detector_bins += detectors[d]->n_nuclides * RRDET_MODE_COUNT;
+            Detector *det = detectors[d];
+            size_t bins = 0;
+            if (det)
+            {
+                if (det->type == DETECTOR_TYPE_REACTION_RATE)
+                {
+                    size_t energy_bins = det->data.reaction_rate.n_energy_bins;
+                    if (energy_bins == 0)
+                        energy_bins = 1;
+                    bins = det->data.reaction_rate.n_nuclides * energy_bins * RRDET_MODE_COUNT;
+                }
+                else if (det->type == DETECTOR_TYPE_ENERGY_SPECTRUM && det->data.energy_spectrum.grid.enabled)
+                    bins = det->data.energy_spectrum.grid.n_bins;
+            }
+            detector_bin_counts[d] = bins;
+            total_detector_bins += bins;
         }
 
         if (total_detector_bins > 0)
@@ -73,6 +91,7 @@ int runTransport(void)
             {
                 fprintf(stderr, "[ERROR] Memory allocation failed.\n");
                 free(detector_offsets);
+                free(detector_bin_counts);
                 free(detector_thread_sums);
                 free(detector_thread_sums_sq);
                 free(detector_history_counts);
@@ -110,6 +129,7 @@ int runTransport(void)
             {
                 fprintf(stderr, "[ERROR] Failed to build fission bank for generation %zu.\n", g);
                 free(detector_offsets);
+                free(detector_bin_counts);
                 free(detector_thread_sums);
                 free(detector_thread_sums_sq);
                 free(detector_history_counts);
@@ -131,7 +151,7 @@ int runTransport(void)
 
         #pragma omp parallel default(none)\
                 shared(GLOB, DATA, RES, stdout, stderr, \
-                       detectors, n_detectors, detector_offsets, \
+                       detectors, n_detectors, detector_offsets, detector_bin_counts, \
                        detector_thread_sums, detector_thread_sums_sq, \
                        detector_history_counts, total_detector_bins, do_detectors) \
                 reduction(+:gen_scores)
@@ -168,9 +188,11 @@ int runTransport(void)
                 size_t k = 0;
                 while (n->status == NEUTRON_ALIVE) 
                 {
+                    double segment_energy = n->E;
                     /* Sample distance to next collision */
 
                     double d = sampleDistanceToCollision(n);
+
                     if (d < 0.0)
                     {
                         /* Neutron is outside the geometry */
@@ -190,6 +212,36 @@ int runTransport(void)
                     /* Get material at position moved to */
 
                     n->mat_idx = getMaterialAtPosition(n->x, n->y, n->z);
+
+                    if (do_detectors && d > 0.0)
+                    {
+                        if (n->mat_idx >= 0)
+                        {
+                            for (size_t det_idx = 0; det_idx < n_detectors; ++det_idx)
+                            {
+                                Detector *detector = detectors[det_idx];
+                                if (!detector || detector->type != DETECTOR_TYPE_ENERGY_SPECTRUM)
+                                    continue;
+
+                                size_t bin_count = detector_bin_counts[det_idx];
+                                if (bin_count == 0)
+                                    continue;
+
+                                EnergySpectrumDetector *es = &detector->data.energy_spectrum;
+                                if (!es->grid.enabled)
+                                    continue;
+                                if (es->has_material_filter && es->material_index != n->mat_idx)
+                                    continue;
+
+                                size_t energy_bin = energyGridBinIndex(&es->grid, segment_energy);
+                                if (energy_bin >= es->grid.n_bins)
+                                    continue;
+
+                                size_t offset = detector_offsets[det_idx];
+                                history_counts[offset + energy_bin] += d;
+                            }
+                        }
+                    }
 
                     /* Sample collision nuclide in active material */
 
@@ -214,6 +266,7 @@ int runTransport(void)
                     gen_scores.total_collisions++;
 
                     /* For the first set number of collision score energy */
+                    
                     if (k < MAX_COLLISION_BINS) 
                     {
                         gen_scores.collision_energy_sum[k] += n->E;
@@ -270,10 +323,23 @@ int runTransport(void)
                     {
                         for (size_t d = 0; d < n_detectors; ++d)
                         {
-                            ReactionRateDetector *det = detectors[d];
-                            if (det->material_index == n->mat_idx && (size_t)nuc_idx < det->n_nuclides)
+                            Detector *det = detectors[d];
+                            if (!det || det->type != DETECTOR_TYPE_REACTION_RATE)
+                                continue;
+
+                            ReactionRateDetector *rr = &det->data.reaction_rate;
+                            if (rr->material_index == n->mat_idx && (size_t)nuc_idx < rr->n_nuclides)
                             {
-                                size_t bin = detector_offsets[d] + (size_t)nuc_idx * RRDET_MODE_COUNT + (size_t)r_mode;
+                                size_t energy_bins = (rr->n_energy_bins > 0) ? rr->n_energy_bins : 1;
+                                size_t energy_bin = 0;
+                                if (rr->energy_grid.enabled && rr->n_energy_bins > 0)
+                                {
+                                    energy_bin = energyGridBinIndex(&rr->energy_grid, segment_energy);
+                                    if (energy_bin >= energy_bins)
+                                        continue;
+                                }
+                                size_t flatten_stride = energy_bins * RRDET_MODE_COUNT;
+                                size_t bin = detector_offsets[d] + (size_t)nuc_idx * flatten_stride + energy_bin * RRDET_MODE_COUNT + (size_t)r_mode;
                                 history_counts[bin] += 1.0;
                             }
                         }
@@ -307,7 +373,7 @@ int runTransport(void)
                 RES.avg_scores[g - 1 - GLOB.n_inactive] = gen_scores;
         }
         
-        /* Score detectors if in active cycle */
+        /* Score detectors from thread private buffers if in active cycle */
 
         if (g > GLOB.n_inactive && n_detectors > 0)
         {
@@ -320,13 +386,47 @@ int runTransport(void)
         {
             for (size_t d = 0; d < n_detectors; ++d)
             {
-                ReactionRateDetector *det = detectors[d];
+                Detector *det = detectors[d];
+                size_t bins = detector_bin_counts ? detector_bin_counts[d] : 0;
+                if (!det || bins == 0)
+                    continue;
+
                 size_t offset = detector_offsets[d];
-                for (size_t nuc = 0; nuc < det->n_nuclides; ++nuc)
+                if (det->type == DETECTOR_TYPE_REACTION_RATE)
                 {
-                    for (size_t mode = 0; mode < RRDET_MODE_COUNT; ++mode)
+                    ReactionRateDetector *rr = &det->data.reaction_rate;
+                    size_t energy_bins = (rr->n_energy_bins > 0) ? rr->n_energy_bins : 1;
+                    size_t flatten_stride = energy_bins * RRDET_MODE_COUNT;
+                    for (size_t nuc = 0; nuc < rr->n_nuclides; ++nuc)
                     {
-                        size_t bin_index = offset + nuc * RRDET_MODE_COUNT + mode;
+                        for (size_t ebin = 0; ebin < energy_bins; ++ebin)
+                        {
+                            for (size_t mode = 0; mode < RRDET_MODE_COUNT; ++mode)
+                            {
+                                size_t bin_index = offset + nuc * flatten_stride + ebin * RRDET_MODE_COUNT + mode;
+                                double sum_val = 0.0;
+                                double sum_sq_val = 0.0;
+                                for (int tid = 0; tid < max_threads; ++tid)
+                                {
+                                    size_t base = (size_t)tid * total_detector_bins + bin_index;
+                                    sum_val    += detector_thread_sums[base];
+                                    sum_sq_val += detector_thread_sums_sq[base];
+                                }
+
+                                size_t tally_index = ebin * RRDET_MODE_COUNT + mode;
+                                ReactionRateTally *tally = &rr->nuclides[nuc].tallies[tally_index];
+                                tally->sum    += sum_val;
+                                tally->sum_sq += sum_sq_val;
+                            }
+                        }
+                    }
+                }
+                else if (det->type == DETECTOR_TYPE_ENERGY_SPECTRUM)
+                {
+                    EnergySpectrumDetector *es = &det->data.energy_spectrum;
+                    for (size_t bin = 0; bin < es->grid.n_bins; ++bin)
+                    {
+                        size_t bin_index = offset + bin;
                         double sum_val = 0.0;
                         double sum_sq_val = 0.0;
                         for (int tid = 0; tid < max_threads; ++tid)
@@ -336,9 +436,8 @@ int runTransport(void)
                             sum_sq_val += detector_thread_sums_sq[base];
                         }
 
-                        ReactionRateTally *tally = &det->nuclides[nuc].tallies[mode];
-                        tally->sum    += sum_val;
-                        tally->sum_sq += sum_sq_val;
+                        es->track_length_sum[bin]    += sum_val;
+                        es->track_length_sum_sq[bin] += sum_sq_val;
                     }
                 }
             }
@@ -357,45 +456,51 @@ int runTransport(void)
     /* Return succesfully */
 
     free(detector_offsets);
+    free(detector_bin_counts);
     free(detector_thread_sums);
     free(detector_thread_sums_sq);
     free(detector_history_counts);
     return EXIT_SUCCESS;
 }
 
-/**
- * @brief Walks the built fission bank and comb samples it down to target_count neutrons.
- * 
- */
-void combNeutronBank()
+inline size_t energyGridBinIndex(const EnergyGrid *grid, double energy)
 {
-    size_t target_count = GLOB.n_particles;
-    size_t bank_size = DATA.n_bank;
+    if (!grid)
+        return 0;
 
-    if (bank_size == 0 || target_count == 0)
+    if (!grid->enabled || !grid->edges || grid->n_bins == 0)
+        return grid->n_bins;
+
+    if (energy < grid->E_min)
+        return grid->n_bins;
+
+    if (energy > grid->E_max)
+        return grid->n_bins;
+
+    if (energy == grid->E_max)
+        return (grid->n_bins > 0) ? grid->n_bins - 1 : grid->n_bins;
+
+    const double *edges = grid->edges;
+    size_t left = 0;
+    size_t right = grid->n_bins;
+    while (left < right)
     {
-        DATA.n_bank = 0;
-        return;
+        size_t mid = (left + right) >> 1;
+        double low = edges[mid];
+        double high = edges[mid + 1];
+        if (energy < low)
+        {
+            right = mid;
+        }
+        else if (energy >= high)
+        {
+            left = mid + 1;
+        }
+        else
+        {
+            return mid;
+        }
     }
 
-    if (bank_size <= target_count)
-        return;
-
-    const double stride = (double)bank_size / (double)target_count;
-
-    double position = randd(&GLOB.rng_state) * stride;
-
-    for (size_t write_idx = 0; write_idx < target_count; write_idx++)
-    {
-        size_t selected_idx = (size_t)position;
-        if (selected_idx >= bank_size)
-            selected_idx = bank_size - 1;
-
-        if (selected_idx != write_idx)
-            DATA.bank[write_idx] = DATA.bank[selected_idx];
-
-        position += stride;
-    }
-
-    DATA.n_bank = target_count;
+    return grid->n_bins;
 }

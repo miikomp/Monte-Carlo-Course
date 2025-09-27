@@ -133,6 +133,12 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
 
+        /* Calculate memory footprint of results data structure */
+
+        size_t total_bytes = sizeof(ResultsData) + (size_t)GLOB.n_generations * sizeof(GenerationScores);
+        fprintf(stdout, "Memory allocated for results: %.2f MB\n", (double)total_bytes / (1024.0 * 1024.0));
+
+
         fprintf(stdout, "DONE.\n");
 
         /* Process detectors */
@@ -140,6 +146,13 @@ int main(int argc, char **argv) {
         if (processDetectors() != 0) 
         {
             fprintf(stderr, "[ERROR] Could not process detectors.\n");
+            return EXIT_FAILURE;
+        }
+
+        /* Fill neutron bank with initial source neutrons */
+
+        if (sampleInitialSource() < 0) {
+            fprintf(stderr, "[ERROR] Failed to sample initial source.\n");
             return EXIT_FAILURE;
         }
     }
@@ -176,13 +189,6 @@ int main(int argc, char **argv) {
     switch (GLOB.mode) {
     case RUNMODE_TRANSPORT:
     {
-        /* Fill neutron bank with initial source neutrons */
-
-        if (sampleInitialSource() < 0) {
-            fprintf(stderr, "[ERROR] Failed to sample initial source.\n");
-            return EXIT_FAILURE;
-        }
-
         /* Run the transport simulation */
 
         if (runTransport() != 0) {

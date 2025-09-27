@@ -206,8 +206,32 @@ int runTransport(void)
                     n->x += d * n->u;
                     n->y += d * n->v;
                     n->z += d * n->w;
+
+                    /* Update path length */
+
                     n->path_length += d;
                     gen_scores.total_path_length += d;
+
+                    if (n->E > E_THERMAL)
+                    {
+                        n->fast_path_length += d;
+                        gen_scores.total_fast_path_length += d;
+                    }
+
+                    /* Update time */
+        
+                    double v = getVelocityCmPerS(n->E);
+                    if (v > 0.0)
+                    {
+                        double dt = d / v;
+                        n->time += dt;
+                        gen_scores.total_time += dt;
+                        if (n->E > E_THERMAL)
+                        {
+                            n->time_fast += dt;
+                            gen_scores.total_time_fast += dt;
+                        }
+                    }
 
                     /* Get material at position moved to */
 
@@ -294,8 +318,19 @@ int runTransport(void)
 
                         gen_scores.total_fission_yield += n->fission_yield;
 
+                        if (n->E > E_THERMAL)
+                            gen_scores.total_fast_fissions++;
+
                         r_mode = RRDET_MODE_FISSION;
-                        
+
+                        /* Score fission time */
+                        size_t time_bin = (size_t)(n->time / TIME_BIN_WIDTH);
+                        if (time_bin < MAX_TIME_BINS && n->fission_yield > 0)
+                        {
+                            gen_scores.fission_time_yield[time_bin] += (double)n->fission_yield;
+                            gen_scores.fission_time_events[time_bin] += 1;
+                        }
+
                     }
                     else if (MT_IS_INELASTIC_SCATTER(mt))
                     {

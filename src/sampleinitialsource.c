@@ -42,6 +42,11 @@ long sampleInitialSource(void) {
             n->status = NEUTRON_ALIVE;
             n->id = (DATA.generation - 1) * GLOB.n_particles + i;
             n->mat_idx = -1;
+            n->fission_yield = 0;
+            n->path_length = 0.0;
+            n->fast_path_length = 0.0;
+            n->time = 0.0;
+            n->time_fast = 0.0;
 
             /* Initialize particle private seeding */
 
@@ -54,7 +59,6 @@ long sampleInitialSource(void) {
         }   
     }
 
-    fprintf(stdout, "DONE.\n");
     if (VERBOSITY >= 1)
         fprintf(stdout, "Added %zu source neutrons into bank.\n", DATA.n_bank);
 
@@ -65,7 +69,9 @@ long sampleInitialSource(void) {
         total_bytes += sizeof(Neutron);
 
     GLOB.mem_nbank = total_bytes;
-    fprintf(stdout, "\nMemory allocated for neutron bank: %.2f MB\n", (double)total_bytes / (1024.0 * 1024.0));
+    fprintf(stdout, "Memory allocated for neutron bank: %.2f MB\n", (double)total_bytes / (1024.0 * 1024.0));
+
+    fprintf(stdout, "DONE.\n");
 
     return 0;
 }

@@ -200,7 +200,7 @@ long readInput() {
 
              /* Temperature in Kelvin */
 
-            if (!parseDouble(tempTok, &M.temp) || M.temp <= 0.0) 
+            if (!parseDouble(tempTok, &M.T) || M.T <= 0.0) 
             {
                 fprintf(stderr, "[ERROR] Bad temperature for material \"%s\" (line %ld).\n", M.name, lnum);
                 fclose(fp);
@@ -209,9 +209,9 @@ long readInput() {
 
             /* Temperature in MeV */
 
-            M.temp_MeV = M.temp * BOLTZMANN;
+            M.kT = M.T * BOLTZMANN;
 
-            /* Read ZA + fraction pairs until empty line or comment put into temp struct */
+            /* Read ZA + fraction pairs until empty line or comment put into T struct */
 
             CompVec cv = {0};
 
@@ -365,7 +365,7 @@ long readInput() {
                 exit(EXIT_FAILURE);
             }
 
-            /* Append temp vector into Material */
+            /* Append T vector into Material */
 
             M.n_nucs = cv.n;
             M.nucs   = cv.v;
@@ -391,7 +391,7 @@ long readInput() {
                         M.name, 
                         (M.adens > 0.0) ? M.adens : M.mdens,
                         (M.adens > 0.0) ? "atoms/b*cm" : "g/cm3",
-                        M.temp, 
+                        M.T, 
                         M.n_nucs
                     );
             }

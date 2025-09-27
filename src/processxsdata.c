@@ -230,7 +230,7 @@ int processXsData(TempNucDataLib **lib, size_t *nlib) {
             fprintf(stdout,
                 "Parsed xsdata: ZA = %5ld (%s), T = %.1fK, AW = %.3f, nubar = %s, MTs = %d, MT = 1 calculated on union grid.\n",
                 ZA, N->name,
-                var.temp,
+                var.T,
                 N->AW,
             has_nubar ? "yes" : "no",
             nmods
@@ -285,7 +285,7 @@ int processXsData(TempNucDataLib **lib, size_t *nlib) {
             for (size_t v = 0; v < N->n_var; ++v) 
             {
                 const Nuclide *var = &N->var[v];
-                const int Tk = (int)lrint(var->temp);
+                const int Tk = (int)lrint(var->T);
 
                 /* All MTs, including computed total */
                 for (size_t k = 0; k < var->n_xs; ++k) 
@@ -295,7 +295,7 @@ int processXsData(TempNucDataLib **lib, size_t *nlib) {
                     snprintf(varname, sizeof varname, "xs_%d_MT%d_%dK", ZA, tab->mt, Tk);
 
                     fprintf(m, "%% ZA=%d (%s), T=%g K, MT=%d, Q=%.8g, points=%zu\n",
-                            ZA, N->name, (double)var->temp, tab->mt, tab->Q, tab->n);
+                            ZA, N->name, (double)var->T, tab->mt, tab->Q, tab->n);
                     fprintf(m, "%s = [\n", varname);
                     for (size_t j = 0; j < tab->n; ++j)
                         fprintf(m, "  %.16e  %.16e\n", tab->E[j], tab->xs[j]);
@@ -308,7 +308,7 @@ int processXsData(TempNucDataLib **lib, size_t *nlib) {
                     char vnn[128];
                     snprintf(vnn, sizeof vnn, "nubar_%d_%dK", ZA, Tk);
                     fprintf(m, "%% ZA=%d (%s), T=%g K, nubar points=%zu\n",
-                            ZA, N->name, (double)var->temp, var->nubar.n);
+                            ZA, N->name, (double)var->T, var->nubar.n);
                     fprintf(m, "%s = [\n", vnn);
                     for (size_t j = 0; j < var->nubar.n; ++j)
                         fprintf(m, "  %.16e  %.16e\n", var->nubar.E[j], var->nubar.nu[j]);
@@ -382,7 +382,7 @@ int parseXsDataFile(const char *abspath, double Tlist,
     out->A   = A;
     out->ZA  = Z * 1000 + A;
     out->AW  = AW;
-    out->temp = Tlist;
+    out->T = Tlist;
     snprintf(out->name, sizeof out->name, "%s", sym);
     memset(out->mt_idx, -1, sizeof(out->mt_idx));
 

@@ -1,7 +1,5 @@
 #include "header.h"
 
-void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx);
-
 int buildFissionBank()
 {   
     /* Count fission neutrons */
@@ -143,52 +141,3 @@ int buildFissionBank()
 
     return 0;
 }
-
-void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx)
-{
-    /* Initialize misc. parameters */
-
-    new_neutron->status = NEUTRON_ALIVE;
-    new_neutron->id = (DATA.generation - 1) * GLOB.n_particles + idx;
-    new_neutron->mat_idx = -1;
-    new_neutron->fission_yield = 0;
-    new_neutron->path_length = 0.0;
-
-    /* Inherit location of fission site */
-
-    new_neutron->x = parent->x;
-    new_neutron->y = parent->y;
-    new_neutron->z = parent->z;
-
-    /* Inherit seed */
-
-    new_neutron->seed = parent->seed + idx;
-
-    /* Derive rng state */
-
-    xoshiro256ss_seed(&new_neutron->state, new_neutron->seed);
-
-    /* Isotropic initial direction */
-
-    sampleNeutronDirection(new_neutron);
-
-    /* Energy from Watts distribution */
-
-    new_neutron->E = sampleMaxwellianEnergy(new_neutron, TNUC_FISSION);
-}
-
-/*
-
-
-if (expanded_size > DATA.bank_cap)
-{
-    Neutron *tmp = (Neutron *)realloc(DATA.bank, expanded_size * sizeof(Neutron));
-    if (!tmp)
-    {
-        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
-        return 1;
-    }
-    DATA.bank = tmp;
-    DATA.bank_cap = expanded_size;
-}
-*/

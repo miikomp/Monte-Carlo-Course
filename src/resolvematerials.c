@@ -60,11 +60,11 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib) {
             /* No temperature adjustments are made */
 
             size_t vbest = 0;
-            double dbest = fabs(N->var[0].temp - M->temp);
+            double dbest = fabs(N->var[0].T - M->T);
             for (size_t v = 1; v < N->n_var; ++v) 
             {
-                double d = fabs(N->var[v].temp - M->temp);
-                if (d < dbest || (d == dbest && N->var[v].temp > N->var[vbest].temp)) {
+                double d = fabs(N->var[v].T - M->T);
+                if (d < dbest || (d == dbest && N->var[v].T > N->var[vbest].T)) {
                     dbest = d; vbest = v;
                 }
             }
@@ -72,7 +72,7 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib) {
 
             /* Copy the chosen variant into material nuclide data */
 
-            mc->nuc_data.temp       = src->temp;
+            mc->nuc_data.T       = src->T;
             if (src->AW != 0.0)
                 mc->nuc_data.AW     = src->AW;
             mc->nuc_data.has_nubar  = src->has_nubar;
@@ -125,7 +125,7 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib) {
             
             size_t n_modes = (mc->nuc_data.n_xs > 0 ? mc->nuc_data.n_xs - 1 : 0);
             fprintf(stdout, "  %5d - %s with %zu reaction modes (using %.0fK data).\n",
-                    mc->nuc_data.ZA, mc->nuc_data.name, n_modes, mc->nuc_data.temp);
+                    mc->nuc_data.ZA, mc->nuc_data.name, n_modes, mc->nuc_data.T);
         }
 
         /* Second pass: compute fractions and number densities using AW and mdens */
@@ -277,7 +277,7 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib) {
             "  mdens_calc=%.6E g/cm^3, adens_calc=%.6E atoms/b*cm\n\n",
             (M->adens > 0.0) ? M->adens : M->mdens,
             (M->adens > 0.0) ? "atoms/b*cm" : "g/cm3",
-            M->temp,
+            M->T,
             M->n_nucs, 
             xsum, 
             wsum,
@@ -295,7 +295,7 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib) {
                 "  %5d - %5s : T=%.0fK, AW=%.6E, afrac=%.6E, mfrac=%.6E, N_i=%.6E atoms/b*cm\n",
                 mc->nuc_data.ZA, 
                 mc->nuc_data.name,
-                mc->nuc_data.temp,
+                mc->nuc_data.T,
                 mc->nuc_data.AW, 
                 mc->atom_frac, 
                 mc->mass_frac, 

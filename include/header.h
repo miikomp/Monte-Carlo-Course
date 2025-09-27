@@ -58,14 +58,18 @@ extern int VERBOSITY;
 #define AMU_TO_MEV_C2 931.49410242     /* MeV/c^2 */
 #define MASS_NEUTRON 1.00866491588     /* amu */
 #define INV_MASS_NEUTRON (1.0/MASS_NEUTRON)
+#define C_LIGHT 2.99792458e10          /* cm/s */
 
 #define BARN_TO_CM2 1.0e-24
 #define TNUC_FISSION 1.2895              /* MeV Nuclear temperature of U235 fission */
 #define E_FG_LIMIT 0.0002             /* MeV energy cutoff for free gas model at 200eV */
+#define E_THERMAL 5.0e-7              /* MeV Thermal threshold energy (Cadmium cutoff) */
 
 #define DEFAULT_NEEDLE_LENGTH 0.85
 #define DEFAULT_LINE_SPACING  1.0
 #define MIN_BANK_SIZE 1000
+
+#define TIME_BIN_WIDTH 1e-7    /* seconds */
 
 
 enum SRC_TYPES{
@@ -215,7 +219,6 @@ int buildFissionBank(void);
  */
 void handleElasticScatter(Neutron *n, Nuclide *nuc);
 
-
 /**
  * @brief Handle inelastic level scattering.
  * 
@@ -271,11 +274,28 @@ double getMicroscopicXS(const double E, XsTable* xs_table);
  */
 int getMaterialAtPosition(double x, double y, double z);
 
+/**
+ * @brief Get the Velocity cm/s for a given neutron energy
+ * 
+ * @param E Neutron energy in MeV
+ * @return double Velocity in cm/s, or -1.0 on failure
+ */
+double getVelocityCmPerS(const double E);
+
 /* Compare two doubles, used for quicksort */
 static inline int cmpDouble(const void *a, const void *b) {
     double da = *(const double*)a, db = *(const double*)b;
     return (da < db) ? -1 : (da > db);
 }
+
+/**
+ * @brief Initialize a fission neutron.
+ * 
+ * @param parent Pointer to the parent neutron
+ * @param new_neutron Pointer to the new neutron
+ * @param idx Index of the new neutron in the fission bank (used for setting unique IDs)
+ */
+void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx);
 
 /* Linear–linear interpolation on one segment [E1, E2].
    Returns xs(E) from (E1, xs1) and (E2, xs2). */

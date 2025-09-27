@@ -18,6 +18,21 @@ static double metric_path_length(const GenerationScores *gs)
     return safe_norm(gs->n_histories, gs->total_path_length);
 }
 
+static double metric_fast_path_length(const GenerationScores *gs)
+{
+    return safe_norm(gs->n_histories, gs->total_fast_path_length);
+}
+
+static double metric_time(const GenerationScores *gs)
+{
+    return safe_norm(gs->n_histories, gs->total_time);
+}
+
+static double metric_time_fast(const GenerationScores *gs)
+{
+    return safe_norm(gs->n_histories, gs->total_time_fast);
+}
+
 static double metric_fission_yield(const GenerationScores *gs) 
 {
     return safe_norm(gs->n_histories, gs->total_fission_yield);
@@ -46,6 +61,11 @@ static double metric_inelastic(const GenerationScores *gs)
 static double metric_fissions(const GenerationScores *gs) 
 {
     return safe_norm(gs->n_histories, (double)gs->total_fissions);
+}
+
+static double metric_fast_fissions(const GenerationScores *gs) 
+{
+    return safe_norm(gs->n_histories, (double)gs->total_fast_fissions);
 }
 
 static double metric_leakages(const GenerationScores *gs) 
@@ -91,12 +111,16 @@ void processTransportResults(void)
 
     const MetricSpec metrics[] = {
         {"Path length",        "PATH_LENGTH",          metric_path_length},
+        {"Fast path length",   "FAST_PATH_LENGTH",     metric_fast_path_length},
+        {"Flight time",        "FLIGHT_TIME",          metric_time},
+        {"Fast flight time",   "FAST_FLIGHT_TIME",     metric_time_fast},
         {"Fission yield",      "FISSION_YIELD",        metric_fission_yield},
         {"Collisions",         "COLLISIONS",           metric_collisions},
         {"Captures",           "CAPTURES",             metric_captures},
         {"Elastic scatters",   "ELASTIC_SCATTERS",     metric_elastic},
         {"Inelastic scatters", "INELASTIC_SCATTERS",   metric_inelastic},
         {"Fissions",           "FISSIONS",             metric_fissions},
+        {"Fast Fissions",      "FAST_FISSIONS",        metric_fast_fissions},
         {"Leakages",           "LEAKAGES",             metric_leakages},
         {"Unknown outcomes",   "UNKNOWN_OUTCOMES",     metric_unknowns}
     };
@@ -131,16 +155,33 @@ void processTransportResults(void)
     }
 
     size_t max_bin = 0;
+
+    size_t max_time_bin = 0;
+    double *time_yield = (double*)calloc(MAX_TIME_BINS, sizeof(double));
+    uint64_t *time_events = (uint64_t*)calloc(MAX_TIME_BINS, sizeof(uint64_t));
+    if (!time_yield || !time_events)
+    {
+        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+        free(time_yield);
+        free(time_events);
+        for (size_t m = 0; m < nmetrics; ++m)
+            free(metric_values[m]);
+        free(metric_values);
+        free(histories);
+        return;
+    }
+
     const GenerationScores *ref_gen = NULL;
 
-    for (size_t g = 0; g < ngen; ++g) 
+    for (size_t g = 0; g < ngen; ++g)
     {
         const GenerationScores *gs = &RES.avg_scores[g];
         histories[g] = (double)gs->n_histories;
+
         for (size_t m = 0; m < nmetrics; ++m)
             metric_values[m][g] = metrics[m].extract(gs);
 
-        for (size_t b = 0; b < MAX_COLLISION_BINS; ++b) 
+        for (size_t b = 0; b < MAX_COLLISION_BINS; ++b)
         {
             if (gs->collision_energy_count[b] == 0)
                 continue;
@@ -148,10 +189,21 @@ void processTransportResults(void)
                 max_bin = b + 1;
         }
 
+        for (size_t b = 0; b < MAX_TIME_BINS; ++b)
+        {
+            double yield = gs->fission_time_yield[b];
+            uint64_t events = gs->fission_time_events[b];
+            if (yield <= 0.0 && events == 0)
+                continue;
+            time_yield[b] += yield;
+            time_events[b] += events;
+            if (b + 1 > max_time_bin)
+                max_time_bin = b + 1;
+        }
+
         if (!ref_gen && gs->collision_energy_count[0] > 0)
             ref_gen = gs;
     }
-
     if (ref_gen)
         max_bin = ref_gen->max_collision_bin;
 
@@ -241,6 +293,30 @@ void processTransportResults(void)
             fprintf(mfile, "];\n\n");
         }
 
+        if (max_time_bin > 0)
+        {
+            fprintf(mfile, "FISSION_TIME_BIN_WIDTH = %.12e;\n", (double)TIME_BIN_WIDTH);
+            fprintf(mfile, "FISSION_TIME_BIN_COUNT = %zu;\n\n", max_time_bin);
+
+            fprintf(mfile, "FISSION_TIME_BIN_CENTERS = [\n");
+            for (size_t b = 0; b < max_time_bin; ++b)
+            {
+                double center = (b + 0.5) * (double)TIME_BIN_WIDTH;
+                fprintf(mfile, "  %.12e\n", center);
+            }
+            fprintf(mfile, "];\n\n");
+
+            fprintf(mfile, "FISSION_NEUTRONS_PER_BIN = [\n");
+            for (size_t b = 0; b < max_time_bin; ++b)
+                fprintf(mfile, "  %.12e\n", time_yield[b]);
+            fprintf(mfile, "];\n\n");
+
+            fprintf(mfile, "FISSION_EVENTS_PER_BIN = [\n");
+            for (size_t b = 0; b < max_time_bin; ++b)
+                fprintf(mfile, "  %" PRIu64 "\n", time_events[b]);
+            fprintf(mfile, "];\n\n");
+        }
+
         fclose(mfile);
         fprintf(stdout, "\nWrote transport results to '%s'.\n", mpath);
     }
@@ -249,4 +325,6 @@ void processTransportResults(void)
         free(metric_values[m]);
     free(metric_values);
     free(histories);
+    free(time_yield);
+    free(time_events);
 }

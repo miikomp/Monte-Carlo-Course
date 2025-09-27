@@ -11,7 +11,7 @@ void handleElasticScatter(Neutron *n, Nuclide *nuc)
 
         /* Sample target energy from Maxwellian distribution */
 
-        double Et = sampleMaxwellianEnergy(n, DATA.mats[n->mat_idx].temp_MeV);
+        double Et = sampleMaxwellianEnergy(n, DATA.mats[n->mat_idx].kT);
 
         /* Calculate speed (cm/s) */
 
@@ -111,7 +111,7 @@ void handleElasticScatter(Neutron *n, Nuclide *nuc)
 
 void handleInelasticScatter(Neutron *n, Nuclide *nuc, int mt)
 {
-    /* Get xsdata for inelastic scattering */
+    /* Get xsdata for inelastic level scattering */
 
     int xs_idx = nuc->mt_idx[mt];
     XsTable xstable = nuc->xs[xs_idx];
@@ -423,4 +423,11 @@ double getMicroscopicXS(const double E, XsTable* xs_table)
     }
 
     return sigma;
+}
+
+double getVelocityCmPerS(const double E)
+{
+    if (E < 0.0)
+        return -1.0;
+    return C_LIGHT * sqrt(2.0 * E / (AMU_TO_MEV_C2 * MASS_NEUTRON));
 }

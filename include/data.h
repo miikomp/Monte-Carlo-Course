@@ -9,6 +9,7 @@
 #define MAX_STR_LEN 1024
 #define MAX_PATH 4096
 #define MAX_COLLISION_BINS 250
+#define MAX_TIME_BINS 1000
 #define MAX_NUM_DETECTORS 16
 
 typedef struct {
@@ -47,7 +48,7 @@ typedef struct {
     int        Z;
     int        A;
     int        ZA;      // 1000*Z + A
-    double     temp;    // K
+    double     T;    // K
     double     AW;      // atomic weight
     int        mt_idx[MAX_MT]; // index for each MT-reaction in xs array, -1 if not present
     size_t     n_xs;
@@ -72,8 +73,8 @@ typedef struct {
     char     name[128];
     double   mdens;   // g/cm3
     double   adens;   // 1/b*cm2
-    double   temp;    // K
-    double   temp_MeV;
+    double   T;       // K
+    double   kT;      // MeV
     size_t   n_nucs;
     MaterialNuclide *nucs;
     size_t   n_macro_xs;
@@ -93,33 +94,47 @@ typedef struct {
     uint64_t seed;        // RNG seed
     xoshiro256ss_state state;
     double path_length;   // accumulated path length cm
+    double fast_path_length; // path length in fast region cm
+    double time;        // time since birth in seconds
+    double time_fast;   // time in fast region seconds
     int fission_yield;   // fission neutrons produced
 } Neutron;
 
 /* --- Scoring data structures --- */
 
-// Per generation scoring structure. And the accompynying custom reduction clause
+// Per generation scoring structure. Only scalars and fixed size arrays to allow use of OpenMP reduction.
 typedef struct {
     uint64_t n_histories;
     double   total_path_length;
+    double   total_fast_path_length;
+    double   total_time;
+    double   total_time_fast;
     long   total_fission_yield;
     uint64_t total_collisions;
     uint64_t total_captures;
     uint64_t total_elastic_scatters;
     uint64_t total_inelastic_scatters;
     uint64_t total_fissions;
+    uint64_t total_fast_fissions;
     uint64_t total_leakages;
     uint64_t total_unknowns;
     size_t   max_collision_bin;
     double   collision_energy_sum[MAX_COLLISION_BINS];
     uint64_t collision_energy_count[MAX_COLLISION_BINS];
+    double   fission_time_yield[MAX_TIME_BINS];
+    uint64_t fission_time_events[MAX_TIME_BINS];
 } GenerationScores;
+
+/* Custom OpenMP reduction clause for the GenerationScores structure */
 
 #ifdef _OPENMP
 static inline void GenerationScoresReduce(GenerationScores *restrict out,
                                           const GenerationScores *restrict in)
 {
     out->total_path_length   += in->total_path_length;
+    out->total_fast_path_length += in->total_fast_path_length;
+    out->total_time         += in->total_time;
+    out->total_time_fast    += in->total_time_fast;
     out->total_fission_yield += in->total_fission_yield;
     out->total_collisions    += in->total_collisions;
     out->n_histories         += in->n_histories;
@@ -127,6 +142,7 @@ static inline void GenerationScoresReduce(GenerationScores *restrict out,
     out->total_elastic_scatters   += in->total_elastic_scatters;
     out->total_inelastic_scatters += in->total_inelastic_scatters;
     out->total_fissions      += in->total_fissions;
+    out->total_fast_fissions += in->total_fast_fissions;
     out->total_leakages      += in->total_leakages;
     out->total_unknowns      += in->total_unknowns;
     if (in->max_collision_bin > out->max_collision_bin)
@@ -135,6 +151,11 @@ static inline void GenerationScoresReduce(GenerationScores *restrict out,
     {
         out->collision_energy_sum[b]   += in->collision_energy_sum[b];
         out->collision_energy_count[b] += in->collision_energy_count[b];
+    }
+    for (size_t b = 0; b < MAX_TIME_BINS; ++b)
+    {
+        out->fission_time_yield[b]   += in->fission_time_yield[b];
+        out->fission_time_events[b] += in->fission_time_events[b];
     }
 }
 

@@ -46,7 +46,7 @@ long sampleInitialSource(void) {
             n->path_length = 0.0;
             n->fast_path_length = 0.0;
             n->time = 0.0;
-            n->time_fast = 0.0;
+            n->slowing_down_time = 0.0;
 
             /* Initialize particle private seeding */
 

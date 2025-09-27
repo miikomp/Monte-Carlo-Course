@@ -96,7 +96,7 @@ typedef struct {
     double path_length;   // accumulated path length cm
     double fast_path_length; // path length in fast region cm
     double time;        // time since birth in seconds
-    double time_fast;   // time in fast region seconds
+    double slowing_down_time;   // time in fast region seconds
     int fission_yield;   // fission neutrons produced
 } Neutron;
 
@@ -108,13 +108,14 @@ typedef struct {
     double   total_path_length;
     double   total_fast_path_length;
     double   total_time;
-    double   total_time_fast;
+    double   total_slowing_down_time;
     long   total_fission_yield;
     uint64_t total_collisions;
     uint64_t total_captures;
     uint64_t total_elastic_scatters;
     uint64_t total_inelastic_scatters;
     uint64_t total_fissions;
+    uint64_t total_thermal_fissions;
     uint64_t total_fast_fissions;
     uint64_t total_leakages;
     uint64_t total_unknowns;
@@ -134,7 +135,7 @@ static inline void GenerationScoresReduce(GenerationScores *restrict out,
     out->total_path_length   += in->total_path_length;
     out->total_fast_path_length += in->total_fast_path_length;
     out->total_time         += in->total_time;
-    out->total_time_fast    += in->total_time_fast;
+    out->total_slowing_down_time    += in->total_slowing_down_time;
     out->total_fission_yield += in->total_fission_yield;
     out->total_collisions    += in->total_collisions;
     out->n_histories         += in->n_histories;
@@ -142,6 +143,7 @@ static inline void GenerationScoresReduce(GenerationScores *restrict out,
     out->total_elastic_scatters   += in->total_elastic_scatters;
     out->total_inelastic_scatters += in->total_inelastic_scatters;
     out->total_fissions      += in->total_fissions;
+    out->total_thermal_fissions += in->total_thermal_fissions;
     out->total_fast_fissions += in->total_fast_fissions;
     out->total_leakages      += in->total_leakages;
     out->total_unknowns      += in->total_unknowns;

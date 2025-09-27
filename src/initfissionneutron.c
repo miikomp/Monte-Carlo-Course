@@ -11,10 +11,10 @@ void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx)
 
     new_neutron->path_length = 0.0;
     new_neutron->fast_path_length = 0.0;
-    new_neutron->time_fast = 0.0;
+    new_neutron->slowing_down_time = 0.0;
 
     /* Inherit parent time for time-resolved generational history */
-    
+
     new_neutron->time = parent->time;
 
     /* Inherit location of fission site */

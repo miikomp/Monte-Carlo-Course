@@ -64,6 +64,7 @@ extern int VERBOSITY;
 #define TNUC_FISSION 1.2895              /* MeV Nuclear temperature of U235 fission */
 #define E_FG_LIMIT 0.0002             /* MeV energy cutoff for free gas model at 200eV */
 #define E_THERMAL 5.0e-7              /* MeV Thermal threshold energy (Cadmium cutoff) */
+#define E_EPITHERMAL 0.1              /* MeV Epithermal threshold energy */
 
 #define DEFAULT_NEEDLE_LENGTH 0.85
 #define DEFAULT_LINE_SPACING  1.0

@@ -228,8 +228,8 @@ int runTransport(void)
                         gen_scores.total_time += dt;
                         if (n->E > E_THERMAL)
                         {
-                            n->time_fast += dt;
-                            gen_scores.total_time_fast += dt;
+                            n->slowing_down_time += dt;
+                            gen_scores.total_slowing_down_time += dt;
                         }
                     }
 
@@ -314,12 +314,14 @@ int runTransport(void)
                     {
                         gen_scores.total_fissions++;
 
+                        if (n->E > E_EPITHERMAL)
+                            gen_scores.total_fast_fissions++;
+                        else if (n->E <= E_THERMAL)
+                            gen_scores.total_thermal_fissions++;
+
                         handleFission(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
 
                         gen_scores.total_fission_yield += n->fission_yield;
-
-                        if (n->E > E_THERMAL)
-                            gen_scores.total_fast_fissions++;
 
                         r_mode = RRDET_MODE_FISSION;
 

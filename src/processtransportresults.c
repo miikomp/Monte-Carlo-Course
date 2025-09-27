@@ -30,7 +30,7 @@ static double metric_time(const GenerationScores *gs)
 
 static double metric_time_fast(const GenerationScores *gs)
 {
-    return safe_norm(gs->n_histories, gs->total_time_fast);
+    return safe_norm(gs->n_histories, gs->total_slowing_down_time);
 }
 
 static double metric_fission_yield(const GenerationScores *gs) 
@@ -66,6 +66,11 @@ static double metric_fissions(const GenerationScores *gs)
 static double metric_fast_fissions(const GenerationScores *gs) 
 {
     return safe_norm(gs->n_histories, (double)gs->total_fast_fissions);
+}
+
+static double metric_thermal_fissions(const GenerationScores *gs) 
+{
+    return safe_norm(gs->n_histories, (double)gs->total_thermal_fissions);
 }
 
 static double metric_leakages(const GenerationScores *gs) 
@@ -120,6 +125,7 @@ void processTransportResults(void)
         {"Elastic scatters",   "ELASTIC_SCATTERS",     metric_elastic},
         {"Inelastic scatters", "INELASTIC_SCATTERS",   metric_inelastic},
         {"Fissions",           "FISSIONS",             metric_fissions},
+        {"Thermal Fissions",   "THERMAL_FISSIONS",     metric_thermal_fissions},
         {"Fast Fissions",      "FAST_FISSIONS",        metric_fast_fissions},
         {"Leakages",           "LEAKAGES",             metric_leakages},
         {"Unknown outcomes",   "UNKNOWN_OUTCOMES",     metric_unknowns}

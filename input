@@ -66,7 +66,7 @@ src 1 0.0 0.0 0.0 1.0
 
 # Specify a detector for material to score nuclide wise reaction rates over all reaction modes
 # This combines MTs into: elastic scattering, inelastic scattering, fission, and capture
-det reactionrate_grouped dr all dm NAT_U_WATER
+det reactionrate_grouped dr all dm NAT_U_WATER de 5 10 1 1
 
 # Specify an energy spectrum detector with 500 bins between 1e-11 and 2 MeV with log spacing across all materials
 # It will tally total track lenght for each bin

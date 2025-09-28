@@ -7,14 +7,18 @@ long sampleInitialSource(void) {
     /* If bank capacity is zero, initialize it to value slightly more than the current 
     number of particles to avoid having to realloc during a run */
 
-    if (DATA.bank_cap == 0) {
+    if (DATA.bank_cap == 0) 
+    {
         DATA.bank_cap = (size_t)fmax(GLOB.n_particles * 1.1, (double)MIN_BANK_SIZE);
         DATA.bank = (Neutron*)calloc(DATA.bank_cap, sizeof(Neutron));
-        if (!DATA.bank) {
+        if (!DATA.bank) 
+        {
             fprintf(stderr,"[ERROR] Memory allocation failed.\n");
             return -1;
         }
     }
+
+    DATA.n_bank = 0;
 
     /* Build a bank of neutrons by sampling a source */
 

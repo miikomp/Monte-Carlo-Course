@@ -16,16 +16,17 @@ int buildFissionBank()
         }
     }
 
-    /* No fissions revive all neutrons in the bank and continue */
+    /* No fissions, sample initial source again */
 
     if (n_fission_neutrons == 0)
     {
-        for (size_t i = 0; i < DATA.n_bank; i++)
+        if (sampleInitialSource() < 0)
         {
-            Neutron *n = &DATA.bank[i];
-            n->status = NEUTRON_ALIVE;
+            fprintf(stderr, "[ERROR] Failed to re-sample initial source.\n");
+            return EXIT_FAILURE;
         }
-        fprintf(stdout, "\n[WARNING] No fission events. Re-using previous generation\n");
+
+        fprintf(stdout, "\n[WARNING] No fission events. Re-sampling initial source\n");
         return EXIT_SUCCESS;
     }
 
@@ -53,7 +54,7 @@ int buildFissionBank()
        and a chance to include that site */
 
     double factor = (double)GLOB.n_particles / (double)n_fission_neutrons;
-    long repeats = (int)factor;
+    long repeats = (int)factor; // cast to int to floor
     double a = factor - repeats;
 
     /* Loop over sites */

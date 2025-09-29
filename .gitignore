@@ -15,6 +15,7 @@ build/*
 ### Ignore the scripts directory ###
 
 scripts/*
+TODO.md
 
 ### Ignore the executable ###
 

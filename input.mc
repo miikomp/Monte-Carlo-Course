@@ -1,7 +1,7 @@
 # Example input file for the "moca" Monte Carlo neutron trasnport code
 
 # Set the seed (if not set, a random seed is used)
-set seed 12165467978
+# set seed 12165467978
 
 # Set number of neutrons in a generation and number of generations
 set pop 100000 100

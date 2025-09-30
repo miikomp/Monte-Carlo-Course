@@ -326,7 +326,7 @@ int computeMacroXs(void)
     if (DATA.n_mats > 0) 
     {
         char mpath[MAX_PATH];
-        snprintf(mpath, sizeof mpath, "%s_macroxs.m", GLOB.fname);
+        snprintf(mpath, sizeof mpath, "%s_macroxs.m", GLOB.inputfname);
 
         FILE *m = fopen(mpath, "w");
         if (!m) 

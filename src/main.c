@@ -15,7 +15,28 @@ int main(int argc, char **argv) {
 
     /* Filename is the last argument */
 
-    GLOB.fname = argv[argc - 1];
+    char *filename = argv[argc - 1];
+    static char inputfname[MAX_PATH];
+
+    GLOB.inputf = filename;
+
+    /* Strip file extension and path if present */
+    const char *dot = strrchr(filename, '.');
+    const char *slash = strrchr(filename, '/');
+
+    if (dot && dot != filename && (!slash || dot > slash))
+    {
+        size_t len = (size_t)(dot - filename);
+        if (len >= sizeof(inputfname))
+            len = sizeof(inputfname) - 1;
+        memcpy(inputfname, filename, len);
+        inputfname[len] = '\0';
+        GLOB.inputfname = inputfname;
+    }
+    else
+    {
+        GLOB.inputfname = filename;
+    }
 
     /* Try to parse commandline arguments */
     

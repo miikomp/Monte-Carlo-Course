@@ -264,7 +264,7 @@ int processXsData(TempNucDataLib **lib, size_t *nlib) {
     /* Write all MTs computed/parsed into file for verification */
 
     char mpath[MAX_PATH];
-    snprintf(mpath, sizeof mpath, "%s_xs.m", GLOB.fname);
+    snprintf(mpath, sizeof mpath, "%s_xs.m", GLOB.inputfname);
 
     FILE *m = fopen(mpath, "w");
     if (!m) 

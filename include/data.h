@@ -273,7 +273,8 @@ typedef struct {
 // Global struct for general information and pointers to other data
 typedef struct {
     /* General parameters */
-    const char *fname;
+    const char *inputf;
+    const char *inputfname;
     const char *outfname;
     const char *errfname;
     char        xslibpath[MAX_STR_LEN];

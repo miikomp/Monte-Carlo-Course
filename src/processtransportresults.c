@@ -255,7 +255,7 @@ void processTransportResults(void)
     /* Write results to MATLAB-compatible .m file */
 
     char mpath[MAX_PATH];
-    snprintf(mpath, sizeof(mpath), "%s_res.m", GLOB.fname ? GLOB.fname : "results");
+    snprintf(mpath, sizeof(mpath), "%s_res.m", GLOB.inputfname);
 
     FILE *mfile = fopen(mpath, "w");
     if (!mfile) 
@@ -265,7 +265,7 @@ void processTransportResults(void)
     else 
     {
         fprintf(mfile, "%%%% Transport results auto-generated\n");
-        fprintf(mfile, "%% Input file: %s\n\n", GLOB.fname ? GLOB.fname : "<unknown>");
+        fprintf(mfile, "%% Input file: %s\n\n", GLOB.inputf);
         fprintf(mfile, "N_GENERATIONS = %zu;\n\n", ngen);
 
         fprintf(mfile, "HISTORIES = [\n");

@@ -18,15 +18,12 @@ typedef struct {
 long readInput() {
     long np = 0l, lnum = 0l;
 
-    /* Avoid compiler warning */
-    parseUInt("\0", NULL);
-
     /* Open file for reading */
     
-    FILE *fp = fopen(GLOB.fname, "r");
+    FILE *fp = fopen(GLOB.inputf, "r");
     if (fp == NULL) 
     {
-        fprintf(stderr, "[ERROR] Cannot open file \"%s\".\n", GLOB.fname);
+        fprintf(stderr, "[ERROR] Cannot open file \"%s\".\n", GLOB.inputf);
         exit(EXIT_FAILURE);
     }
 
@@ -34,7 +31,7 @@ long readInput() {
 
     /* Try to parse keyword arguments and related options */
 
-    fprintf(stdout, "\nReading input file \"%s\"...\n", GLOB.fname);
+    fprintf(stdout, "\nReading input file \"%s\"...\n", GLOB.inputf);
 
     char line[4096];
 
@@ -63,7 +60,7 @@ long readInput() {
     /* --- Handle keywords --- */
 
         /* ###################################################################################### */
-        /* --- material --- */
+        /* --- mat --- (Material definition)*/
         if (!strcmp(tok, "mat"))
         {
             /* Try to get the material parameters from the same line */
@@ -307,7 +304,7 @@ long readInput() {
         }
 
         /* ###################################################################################### */
-        /* --- src --- */
+        /* --- src --- (External source definition)*/
         else if (!strcmp(tok, "src"))
         {
             /* Read input parameters */
@@ -377,7 +374,7 @@ long readInput() {
         }
 
         /* ###################################################################################### */        
-        /* --- det --- */
+        /* --- det --- (Detector definition for scoring reaction channels)*/
         else if (!strcmp(tok, "det"))
         {
             if (DATA.n_detectors >= (size_t)MAX_NUM_DETECTORS) 
@@ -614,7 +611,7 @@ long readInput() {
 
 
         /* ###################################################################################### */        
-        /* --- set --- */
+        /* --- set --- (Settings keyword followed by subwords and arguments) */
 
         else if (!strcmp(tok, "set"))
         {

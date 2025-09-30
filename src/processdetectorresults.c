@@ -25,8 +25,8 @@ void processDetectorResults(void)
     fprintf(stdout, "\nProcessing detector results...\n");
 
     char mpath[MAX_PATH];
-    const char *fname = GLOB.fname ? GLOB.fname : "results";
-    snprintf(mpath, sizeof(mpath), "%s_det.m", fname);
+    const char *inputf = GLOB.inputfname;
+    snprintf(mpath, sizeof(mpath), "%s_det.m", inputf);
 
     FILE *mfile = fopen(mpath, "w");
     if (!mfile)
@@ -36,7 +36,7 @@ void processDetectorResults(void)
     else
     {
         fprintf(mfile, "%%%% Detector results auto-generated\n");
-        fprintf(mfile, "%% Input file: %s\n\n", fname);
+        fprintf(mfile, "%% Input file: %s\n\n", inputf);
     }
 
     for (size_t d = 0; d < n_detectors; ++d)

@@ -5,7 +5,8 @@ int VERBOSITY = 0;
 /* Initialize global data structs */
 
 runInfo GLOB = {
-    .fname          = NULL,
+    .inputf          = NULL,
+    .inputfname    = NULL,
     .outfname       = NULL,
     .errfname       = NULL,
     .xslibpath      = {0},

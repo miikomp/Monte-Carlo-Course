@@ -27,6 +27,9 @@ long readInput() {
         exit(EXIT_FAILURE);
     }
 
+    /* Standard rand used for colour randomization */
+    srand((unsigned int)time(NULL));
+
     /* ########################################################################################## */
 
     /* Try to parse keyword arguments and related options */
@@ -111,6 +114,46 @@ long readInput() {
             /* Temperature in MeV */
 
             M.kT = M.T * BOLTZMANN;
+
+            /* See if colour is provided, randomize if not */
+            char *rgbtok = strtok(NULL, DELIMS);
+            if (rgbtok && !strcmp(rgbtok, "rgb"))
+            {
+                /* Read three colour channels */
+                
+                char *r_tok = strtok(NULL, DELIMS);
+                char *g_tok = strtok(NULL, DELIMS);
+                char *b_tok = strtok(NULL, DELIMS);
+
+                int r, g, b;
+
+                if (!parseUInt(r_tok, (uint32_t*)&r) || r < 0 || r > 255 ||
+                    !parseUInt(g_tok, (uint32_t*)&g) || g < 0 || g > 255 ||
+                    !parseUInt(b_tok, (uint32_t*)&b) || b < 0 || b > 255)
+                {
+                    fprintf(stderr, "[ERROR] Bad RGB values for material \"%s\" (line %ld).\n", M.name, lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                M.rgb[0] = r;
+                M.rgb[1] = g;
+                M.rgb[2] = b;
+
+                if (VERBOSITY >= 2)
+                    fprintf(stdout, "Material \"%s\" colour set to RGB(%u,%u,%u).\n", M.name, r, g, b);
+            }
+            else
+            {
+                /* Randomize all three channels */
+
+                M.rgb[0] = (uint32_t)(rand() % 256);
+                M.rgb[1] = (uint32_t)(rand() % 256);
+                M.rgb[2] = (uint32_t)(rand() % 256);
+
+                if (VERBOSITY >= 2)
+                    fprintf(stdout, "Material \"%s\" colour randomized to RGB(%u,%u,%u).\n", M.name, M.rgb[0], M.rgb[1], M.rgb[2]);
+            }
 
             /* Store header line number for errors */
 

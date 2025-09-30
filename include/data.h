@@ -71,6 +71,7 @@ typedef struct {
 // Struct for material data
 typedef struct {
     char     name[128];
+    uint32_t rgb[3];  // colour in geometry plots
     double   mdens;   // g/cm3
     double   adens;   // 1/b*cm2
     double   T;       // K

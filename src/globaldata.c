@@ -16,6 +16,8 @@ runInfo GLOB = {
     .t0             = 0.0,
     .t1             = 0.0,
     .n_threads      = 1,
+    .nbuf_factor    = 1.0,
+    .norun          = false,
 
     .n_generations  = 0l,
     .n_particles    = 0l,
@@ -27,7 +29,7 @@ runInfo GLOB = {
 };
 
 runData DATA = { 
-    .generation = 1ul,
+    .cur_gen = 1ul,
     .n_mats = 0ul,
     .mats   = NULL,
     .n_bank = 0ul,
@@ -39,7 +41,7 @@ runData DATA = {
 };
 
 ResultsData RES = {
-    .n_generations = 0l,
+    .n_iterations = 0l,
     .avg_scores = NULL
 };
 

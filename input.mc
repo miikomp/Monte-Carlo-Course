@@ -4,7 +4,7 @@
 # set seed 12165467978
 
 # Set number of neutrons in a generation and number of generations
-set pop 100000 100
+set nps 1E8 20
 
 # Specify cross section library path
 set xslibpath ./xsdata/xsdata.lib

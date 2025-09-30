@@ -5,7 +5,7 @@ void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx)
     /* Initialize misc. parameters */
 
     new_neutron->status = NEUTRON_ALIVE;
-    new_neutron->id = (DATA.generation - 1) * GLOB.n_particles + idx;
+    new_neutron->id = (DATA.cur_gen - 1) * GLOB.n_particles + idx;
     new_neutron->mat_idx = -1;
     new_neutron->fission_yield = 0;
 
@@ -29,7 +29,7 @@ void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx)
 
     /* Inherit generation incremented by one */
 
-    new_neutron->generation = parent->generation + 1;
+    new_neutron->genc = parent->genc + 1;
 
     /* Derive rng state */
 

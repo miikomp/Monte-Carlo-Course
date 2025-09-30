@@ -98,7 +98,7 @@ typedef struct {
     double fast_path_length; // path length in fast region cm
     double time;        // time since birth in seconds
     double slowing_down_time;   // time in fast region seconds
-    long generation;      // generation number
+    long genc;      // generation counter
     int fission_yield;   // fission neutrons produced
 } Neutron;
 
@@ -126,13 +126,13 @@ typedef struct {
     uint64_t collision_energy_count[MAX_COLLISION_BINS];
     double   fission_time_yield[MAX_TIME_BINS];
     uint64_t fission_time_events[MAX_TIME_BINS];
-} GenerationScores;
+} TransportRunScores;
 
-/* Custom OpenMP reduction clause for the GenerationScores structure */
+/* Custom OpenMP reduction clause for the TransportRunScores structure */
 
 #ifdef _OPENMP
-static inline void GenerationScoresReduce(GenerationScores *restrict out,
-                                          const GenerationScores *restrict in)
+static inline void TransportRunScoresReduce(TransportRunScores *restrict out,
+                                          const TransportRunScores *restrict in)
 {
     out->total_path_length   += in->total_path_length;
     out->total_fast_path_length += in->total_fast_path_length;
@@ -163,8 +163,8 @@ static inline void GenerationScoresReduce(GenerationScores *restrict out,
     }
 }
 
-#pragma omp declare reduction(+:GenerationScores: GenerationScoresReduce(&omp_out, &omp_in)) \
-    initializer(omp_priv = (GenerationScores){0})
+#pragma omp declare reduction(+:TransportRunScores: TransportRunScoresReduce(&omp_out, &omp_in)) \
+    initializer(omp_priv = (TransportRunScores){0})
 #endif
 
 /* --- Detector structures --- */
@@ -254,7 +254,8 @@ typedef union {
 
 // Collection data structure for all of the data needed during a run
 typedef struct {
-    uint64_t  generation;
+    uint64_t  cur_gen;
+    uint64_t  cur_cycle;
     size_t    n_mats;
     Material *mats;
     size_t    n_bank;
@@ -267,8 +268,8 @@ typedef struct {
 } runData;
 
 typedef struct {
-    int64_t          n_generations;
-    GenerationScores *avg_scores;
+    int64_t          n_iterations;
+    TransportRunScores *avg_scores;
 } ResultsData;
 
 // Global struct for general information and pointers to other data
@@ -286,11 +287,14 @@ typedef struct {
     double      t0;
     double      t1;
     int         n_threads;
+    double      nbuf_factor;
+    bool        norun;
 
     /* Iteration parameters */
-    long        n_generations;
-    long        n_particles;
-    long        n_inactive;
+    long        n_generations;  // criticality simulation
+    long        n_cycles;       // external source simulation
+    long        n_particles;    // particles per cycle/generation
+    long        n_inactive;     // number of inactive generations/cycles
 
     /* Cutoff parameters */
     double      energy_cutoff; // MeV

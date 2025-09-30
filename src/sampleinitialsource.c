@@ -2,14 +2,14 @@
 
 long sampleInitialSource(void) {
 
-    fprintf(stdout, "\nSampling initial neutron source...\n");
-
-    /* If bank capacity is zero, initialize it to value slightly more than the current 
-    number of particles to avoid having to realloc during a run */
+    /* If bank capacity is zero, initialize it to a size corresponding 
+       to the number of particles sized by a fixed factor */
 
     if (DATA.bank_cap == 0) 
     {
-        DATA.bank_cap = (size_t)fmax(GLOB.n_particles * 1.1, (double)MIN_BANK_SIZE);
+        DATA.bank_cap = (size_t)fmax(GLOB.n_particles * 1.2 * GLOB.nbuf_factor, (double)MIN_BANK_SIZE);
+        if (VERBOSITY >= 1)
+            fprintf(stdout, "Allocating neutron bank with capacity for %.0E neutrons.\n", (double)DATA.bank_cap);
         DATA.bank = (Neutron*)calloc(DATA.bank_cap, sizeof(Neutron));
         if (!DATA.bank) 
         {
@@ -17,13 +17,15 @@ long sampleInitialSource(void) {
             return -1;
         }
     }
+    /* Reset number of neutrons in bank */
 
     DATA.n_bank = 0;
 
-    /* Build a bank of neutrons by sampling a source */
+    /* Sample from a user defined neutron source */
 
-    if (DATA.src != NULL) 
+    if (GLOB.mode == RUNMODE_EXTERNAL_SOURCE) 
     {
+
         /* For now only Monoenergetic point source is included */
 
         for (long i = 0; i < GLOB.n_particles; i++)
@@ -44,13 +46,14 @@ long sampleInitialSource(void) {
             /* Initialize misc. parameters */
 
             n->status = NEUTRON_ALIVE;
-            n->id = (DATA.generation - 1) * GLOB.n_particles + i;
+            n->id = (DATA.cur_gen - 1) * GLOB.n_particles + i;
             n->mat_idx = -1;
             n->fission_yield = 0;
             n->path_length = 0.0;
             n->fast_path_length = 0.0;
             n->time = 0.0;
             n->slowing_down_time = 0.0;
+            n->genc = 0;
 
             /* Initialize particle private seeding */
 
@@ -62,20 +65,15 @@ long sampleInitialSource(void) {
             sampleNeutronDirection(n);
         }   
     }
+    /* Sample from fissile material (criticality simulation) */
+    else
+    {
+        fprintf(stderr, "[ERROR] Initial source sampling for criticality mode not implemented.\n");
+        return EXIT_FAILURE;
+    }
 
     if (VERBOSITY >= 1)
         fprintf(stdout, "Added %zu source neutrons into bank.\n", DATA.n_bank);
-
-    /* Calculate and report total memory allocated for the bank */
-
-    size_t total_bytes = 0;
-    for (size_t idx = 0; idx < DATA.bank_cap; ++idx)
-        total_bytes += sizeof(Neutron);
-
-    GLOB.mem_nbank = total_bytes;
-    fprintf(stdout, "Memory allocated for neutron bank: %.2f MB\n", (double)total_bytes / (1024.0 * 1024.0));
-
-    fprintf(stdout, "DONE.\n");
 
     return 0;
 }

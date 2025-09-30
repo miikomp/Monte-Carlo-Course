@@ -67,9 +67,9 @@ int main(int argc, char **argv) {
 
             VERBOSITY = val;
         }
-        else if (!strcmp(argv[i], "-check")) 
+        else if (!strcmp(argv[i], "-norun") || !strcmp(argv[i], "--norun")) 
         {
-            GLOB.mode = RUNMODE_CHECK;
+            GLOB.norun = true;
         }
         else 
         {
@@ -103,84 +103,91 @@ int main(int argc, char **argv) {
 
     /* ########################################################################################## */
 
-    /* If in transport mode read and process the xsdata and resolve all materials */
+    /* Read and process the xsdata and resolve all materials */
 
-    if (GLOB.mode == RUNMODE_CRITICALITY || GLOB.mode == RUNMODE_CHECK)
+    fprintf(stdout, "\n------------------------\n");
+    fprintf(stdout, "  Processing XS-data\n");
+    fprintf(stdout, "------------------------\n");
+
+    /* Read and process the xsdata from the given path into a temporary librabry */
+    TempNucDataLib *lib = NULL;
+    size_t nlib = 0;
+
+    if (processXsData(&lib, &nlib) != 0) 
     {
-        fprintf(stdout, "\n------------------------\n");
-        fprintf(stdout, "  Processing XS-data\n");
-        fprintf(stdout, "------------------------\n");
-
-        /* Read and process the xsdata from the given path into a temporary librabry */
-        TempNucDataLib *lib = NULL;
-        size_t nlib = 0;
-
-        if (processXsData(&lib, &nlib) != 0) 
-        {
-            fprintf(stderr, "[ERROR] Could not process cross section library file at \"%s\".\n", GLOB.xslibpath);
-            return EXIT_FAILURE;
-        }
-
-        /* Resolve all materials using the temporary nuclide library */
-
-        if (resolveMaterials(lib, nlib) != 0) 
-        {
-            fprintf(stderr, "[ERROR] Could not resolve materials.\n");
-            return EXIT_FAILURE;
-        }
-
-        /* Library freed inside resolveMaterials avoid dangling pointer */
-
-        lib = NULL;
-        nlib = 0;
-
-        /* Compute macroscopic cross sections for all resolved materials and reaction modes */
-        
-        if (computeMacroXs() != 0)
-        {
-            fprintf(stderr, "[ERROR] Failed to compute macroscopic cross sections.\n");
-            return EXIT_FAILURE;
-        }
-
-        fprintf(stdout, "\n----------------------------\n");
-        fprintf(stdout, "  Preparing simulation\n");
-        fprintf(stdout, "----------------------------\n\n");
-
-        /* Initialize results data struct */
-
-        fprintf(stdout, "Clearing results...\n");
-
-        RES.n_generations = GLOB.n_generations;
-        RES.avg_scores = (GenerationScores*)calloc((size_t)GLOB.n_generations, sizeof(GenerationScores));
-        if (!RES.avg_scores)
-        {
-            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
-            return EXIT_FAILURE;
-        }
-
-        /* Calculate memory footprint of results data structure */
-
-        size_t total_bytes = sizeof(ResultsData) + (size_t)GLOB.n_generations * sizeof(GenerationScores);
-        fprintf(stdout, "Memory allocated for results: %.2f MB\n", (double)total_bytes / (1024.0 * 1024.0));
-
-
-        fprintf(stdout, "DONE.\n");
-
-        /* Process detectors */
-
-        if (processDetectors() != 0) 
-        {
-            fprintf(stderr, "[ERROR] Could not process detectors.\n");
-            return EXIT_FAILURE;
-        }
-
-        /* Fill neutron bank with initial source neutrons */
-
-        if (sampleInitialSource() < 0) {
-            fprintf(stderr, "[ERROR] Failed to sample initial source.\n");
-            return EXIT_FAILURE;
-        }
+        fprintf(stderr, "[ERROR] Could not process cross section library file at \"%s\".\n", GLOB.xslibpath);
+        return EXIT_FAILURE;
     }
+
+    /* Resolve all materials using the temporary nuclide library */
+
+    if (resolveMaterials(lib, nlib) != 0) 
+    {
+        fprintf(stderr, "[ERROR] Could not resolve materials.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Library freed inside resolveMaterials avoid dangling pointer */
+
+    lib = NULL;
+    nlib = 0;
+
+    /* Compute macroscopic cross sections for all resolved materials and reaction modes */
+    
+    if (computeMacroXs() != 0)
+    {
+        fprintf(stderr, "[ERROR] Failed to compute macroscopic cross sections.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* ########################################################################################## */
+
+    fprintf(stdout, "\n----------------------------\n");
+    fprintf(stdout, "  Preparing simulation\n");
+    fprintf(stdout, "----------------------------\n\n");
+
+    /* Initialize results data struct */
+
+    fprintf(stdout, "Clearing results...\n");
+
+    size_t n_res = (size_t)GLOB.n_generations ? GLOB.n_generations > 0 : GLOB.n_cycles;
+    RES.n_iterations = n_res;
+    RES.avg_scores = (TransportRunScores*)calloc(n_res, sizeof(TransportRunScores));
+    if (!RES.avg_scores)
+    {
+        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Calculate memory footprint of results data structure */
+
+    size_t total_bytes = sizeof(ResultsData) + n_res * sizeof(TransportRunScores);
+    fprintf(stdout, "Memory allocated for results: %.2f MB\n", (double)total_bytes / (1024.0 * 1024.0));
+
+
+    fprintf(stdout, "DONE.\n");
+
+    /* Process detectors */
+
+    if (processDetectors() != 0) 
+    {
+        fprintf(stderr, "[ERROR] Could not process detectors.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Fill neutron bank with initial source neutrons */
+
+    fprintf(stdout, "\nSampling initial neutron source...\n");
+
+    if (sampleInitialSource() < 0) {
+        fprintf(stderr, "[ERROR] Failed to sample initial source.\n");
+        return EXIT_FAILURE;
+    }
+    size_t mem_bytes = DATA.bank_cap * sizeof(Neutron);
+    GLOB.mem_nbank = mem_bytes;
+    fprintf(stdout, "Memory allocated for neutron bank: %.2f MB\n", (double)mem_bytes / (1024.0 * 1024.0));
+    fprintf(stdout, "DONE.\n");
+
     /* ########################################################################################## */
 
     /* Set desired number of threads and put actual number provided */
@@ -197,7 +204,7 @@ int main(int argc, char **argv) {
 
     initTrigTables();
 
-    if (GLOB.mode == RUNMODE_CHECK)
+    if (GLOB.norun)
     {
         fprintf(stdout, "\nLaunched in check mode and found no issues. Exiting...\n");
         return EXIT_SUCCESS;
@@ -227,8 +234,8 @@ int main(int argc, char **argv) {
            For super critical systems a cut-off must be in place to avoid infinite loops.
         */
 
-        fprintf(stdout, "Running external source simulation for %ld generations with %ld neutrons each.\n", 
-            GLOB.n_generations, GLOB.n_particles);
+        fprintf(stdout, "Running external source simulation for %ld cycles with %ld neutrons each.\n", 
+            GLOB.n_cycles, GLOB.n_particles);
 
         if (runExternalSourceSimulation() != 0) {
             fprintf(stderr, "[ERROR] Computation failed.\n");

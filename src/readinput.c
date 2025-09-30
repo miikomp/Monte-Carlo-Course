@@ -115,7 +115,7 @@ long readInput() {
 
             M.kT = M.T * BOLTZMANN;
 
-            /* See if colour is provided, randomize if not */
+            /* See if colour is provided, randomise if not */
             char *rgbtok = strtok(NULL, DELIMS);
             if (rgbtok && !strcmp(rgbtok, "rgb"))
             {
@@ -793,29 +793,65 @@ long readInput() {
                     exit(EXIT_FAILURE);
                 }
 
-                long n_particles, n_generations, n_inactive;
-                if (!parseLong(a1, &n_particles) || !parseLong(a2, &n_generations)) 
+                double n_particles, n_generations, n_inactive;
+                if (!parseDouble(a1, &n_particles) || !parseDouble(a2, &n_generations)) 
                 {
                     fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
-                if (!parseLong(a3, &n_inactive))
+                if (!parseDouble(a3, &n_inactive))
                     n_inactive = 0;
 
                 /* Check for valid values */
 
-                if (n_generations < 1 || n_particles < 1 || n_inactive < 0) {
+                if (n_generations < 1.0 || n_particles < 1.0 || n_inactive < 0.0) {
                     fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
 
-                GLOB.n_generations = n_generations;
-                GLOB.n_particles = n_particles;
-                GLOB.n_inactive = n_inactive;
-                if (GLOB.mode != RUNMODE_CHECK)
-                    GLOB.mode = RUNMODE_CRITICALITY;
+                GLOB.n_generations = (long)n_generations;
+                GLOB.n_particles = (long)n_particles;
+                GLOB.n_inactive = (long)n_inactive;
+                GLOB.mode = RUNMODE_CRITICALITY;
+                np++;
+            }
+            /* --- External source simulation population */
+            else if (!strcmp(subkey, "nps")) 
+            {
+                char *a1 = strtok(NULL, DELIMS);
+                char *a2 = strtok(NULL, DELIMS);
+                char *a3 = strtok(NULL, DELIMS);
+                if (!a1 || !a2) 
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                double n_particles, n_cycles, n_inactive;
+                if (!parseDouble(a1, &n_particles) || !parseDouble(a2, &n_cycles)) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+                if (!parseDouble(a3, &n_inactive))
+                    n_inactive = 0;
+
+                /* Check for valid values */
+
+                if (n_cycles < 1.0 || n_particles < 1.0 || n_inactive < 0.0) {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                GLOB.n_cycles = (long)n_cycles;
+                GLOB.n_particles = (long)(n_particles / n_cycles);
+                GLOB.n_inactive = (long)n_inactive;
+                GLOB.mode = RUNMODE_EXTERNAL_SOURCE;
                 np++;
             }
             /* --- RNG seed */
@@ -838,6 +874,28 @@ long readInput() {
                 }
 
                 GLOB.seed = seed;
+                np++;
+            }
+            /* --- Neutron buffer factor */
+            else if (!strcmp(subkey, "nbuf")) 
+            {
+                char *a1 = strtok(NULL, DELIMS);
+                if (!a1) 
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                double nbuf_factor;
+                if (!parseDouble(a1, &nbuf_factor)) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                GLOB.nbuf_factor = nbuf_factor;
                 np++;
             }
             else 

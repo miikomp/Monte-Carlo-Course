@@ -65,7 +65,6 @@ extern int VERBOSITY;
 enum RUN_MODES{
     RUNMODE_EXTERNAL_SOURCE = 0,
     RUNMODE_CRITICALITY,
-    RUNMODE_CHECK
 };
 
 enum NEUTRON_STATUS{
@@ -260,6 +259,13 @@ int getMaterialAtPosition(double x, double y, double z);
  * @return double Velocity in cm/s, or -1.0 on failure
  */
 double getVelocityCmPerS(const double E);
+
+/**
+ * @brief Check if any cutt-off has been reached, terminate neutron if yes.
+ * 
+ * @param n Pointer to Neutron
+ */
+void checkNeutronCutoff(Neutron *n);
 
 /**
  * @brief Initialize a fission neutron.

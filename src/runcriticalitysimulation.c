@@ -8,7 +8,7 @@ int runCriticalitySimulation(void)
     1) On all but the first generation either:
         a) Build a fission neutron bank from fission sites of last generation
         b) Re-use last generation's bank
-    2) Initialize a GenerationScores struct to hold scores for this generation
+    2) Initialize a TransportRunScores struct to hold scores for this generation
     3) Loop over all neutrons in the bank by comb sampling #pragma omp parallel for
         a) While neutron is alive repeatedly:
             i) Sample distance to next collision
@@ -20,7 +20,7 @@ int runCriticalitySimulation(void)
             vii) If scatter sample new energy and direction
                 - Target energy is either ignored, or free gas model is used (E < 200eV)
             viii) if maximum number of collisions or energy below cutoff kill neutron
-        b) Use #pragma reduction to sum scores into GenerationScores struct
+        b) Use #pragma reduction to sum scores into TransportRunScores struct
     4) After all neutrons are done, add generation scores to RES.avg_scores in some valid way (single threaded?)
     5) Repeat until all generations are done
     */
@@ -104,12 +104,12 @@ int runCriticalitySimulation(void)
 
     for (long g = 1; g <= GLOB.n_generations + GLOB.n_inactive; g++) 
     {
-        DATA.generation = (uint64_t)g;
+        DATA.cur_gen = (uint64_t)g;
 
         /* Initialize generation score struct to reduce during parallel run */
 
-        GenerationScores gen_scores;
-        memset(&gen_scores, 0, sizeof(GenerationScores));
+        TransportRunScores gen_scores;
+        memset(&gen_scores, 0, sizeof(TransportRunScores));
 
         /* Clear thread-local detector scoring arrays */
 
@@ -212,7 +212,7 @@ int runCriticalitySimulation(void)
                     n->path_length += d;
                     gen_scores.total_path_length += d;
 
-                    if (n->E > E_THERMAL)
+                    if (n->E >= E_THERMAL)
                     {
                         n->fast_path_length += d;
                         gen_scores.total_fast_path_length += d;
@@ -406,7 +406,7 @@ int runCriticalitySimulation(void)
 
         if (g > GLOB.n_inactive)
         {
-            if (g - 1 - GLOB.n_inactive < RES.n_generations && RES.avg_scores)
+            if (g - 1 - GLOB.n_inactive < RES.n_iterations && RES.avg_scores)
                 RES.avg_scores[g - 1 - GLOB.n_inactive] = gen_scores;
         }
         

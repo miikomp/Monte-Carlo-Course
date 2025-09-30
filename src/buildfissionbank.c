@@ -30,7 +30,7 @@ int buildFissionBank()
         return EXIT_SUCCESS;
     }
 
-    /* Build fission bank large enough to hold the next generation */
+    /* Build fission bank large enough to hold the next cur_gen */
 
     size_t new_bank_size = GLOB.n_particles * 1.2;
     Neutron *new_bank = (Neutron *)calloc(new_bank_size, sizeof(Neutron));

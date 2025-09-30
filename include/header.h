@@ -31,18 +31,6 @@ extern int VERBOSITY;
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
-#define RUNMODE_TRANSPORT   0
-#define RUNMODE_CIRCLE_PI   1
-#define RUNMODE_BUFFONS_PI  2
-#define RUNMODE_CHECK       3
-
-#define NEUTRON_ALIVE 0
-#define NEUTRON_DEAD_FISSION 1
-#define NEUTRON_DEAD_CAPTURE 2
-#define NEUTRON_DEAD_LEAKAGE 3
-#define NEUTRON_DEAD_TERMINATED 4
-
-#define PRG_BAR_WIDTH 50
 #define TRIG_LOOKUP_TABLE_SIZE 10000
 
 #define UNION_ENERGY_GRID_SIZE 500
@@ -61,7 +49,7 @@ extern int VERBOSITY;
 #define C_LIGHT 2.99792458e10          /* cm/s */
 
 #define BARN_TO_CM2 1.0e-24
-#define TNUC_FISSION 1.2895              /* MeV Nuclear temperature of U235 fission */
+#define TNUC_FISSION 1.2895           /* MeV Nuclear temperature of U235 fission */
 #define E_FG_LIMIT 0.0002             /* MeV energy cutoff for free gas model at 200eV */
 #define E_THERMAL 5.0e-7              /* MeV Thermal threshold energy (Cadmium cutoff) */
 #define E_EPITHERMAL 0.1              /* MeV Epithermal threshold energy */
@@ -72,6 +60,21 @@ extern int VERBOSITY;
 
 #define TIME_BIN_WIDTH 1e-7    /* seconds */
 
+/* --- Enums --- */
+
+enum RUN_MODES{
+    RUNMODE_EXTERNAL_SOURCE = 0,
+    RUNMODE_CRITICALITY,
+    RUNMODE_CHECK
+};
+
+enum NEUTRON_STATUS{
+    NEUTRON_ALIVE = 0,
+    NEUTRON_DEAD_FISSION,
+    NEUTRON_DEAD_CAPTURE,
+    NEUTRON_DEAD_LEAKAGE,
+    NEUTRON_DEAD_TERMINATED
+};
 
 enum SRC_TYPES{
     SRC_MONO_POINT = 1
@@ -80,10 +83,6 @@ enum SRC_TYPES{
 enum DET_TYPES{
     DET_REACTION_RATE = 1
 };
-
-/* inverse of 32-bit max integer */
-
-#define INV_INT32_MAX (1.0/(double)UINT32_MAX)
 
 /* --- Function declaration --- */
 
@@ -101,33 +100,6 @@ long readInput();
  * 
  */
 void initTrigTables();
-
-/**
- * @brief Single threaded outerloop of the quarter circle pi approximation.
- * 
- * @param sm seed for seed scrambler
- * @param seeds thread private seed storage
- * @return int 0 on success 1 on failure
- */
-int runCirclePi(uint64_t sm);
-
-/**
- * @brief Single threaded outerloop of Buffon's needle simulation.
- * 
- * @param sm seed for seed scrambler
- * @param seeds thread private seed storage
- * @return int 0 on success 1 on failure
- */
-int runBuffonsPi(uint64_t sm);
-
-/**
- * @brief Summarize an array of results by calculating and printing basic statistics like
- * mean, standard deviation, 95% confidence interval and figure-of-merit (FOM). Used for the two
- * pi estimation methods.
- * 
- * @param results ptr to results array with GLOB.n_generations items
- */
-void summarizePiResultsArray(const double *results);
 
 /**
  * @brief Process and validate input data stored in GLOB. Raise errors when applicable.
@@ -168,7 +140,6 @@ int computeMacroXs(void);
  */
 int processDetectors(void);
 
-
 /**
  * @brief Process scored detector results and output relevant data into file and stdout.
  * 
@@ -184,11 +155,18 @@ void processDetectorResults();
 long sampleInitialSource(void);
 
 /**
- * @brief Run the transport simulation.
+ * @brief Runs the external source transport simulation. 
  * 
  * @return int 0 on success 1 on failure
  */
-int runTransport(void);
+int runExternalSourceSimulation(void);
+
+/**
+ * @brief Run the criticality source simulation.
+ * 
+ * @return int 0 on success 1 on failure
+ */
+int runCriticalitySimulation(void);
 
 /**
  * @brief Process transport results and output relevant data into file and stdout.
@@ -283,12 +261,6 @@ int getMaterialAtPosition(double x, double y, double z);
  */
 double getVelocityCmPerS(const double E);
 
-/* Compare two doubles, used for quicksort */
-static inline int cmpDouble(const void *a, const void *b) {
-    double da = *(const double*)a, db = *(const double*)b;
-    return (da < db) ? -1 : (da > db);
-}
-
 /**
  * @brief Initialize a fission neutron.
  * 
@@ -297,6 +269,14 @@ static inline int cmpDouble(const void *a, const void *b) {
  * @param idx Index of the new neutron in the fission bank (used for setting unique IDs)
  */
 void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx);
+
+/* --- Inline functions --- */
+
+/* Compare two doubles, used for quicksort */
+static inline int cmpDouble(const void *a, const void *b) {
+    double da = *(const double*)a, db = *(const double*)b;
+    return (da < db) ? -1 : (da > db);
+}
 
 /* Linear–linear interpolation on one segment [E1, E2].
    Returns xs(E) from (E1, xs1) and (E2, xs2). */

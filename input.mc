@@ -1,13 +1,13 @@
 # Example input file for the "moca" Monte Carlo neutron trasnport code
 
 # Set the seed (if not set, a random seed is used)
-# seed 12165467978
+set seed 12165467978
 
 # Set number of neutrons in a generation and number of generations
-pop 100000 100
+set pop 100000 100
 
 # Specify cross section library path
-xslibpath ./xsdata/xsdata.lib
+set xslibpath ./xsdata/xsdata.lib
 
 # Define material(s)
 # Positive density/fraction means mass density in g/cm^3 or mass fraction

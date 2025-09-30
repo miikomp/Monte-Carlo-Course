@@ -97,6 +97,7 @@ typedef struct {
     double fast_path_length; // path length in fast region cm
     double time;        // time since birth in seconds
     double slowing_down_time;   // time in fast region seconds
+    long generation;      // generation number
     int fission_yield;   // fission neutrons produced
 } Neutron;
 
@@ -291,15 +292,13 @@ typedef struct {
 
     /* Cutoff parameters */
     double      energy_cutoff; // MeV
-    long        max_collisions; // per neutron
+    long        collision_cutoff; // per neutron
+    long        generation_cutoff; // in external source mode to limits lengths of fission histories
+    long        time_cutoff; // seconds
 
     /* Allocated memory footprint (bytes)*/
     size_t      mem_xsdata;
     size_t      mem_nbank;
-
-    /* Buffon's needle specific parameters */
-    double      needle_length;
-    double      line_spacing;
 } runInfo;
 
 extern runData DATA;
@@ -307,11 +306,6 @@ extern ResultsData RES;
 extern runInfo GLOB;
 
 /* --- Misc. data structures --- */
-
-typedef struct {
-    long n_tot;
-    long n_hits;
-} PiResult;
 
 /* Temporary data struct for used when parsing nuclide data at multiple temperatures */
 /* The reason is that in the future interpolation could be applied to temperature adjust */

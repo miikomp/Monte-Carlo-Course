@@ -20,10 +20,9 @@ runInfo GLOB = {
     .n_particles    = 0l,
 
     .energy_cutoff  = 0.0,
-    .max_collisions = 1e6l,
-
-    .needle_length  = 0.0,
-    .line_spacing   = 0.0,
+    .collision_cutoff = LONG_MAX,
+    .generation_cutoff = LONG_MAX,
+    .time_cutoff    = LONG_MAX,
 };
 
 runData DATA = { 
@@ -52,23 +51,8 @@ void initTrigTables() {
     for (int i = 0; i < TRIG_LOOKUP_TABLE_SIZE; i++) 
     {
         double angle = (M_PI * i) / (TRIG_LOOKUP_TABLE_SIZE - 1);
-        if (GLOB.mode == RUNMODE_BUFFONS_PI) 
-        {   
-            /* Scale sin by needle length / 2 for Buffon's needle problem */
-
-            sin_table[i] = (GLOB.needle_length / 2.0) * sin(angle);
-            cos_table[i] = cos(angle);
-            tan_table[i] = tan(angle);
-            continue;
-        }
-        else 
-        {
-            /* Just put raw sin, cos and tan for other runmodes */
-
-            sin_table[i] = sin(angle);
-            cos_table[i] = cos(angle);
-            tan_table[i] = tan(angle);
-            continue;
-        }
+        sin_table[i] = sin(angle);
+        cos_table[i] = cos(angle);
+        tan_table[i] = tan(angle);
     }
 }

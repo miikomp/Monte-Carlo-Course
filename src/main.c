@@ -46,6 +46,10 @@ int main(int argc, char **argv) {
 
             VERBOSITY = val;
         }
+        else if (!strcmp(argv[i], "-check")) 
+        {
+            GLOB.mode = RUNMODE_CHECK;
+        }
         else 
         {
             fprintf(stderr, "[ERROR] Unknown commandline argument \"%s\".\n", argv[i]);
@@ -80,7 +84,7 @@ int main(int argc, char **argv) {
 
     /* If in transport mode read and process the xsdata and resolve all materials */
 
-    if (GLOB.mode == RUNMODE_TRANSPORT || GLOB.mode == RUNMODE_CHECK)
+    if (GLOB.mode == RUNMODE_CRITICALITY || GLOB.mode == RUNMODE_CHECK)
     {
         fprintf(stdout, "\n------------------------\n");
         fprintf(stdout, "  Processing XS-data\n");
@@ -172,6 +176,12 @@ int main(int argc, char **argv) {
 
     initTrigTables();
 
+    if (GLOB.mode == RUNMODE_CHECK)
+    {
+        fprintf(stdout, "\nLaunched in check mode and found no issues. Exiting...\n");
+        return EXIT_SUCCESS;
+    }
+
     /* ########################################################################################## */
 
     /* Start timer */
@@ -187,39 +197,37 @@ int main(int argc, char **argv) {
     fprintf(stdout, "------------------------\n\n");
 
     switch (GLOB.mode) {
-    case RUNMODE_TRANSPORT:
+    case RUNMODE_EXTERNAL_SOURCE:
     {
-        /* Run the transport simulation */
+        /* 
+           Run the external source simulation:
+           Simulates a set number of cycles for a set number of neutrons. 
+           Each cycle is independent of the last and last for the entire history of each neutron.
+           For super critical systems a cut-off must be in place to avoid infinite loops.
+        */
 
-        if (runTransport() != 0) {
+        fprintf(stdout, "Running external source simulation for %ld generations with %ld neutrons each.\n", 
+            GLOB.n_generations, GLOB.n_particles);
+
+        if (runExternalSourceSimulation() != 0) {
             fprintf(stderr, "[ERROR] Computation failed.\n");
             return EXIT_FAILURE;
         }
 
         break;
     }
-    case RUNMODE_CIRCLE_PI: 
+    case RUNMODE_CRITICALITY:
     {
-        /* Get scrambler seed from global seed */
+        /* 
+           Run the criticality simulation: 
+           Simulates a set number of generations so that each new generation is spawned from
+           the fission sites of the last generation. 
+        */
 
-        uint64_t sm = (GLOB.seed << 32) ^ UINT64_C(0x94D049BB133111EB);
+        fprintf(stdout, "Running criticality source simulation for %ld generations with %ld neutrons each.\n", 
+            GLOB.n_generations, GLOB.n_particles);
 
-        if (runCirclePi(sm) != 0)
-        {
-            fprintf(stderr, "[ERROR] Computation failed.\n");
-            return EXIT_FAILURE;
-        }
-
-        break;
-    }
-    case RUNMODE_BUFFONS_PI: 
-    {
-
-        /* Get scrambler seed from global seed */
-
-        uint64_t sm = (GLOB.seed << 32) ^ UINT64_C(0x94D049BB133111EB);
-
-        if (runBuffonsPi(sm) != 0) {
+        if (runCriticalitySimulation() != 0) {
             fprintf(stderr, "[ERROR] Computation failed.\n");
             return EXIT_FAILURE;
         }
@@ -247,19 +255,20 @@ int main(int argc, char **argv) {
 
     /* ########################################################################################## */
 
-    if (GLOB.mode == RUNMODE_TRANSPORT || GLOB.mode == RUNMODE_CHECK) 
-    {
-        /* Process and output transport results */
+    /* Process and output transport results */
 
-        fprintf(stdout, "Processing results...\n");
+    fprintf(stdout, "Processing results...\n");
 
-        processTransportResults();
-        processDetectorResults();
+    processTransportResults();
+    processDetectorResults();
 
-        fprintf(stdout, "\nDONE.\n");
-    }
+    fprintf(stdout, "\nDONE.\n");
+    
 
     /* Prepare for termination */
+
+    free(RES.avg_scores);
+    RES.avg_scores = NULL;
 
     /* Exit */
 

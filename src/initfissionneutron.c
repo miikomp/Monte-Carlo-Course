@@ -27,6 +27,10 @@ void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx)
 
     new_neutron->seed = parent->seed + idx;
 
+    /* Inherit generation incremented by one */
+
+    new_neutron->generation = parent->generation + 1;
+
     /* Derive rng state */
 
     xoshiro256ss_seed(&new_neutron->state, new_neutron->seed);

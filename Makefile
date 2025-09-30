@@ -39,7 +39,7 @@ clean:
 
 # Make run compiles everything and runs
 run: all
-	./moca -omp 8 input
+	./moca -omp 8 input.mc
 
 # Testing environment. Compiles everything in ./test into one binary and runs
 # This replaces the main() with the one in tests.c

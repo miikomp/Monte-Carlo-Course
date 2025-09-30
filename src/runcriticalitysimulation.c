@@ -2,7 +2,7 @@
 
 inline size_t energyGridBinIndex(const EnergyGrid *grid, double energy);
 
-int runTransport(void) 
+int runCriticalitySimulation(void) 
 {
     /*
     1) On all but the first generation either:

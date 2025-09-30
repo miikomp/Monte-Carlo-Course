@@ -26,7 +26,7 @@ long readInput() {
     FILE *fp = fopen(GLOB.fname, "r");
     if (fp == NULL) 
     {
-        fprintf(stderr, "[ERROR] Cannot open file \"%s\".", GLOB.fname);
+        fprintf(stderr, "[ERROR] Cannot open file \"%s\".\n", GLOB.fname);
         exit(EXIT_FAILURE);
     }
 
@@ -63,104 +63,8 @@ long readInput() {
     /* --- Handle keywords --- */
 
         /* ###################################################################################### */
-        /* --- seed --- */
-    
-        if (!strcmp(tok, "seed")) 
-        {
-            char *a1 = strtok(NULL, DELIMS);
-            if (!a1) 
-            {
-                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-
-            uint64_t seed;
-            if (!parseULong(a1, &seed)) 
-            {
-                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-
-            /* Put seed */
-
-            GLOB.seed = seed;
-            np++;
-        }
-
-        /* ###################################################################################### */
-        /* --- pop --- */
-
-        else if (!strcmp(tok, "pop")) 
-        {
-            char *a1 = strtok(NULL, DELIMS);
-            char *a2 = strtok(NULL, DELIMS);
-            char *a3 = strtok(NULL, DELIMS);
-            if (!a1 || !a2) 
-            {
-                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-
-            long n_particles, n_generations, n_inactive;
-            if (!parseLong(a1, &n_particles) || !parseLong(a2, &n_generations)) 
-            {
-                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-            if (!parseLong(a3, &n_inactive))
-                n_inactive = 0;
-
-            /* Check for valid values */
-
-            if (n_generations < 1 || n_particles < 1 || n_inactive < 0) {
-                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-            
-            /* Put outer and inner iterations */
-
-            GLOB.n_generations = n_generations;
-            GLOB.n_particles = n_particles;
-            GLOB.n_inactive = n_inactive;
-            np++;
-        }
-
-        /* ###################################################################################### */
-        /* --- xslibpath --- */
-        
-        else if (!strcmp(tok, "xslibpath"))
-        {
-            char *path = strtok(NULL, DELIMS);
-
-            if (!path) {
-                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-
-            /* Check for valid length */
-
-            size_t len = strlen(path);
-            if (len >= MAX_STR_LEN) {
-                fprintf(stderr, "[ERROR] Cross section library path too long on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-
-            /* Put to GLOB */
-
-            snprintf(GLOB.xslibpath, MAX_STR_LEN, "%s", path);
-            np++;
-        }
-
-        /* ###################################################################################### */
         /* --- material --- */
-        else if (!strcmp(tok, "mat"))
+        if (!strcmp(tok, "mat"))
         {
             /* Try to get the material parameters from the same line */
 
@@ -210,6 +114,10 @@ long readInput() {
             /* Temperature in MeV */
 
             M.kT = M.T * BOLTZMANN;
+
+            /* Store header line number for errors */
+
+            long mat_lnum = lnum;
 
             /* Read ZA + fraction pairs until empty line or comment put into T struct */
 
@@ -319,7 +227,7 @@ long readInput() {
 
             if (cv.n == 0) 
             {
-                fprintf(stderr, "[ERROR] Material \"%s\" has no components (line %ld).\n", M.name, lnum);
+                fprintf(stderr, "[ERROR] Material \"%s\" has no components (line %ld).\n", M.name, mat_lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
@@ -339,7 +247,7 @@ long readInput() {
 
             if (sum_atoms > 0.0 && sum_w > 0.0) 
             {
-                fprintf(stderr, "[ERROR] Mixed fraction types in material \"%s\" (line %ld).\n", M.name, lnum);
+                fprintf(stderr, "[ERROR] Mixed fraction types in material \"%s\" (line %ld).\n", M.name, mat_lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
@@ -360,7 +268,7 @@ long readInput() {
             {
                 /* WTF? should not be here */
 
-                fprintf(stderr, "[ERROR] Zero fractions in material \"%s\" (line %ld).\n", M.name, lnum);
+                fprintf(stderr, "[ERROR] Zero fractions in material \"%s\" (line %ld).\n", M.name, mat_lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
@@ -720,103 +628,176 @@ long readInput() {
                 exit(EXIT_FAILURE);
             }
 
-            /* Read the first value */
-
-            char *value = strtok(NULL, DELIMS);
-            if (!value) 
-            {
-                fprintf(stderr, "[ERROR] Missing value for \"set %s\" on line %ld.\n", subkey, lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-
             /* ################################################################################## */
             /* --- Handle the specifier keywords --- */
 
-            if (!strcmp(subkey, "mode")) 
+            /* --- Neutron energy cutoff */
+            if (!strcmp(subkey, "ecut"))
             {
-                long mode;
-                if (!parseLong(value, &mode)) 
+                char *a1 = strtok(NULL, DELIMS);
+                if (!a1) 
                 {
-                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
 
-                /* Check mode */
-                
-                if (!((mode == RUNMODE_CIRCLE_PI) || 
-                    (mode == RUNMODE_BUFFONS_PI) || 
-                    (mode == RUNMODE_CHECK))) 
-                {
-                    fprintf(stderr, "[ERROR] Unknown mode identifier \"%ld\" for \"mode\".\n", mode);
-                    fclose(fp);
-                    exit(EXIT_FAILURE);
-                }
-                
-                /* Put mode */
-                
-                GLOB.mode = mode;
-                np++;
-            }
-            else if (!strcmp(subkey, "ecut"))
-            {
                 double ecut;
-                if (!parseDouble(value, &ecut) || ecut < 0.0) 
+                if (!parseDouble(a1, &ecut) || ecut < 0.0) 
                 {
                     fprintf(stderr, "[ERROR] Invalid value for \"set ecut\" on line %ld.\n", lnum);
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
 
-                /* Put energy cutoff */
-
                 GLOB.energy_cutoff = ecut;
                 np++;
             }
+            /* --- Collision number cutoff */
             else if (!strcmp(subkey, "ccut"))
             {
+                char *a1 = strtok(NULL, DELIMS);
+                if (!a1) 
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
                 double ccut;
-                if (!parseDouble(value, &ccut) || ccut < 0) 
+                if (!parseDouble(a1, &ccut) || ccut < 0) 
                 {
                     fprintf(stderr, "[ERROR] Invalid value for \"set ccut\" on line %ld.\n", lnum);
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
 
-                /* Put collision cutoff */
-
-                GLOB.max_collisions = (long)ccut;
+                GLOB.collision_cutoff = (long)ccut;
                 np++;
             }
-            else if (!strcmp(subkey, "needle")) 
+            /* -- Generation cut off */
+            else if (!strcmp(subkey, "gcut"))
             {
-                double needle_length;
-                if (!parseDouble(value, &needle_length)) 
+                char *a1 = strtok(NULL, DELIMS);
+                if (!a1) 
                 {
-                    fprintf(stderr, "[ERROR] Invalid value for \"set needle\" on line %ld.\n", lnum);
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
 
-                /* Put needle length */
-
-                GLOB.needle_length = needle_length;
-                np++;
-            }
-            else if (!strcmp(subkey, "lines")) 
-            {
-                double line_spacing;
-                if (!parseDouble(value, &line_spacing)) 
+                double gcut;
+                if (!parseDouble(a1, &gcut) || gcut < 0) 
                 {
-                    fprintf(stderr, "[ERROR] Invalid value for \"set lines\" on line %ld.\n", lnum);
+                    fprintf(stderr, "[ERROR] Invalid value for \"set gcut\" on line %ld.\n", lnum);
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
 
-                /* Put line spacing */
+                GLOB.generation_cutoff = gcut;
+                np++;
+            }
+            /* -- Time cut off */
+            else if (!strcmp(subkey, "tcut"))
+            {
+                char *a1 = strtok(NULL, DELIMS);
+                if (!a1) 
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
 
-                GLOB.line_spacing = line_spacing;
+                double tcut;
+                if (!parseDouble(a1, &tcut) || tcut < 0) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid value for \"set tcut\" on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                GLOB.time_cutoff = tcut;
+                np++;
+            }
+            /* --- Cross section library file path */
+            else if (!strcmp(subkey, "xslibpath"))
+            {   
+                char *path = strtok(NULL, DELIMS);
+                if (!path) {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                /* Check for valid length */
+
+                size_t len = strlen(path);
+                if (len >= MAX_STR_LEN) {
+                    fprintf(stderr, "[ERROR] Cross section library path too long on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                snprintf(GLOB.xslibpath, MAX_STR_LEN, "%s", path);
+                np++;
+            }
+            /* --- Criticality source simulation population */
+            else if (!strcmp(subkey, "pop")) 
+            {
+                char *a1 = strtok(NULL, DELIMS);
+                char *a2 = strtok(NULL, DELIMS);
+                char *a3 = strtok(NULL, DELIMS);
+                if (!a1 || !a2) 
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                long n_particles, n_generations, n_inactive;
+                if (!parseLong(a1, &n_particles) || !parseLong(a2, &n_generations)) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+                if (!parseLong(a3, &n_inactive))
+                    n_inactive = 0;
+
+                /* Check for valid values */
+
+                if (n_generations < 1 || n_particles < 1 || n_inactive < 0) {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                GLOB.n_generations = n_generations;
+                GLOB.n_particles = n_particles;
+                GLOB.n_inactive = n_inactive;
+                if (GLOB.mode != RUNMODE_CHECK)
+                    GLOB.mode = RUNMODE_CRITICALITY;
+                np++;
+            }
+            /* --- RNG seed */
+            else if (!strcmp(subkey, "seed")) 
+            {
+                char *a1 = strtok(NULL, DELIMS);
+                if (!a1) 
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                uint64_t seed;
+                if (!parseULong(a1, &seed)) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                GLOB.seed = seed;
                 np++;
             }
             else 

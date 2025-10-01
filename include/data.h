@@ -121,6 +121,7 @@ typedef struct {
     uint64_t total_fast_fissions;
     uint64_t total_leakages;
     uint64_t total_unknowns;
+    uint64_t total_terminated;
     size_t   max_collision_bin;
     double   collision_energy_sum[MAX_COLLISION_BINS];
     uint64_t collision_energy_count[MAX_COLLISION_BINS];
@@ -149,6 +150,7 @@ static inline void TransportRunScoresReduce(TransportRunScores *restrict out,
     out->total_fast_fissions += in->total_fast_fissions;
     out->total_leakages      += in->total_leakages;
     out->total_unknowns      += in->total_unknowns;
+    out->total_terminated      += in->total_terminated;
     if (in->max_collision_bin > out->max_collision_bin)
         out->max_collision_bin = in->max_collision_bin;
     for (size_t b = 0; b < MAX_COLLISION_BINS; ++b)
@@ -300,7 +302,7 @@ typedef struct {
     double      energy_cutoff; // MeV
     long        collision_cutoff; // per neutron
     long        generation_cutoff; // in external source mode to limits lengths of fission histories
-    long        time_cutoff; // seconds
+    double      time_cutoff; // seconds
 
     /* Allocated memory footprint (bytes)*/
     size_t      mem_xsdata;

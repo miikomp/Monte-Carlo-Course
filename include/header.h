@@ -58,7 +58,7 @@ extern int VERBOSITY;
 #define DEFAULT_LINE_SPACING  1.0
 #define MIN_BANK_SIZE 1000
 
-#define TIME_BIN_WIDTH 1e-7    /* seconds */
+#define TIME_BIN_WIDTH 1e-9    /* seconds */
 
 /* --- Enums --- */
 
@@ -264,8 +264,10 @@ double getVelocityCmPerS(const double E);
  * @brief Check if any cutt-off has been reached, terminate neutron if yes.
  * 
  * @param n Pointer to Neutron
+ * 
+ * @return int 0 if no cut-off reached, 1 if cut-off reached and neutron terminated
  */
-void checkNeutronCutoff(Neutron *n);
+int checkNeutronCutoff(Neutron *n);
 
 /**
  * @brief Initialize a fission neutron.

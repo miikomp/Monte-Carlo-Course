@@ -4,7 +4,9 @@
 # set seed 12165467978
 
 # Set number of neutrons in a generation and number of generations
-set nps 1E8 20
+set nps 1E4 10
+
+set gcut 10
 
 # Specify cross section library path
 set xslibpath ./xsdata/xsdata.lib
@@ -21,11 +23,11 @@ set xslibpath ./xsdata/xsdata.lib
 # 1001 2
 # 8016 1
 
-mat NAT_U_WATER -8.387314 300
-  1001 -0.0078724
-  8016 -0.0624704
- 92235 -0.0066096
- 92238 -0.9230476
+#mat NAT_U_WATER -8.387314 300
+#  1001 -0.0078724
+#  8016 -0.0624704
+# 92235 -0.0066096
+# 92238 -0.9230476
 
 #mat CRIT_U_WATER -8.39 300
 # 1001  -0.00787
@@ -37,9 +39,9 @@ mat NAT_U_WATER -8.387314 300
 # 92235 -0.0072
 # 92238 -0.9928
 
-#mat U235_50 -19.1 300
-# 92235 -0.50
-# 92238 -0.50
+mat U235_50 -19.1 300
+ 92235 -0.50
+ 92238 -0.50
 
 #mat CRIT_U -19.1 300
 # 92235 -0.0304
@@ -65,7 +67,7 @@ src 1 0.0 0.0 0.0 1.0
 
 # Specify a detector for material to score nuclide wise reaction rates over all reaction modes
 # This combines MTs into: elastic scattering, inelastic scattering, fission, and capture
-det reactionrate_grouped dr all dm NAT_U_WATER
+#det reactionrate_grouped dr all dm NAT_U_WATER
 
 # Specify an energy spectrum detector with 500 bins between 1e-11 and 2 MeV with log spacing across all materials
 # It will tally total track lenght for each bin

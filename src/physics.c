@@ -432,12 +432,22 @@ double getVelocityCmPerS(const double E)
     return C_LIGHT * sqrt(2.0 * E / (AMU_TO_MEV_C2 * MASS_NEUTRON));
 }
 
-void checkNeutronCutoff(Neutron *n)
+int checkNeutronCutoff(Neutron *n)
 {
     if (n->E < GLOB.energy_cutoff)
+    {
         n->status = NEUTRON_DEAD_TERMINATED;
+        return 1;
+    }
     else if (n->time >= GLOB.time_cutoff)
+    {
         n->status = NEUTRON_DEAD_TERMINATED;
+        return 1;
+    }
     else if (n->genc >= GLOB.generation_cutoff)
+    {
         n->status = NEUTRON_DEAD_LEAKAGE;
+        return 1;
+    }
+    return 0;
 }

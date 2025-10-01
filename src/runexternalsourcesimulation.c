@@ -239,9 +239,17 @@ int runExternalSourceSimulation(void)
                             cycle_scores.total_unknowns++;
                         }
 
-                        checkNeutronCutoff(n);
+                        /* If neutron is alive, check for cut-off */
+
+                        if (n->status == NEUTRON_ALIVE)
+                        {
+                            if (checkNeutronCutoff(n) != 0)
+                                cycle_scores.total_terminated++;
+                        }
+
                     }
                 }
+                /* Update thread-local buffer counts to main array */
 
                 thread_buf_count[tid] = local_count;
                 thread_buf_cap[tid] = local_cap;
@@ -292,7 +300,7 @@ int runExternalSourceSimulation(void)
             DATA.cur_gen += 1;
 
             if (VERBOSITY >= 2)
-                fprintf(stdout, " Cycle %ld: %zu neutrons left.\n", c, DATA.n_bank);
+                fprintf(stdout, " Cycle %ld - Gen %ld: %zu neutrons left.\n", c, DATA.cur_gen, DATA.n_bank);
         }
 
         if (c > GLOB.n_inactive)
@@ -304,9 +312,16 @@ int runExternalSourceSimulation(void)
 
         /* Print cycle summary*/
 
-        double keff = cycle_scores.n_histories > 0 ? (double)cycle_scores.total_fission_yield / (double)cycle_scores.n_histories : 0.0;
-        fprintf(stdout, "---- Cycle %2ld/%2ld - keff: %.6f\n", c, GLOB.n_cycles + GLOB.n_inactive, keff);
+        uint64_t active_histories = 0;
+        if (cycle_scores.n_histories > cycle_scores.total_terminated)
+            active_histories = cycle_scores.n_histories - cycle_scores.total_terminated;
+
+        double keff = active_histories > 0 ? (double)cycle_scores.total_fission_yield / (double)active_histories : 0.0;
+        fprintf(stdout, "---- Cycle %2ld/%2ld - keff: %.6f\n",
+                c, GLOB.n_cycles + GLOB.n_inactive, keff);
     }
+
+    /* Prepare for exit */
 
     for (int i = 0; i < GLOB.n_threads; ++i)
         free(thread_bufs[i]);

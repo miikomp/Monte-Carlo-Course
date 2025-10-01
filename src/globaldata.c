@@ -25,7 +25,7 @@ runInfo GLOB = {
     .energy_cutoff  = 0.0,
     .collision_cutoff = LONG_MAX,
     .generation_cutoff = LONG_MAX,
-    .time_cutoff    = LONG_MAX,
+    .time_cutoff    = HUGE_VAL,
 };
 
 runData DATA = { 

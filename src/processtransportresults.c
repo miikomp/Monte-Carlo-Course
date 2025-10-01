@@ -13,6 +13,20 @@ static double safe_norm(uint64_t count, double value)
     return (count > 0) ? value / (double)count : 0.0;
 }
 
+static inline uint64_t active_histories(const TransportRunScores *gs)
+{
+    if (!gs)
+        return 0;
+    if (gs->n_histories <= gs->total_terminated)
+        return 0;
+    return gs->n_histories - gs->total_terminated;
+}
+
+static double safe_norm_active(const TransportRunScores *gs, double value)
+{
+    return safe_norm(active_histories(gs), value);
+}
+
 static double metric_path_length(const TransportRunScores *gs) 
 {
     return safe_norm(gs->n_histories, gs->total_path_length);
@@ -35,7 +49,7 @@ static double metric_time_fast(const TransportRunScores *gs)
 
 static double metric_fission_yield(const TransportRunScores *gs) 
 {
-    return safe_norm(gs->n_histories, gs->total_fission_yield);
+    return safe_norm_active(gs, (double)gs->total_fission_yield);
 }
 
 static double metric_collisions(const TransportRunScores *gs) 
@@ -60,17 +74,17 @@ static double metric_inelastic(const TransportRunScores *gs)
 
 static double metric_fissions(const TransportRunScores *gs) 
 {
-    return safe_norm(gs->n_histories, (double)gs->total_fissions);
+    return safe_norm_active(gs, (double)gs->total_fissions);
 }
 
 static double metric_fast_fissions(const TransportRunScores *gs) 
 {
-    return safe_norm(gs->n_histories, (double)gs->total_fast_fissions);
+    return safe_norm_active(gs, (double)gs->total_fast_fissions);
 }
 
 static double metric_thermal_fissions(const TransportRunScores *gs) 
 {
-    return safe_norm(gs->n_histories, (double)gs->total_thermal_fissions);
+    return safe_norm_active(gs, (double)gs->total_thermal_fissions);
 }
 
 static double metric_leakages(const TransportRunScores *gs) 
@@ -81,6 +95,11 @@ static double metric_leakages(const TransportRunScores *gs)
 static double metric_unknowns(const TransportRunScores *gs) 
 {
     return safe_norm(gs->n_histories, (double)gs->total_unknowns);
+}
+
+static double metric_terminated(const TransportRunScores *gs) 
+{
+    return safe_norm(gs->n_histories, (double)gs->total_terminated);
 }
 
 static void compute_stats(const double *values, size_t n, double *mean, double *std, double *ci) 
@@ -128,6 +147,7 @@ void processTransportResults(void)
         {"Thermal Fissions",   "THERMAL_FISSIONS",     metric_thermal_fissions},
         {"Fast Fissions",      "FAST_FISSIONS",        metric_fast_fissions},
         {"Leakages",           "LEAKAGES",             metric_leakages},
+        {"Terminated",         "TERMINATED",           metric_terminated},
         {"Unknown outcomes",   "UNKNOWN_OUTCOMES",     metric_unknowns}
     };
 

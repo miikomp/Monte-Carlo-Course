@@ -140,6 +140,21 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    /* Process geometry cells */
+
+    if (resolveCells() != 0)
+    {
+        fprintf(stderr, "[ERROR] Failed to process geometry cells.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Calculate and put outer bounds */
+    if (resolveOuterBounds() != 0)
+    {
+        fprintf(stderr, "[ERROR] Failed to calculate outer bounds.\n");
+        return EXIT_FAILURE;
+    }
+
     /* ########################################################################################## */
 
     fprintf(stdout, "\n----------------------------\n");
@@ -203,6 +218,16 @@ int main(int argc, char **argv) {
     /* Initialize look-up tables */
 
     initTrigTables();
+
+    /* Plot geometry */
+    
+    if (plotGeometry() != 0) 
+    {
+        fprintf(stderr, "[ERROR] Could not plot geometry.\n");
+        return EXIT_FAILURE;
+    }
+    
+    /* If launched in check mode, exit now */
 
     if (GLOB.norun)
     {

@@ -6,11 +6,32 @@
 #include <stdbool.h>
 
 #define MAX_MT 200
-#define MAX_STR_LEN 1024
+#define MAX_STR_LEN 256
 #define MAX_PATH 4096
 #define MAX_COLLISION_BINS 250
 #define MAX_TIME_BINS 1000
 #define MAX_NUM_DETECTORS 16
+
+/* --- Surface types --- */
+typedef enum {
+    SURF_UNKNOWN = 0,
+    SURF_PLANEX,     // YZ-plane
+    SURF_PLANEY,     // XZ-plane
+    SURF_PLANEZ,     // XY-plane
+    SURF_PLANE,      // Arbitrary plane
+    SURF_SPH,        // Sphere
+    SURF_CYLX,       // Cylinder along X-axis
+    SURF_CYLY,       // Cylinder along Y-axis
+    SURF_CYLZ,       // Cylinder along Z-axis
+    SURF_SQR,        // Square prism
+    SURF_HEXX,       // Hexagonal prism X-type
+    SURF_HEXY,       // Hexagonal prism Y-type
+    SURF_CUBE,       // Cube
+    SURF_CUBOID,     // Cuboid
+    SURF_TORUSX,     // Elliptical torus with major radius perpendicular to X-axis
+    SURF_TORUSY,     // Elliptical torus with major radius perpendicular to Y-axis
+    SURF_TORUSZ      // Elliptical torus with major radius perpendicular to Z-axis
+} SurfaceTypes;
 
 typedef struct {
     uint64_t s[4];
@@ -70,7 +91,7 @@ typedef struct {
 
 // Struct for material data
 typedef struct {
-    char     name[128];
+    char     name[MAX_STR_LEN];
     uint32_t rgb[3];  // colour in geometry plots
     double   mdens;   // g/cm3
     double   adens;   // 1/b*cm2
@@ -82,11 +103,31 @@ typedef struct {
     MacroXsTable *macro_xs; // 1/cm idx 0 is total
 } Material;
 
+// Struct for a surface
+typedef struct {
+    char         name[MAX_STR_LEN];
+    SurfaceTypes type;
+    size_t       n_params;
+    double      *params;
+} Surface;
+
+// Struct for a cell
+typedef struct {
+    char    name[MAX_STR_LEN];
+    char    mat_name[MAX_STR_LEN]; // Stores material name given as input
+    int     mat_idx;               // index in DATA.mats, -1 if outside cell
+    char    uni_name[MAX_STR_LEN]; // Stores universe name given as input
+    size_t  n_surfs;
+    char   *surf_names;            // Defining surface names given as input
+    int    *surf_idxs;             // array of surface indices (in DATA.surfs)
+    int    *side;                  // > 0 outside, < 0 inside
+} Cell;
+
 /* --- Particle data structures --- */
 
 // Neutron data structure
 typedef struct {
-    int status;           // 0=alive, 1=dead by fission, 2=dead by capture, 3=dead by leakage   
+    int status;           // defined in enum NEUTRON_STATUS
     uint64_t id;
     int mat_idx;          // active material idx in DATA.mats, -1 if not set
     double x, y, z;       // position cm
@@ -233,7 +274,7 @@ typedef enum {
 
 typedef struct {
     DetectorType type;
-    char   name[128];           // detector name from input
+    char   name[MAX_STR_LEN];           // detector name from input
     uint64_t n_histories;       // number of tallied source histories
     union {
         ReactionRateDetector reaction_rate;
@@ -252,19 +293,36 @@ typedef union {
     MonoNeutronPointSource mono;
 } SourceDefinition;
 
+/* ############################################################################################## */
 /* --- Global data structures --- */
 
 // Collection data structure for all of the data needed during a run
 typedef struct {
-    uint64_t  cur_gen;
-    uint64_t  cur_cycle;
+    /* System */
     size_t    n_mats;
     Material *mats;
+    size_t    n_surf;
+    Surface  *surfs;
+    size_t    n_cells;
+    Cell     *cells;
+
+    /* Bounds */
+    double    x_min, x_max;
+    double    y_min, y_max;
+    double    z_min, z_max;
+
+    /* Runtime */
+    uint64_t  cur_gen;
+    uint64_t  cur_cycle;
     size_t    n_bank;
     size_t    bank_cap;
     Neutron  *bank;
+
+    /* Sources */
     SourceDefinition *src;
     uint32_t src_type;
+
+    /* Detectors*/
     size_t n_detectors;
     Detector *detectors[MAX_NUM_DETECTORS];
 } runData;

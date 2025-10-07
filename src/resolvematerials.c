@@ -301,7 +301,7 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib) {
                 mc->mass_frac, 
                 mc->N_i * 1e-24
                 );
-            if (VERBOSITY >= 1) 
+            if (VERBOSITY >= 2) 
             {
                 fprintf(stdout, "  %5zu Reaction modes:\n", n_modes);
                 for (size_t k = 0; k < mc->nuc_data.n_xs; ++k) 

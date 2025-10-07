@@ -41,6 +41,7 @@ extern int VERBOSITY;
 
 #define CI95_FACTOR 1.959963984540054
 #define M_PI 3.14159265358979323846
+#define SQRT3 1.7320508075688772
 #define NA 6.02214076e23
 #define BOLTZMANN 8.617333262145e-11   /* MeV/K */
 #define AMU_TO_MEV_C2 931.49410242     /* MeV/c^2 */
@@ -124,6 +125,21 @@ int processXsData(TempNucDataLib **outlib, size_t *noutlib);
  * @return int 0 on success 1 on failure
  */
 int resolveMaterials(TempNucDataLib *lib, size_t nlib);
+
+/**
+ * @brief Resolve all cell data, populating the surf_idxs arrays and material indices.
+ * Checks for valid surface and material names.
+ * 
+ * @return int 0 on success, 1 on failure
+ */
+int resolveCells();
+
+/**
+ * @brief Resolve outer boundary of root universe.
+ * 
+ * @return int 0 on success, 1 on failure
+ */
+int resolveOuterBounds();
 
 /**
  * @brief Compute macroscopic cross sections for all resolved materials.
@@ -277,6 +293,42 @@ int checkNeutronCutoff(Neutron *n);
  * @param idx Index of the new neutron in the fission bank (used for setting unique IDs)
  */
 void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx);
+
+/**
+ * @brief Test if a point (X, Y, Z) is inside a given surface. Computes surface equation and returns raw value.
+ * 
+ * @param type Surface type
+ * @param params Surface parameters
+ * @param nparams Number of parameters
+ * @param x X-coordinate
+ * @param y Y-coordinate
+ * @param z Z-coordinate
+ * @return double < 0 if inside, > 0 if outside, 0 if on surface
+ */
+double surfaceTest(SurfaceTypes type, double *params, size_t nparams, double x, double y, double z);
+
+/**
+ * @brief Return distance to surface
+ * 
+ * @param type Surface type
+ * @param params array of surface parameters
+ * @param n_params number of surface parameters
+ * @param x X-coordinate
+ * @param y Y-coordinate
+ * @param z Z-coordinate
+ * @param u X-component of direction
+ * @param v Y-component of direction
+ * @param w Z-component of direction
+ * @return double distance to surface or INFINITY is not in line-of-sight
+ */
+double surfaceDistance(SurfaceTypes type, double* params, size_t n_params, double x, double y, double z, double u, double v, double w);
+
+/**
+ * @brief Plot geometry according to specified plotter instances
+ * 
+ * @return long 0 success, 1 on failure
+ */
+long plotGeometry();
 
 /* --- Inline functions --- */
 

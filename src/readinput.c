@@ -1,5 +1,7 @@
 #include "header.h"
 
+#define MAX_N_PARAMS 256
+
 static int parseLong(const char *s, long *out);
 
 static int parseULong(const char *s, uint64_t *out);
@@ -72,13 +74,26 @@ long readInput() {
             const char *densTok = strtok(NULL, DELIMS);
             const char *tempTok = strtok(NULL, DELIMS);
 
+            if (!nameTok || !densTok || !tempTok) 
+            {
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
             /* Parse material block */
 
             Material M;
             memset(&M, 0, sizeof M);
 
             /* Check for valid parameters and put into Material */
-
+            if (!strcmp(nameTok, "outside"))
+            {
+                fprintf(stderr, "[ERROR] Material name cannot be \"outside\" (line %ld).\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            
             snprintf(M.name, sizeof(M.name), "%s", nameTok);
 
             double density;
@@ -651,7 +666,213 @@ long readInput() {
             DATA.n_detectors++;
             np++;
         }
+        /* ###################################################################################### */        
+        /* --- surf --- (Surface definition) */
 
+        else if (!strcmp(tok, "surf"))
+        {
+            /* "surf" [NAME] [TYPE] [ARGS] (all in one line) */
+
+            char *name = strtok(NULL, DELIMS);
+            char *type = strtok(NULL, DELIMS);
+
+            if (!name || !type) 
+            {
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Read all params into an array */
+            
+            double params[MAX_N_PARAMS];
+            size_t nparams = 0;
+            char* paramTok = strtok(NULL, DELIMS);
+
+            while (nparams < MAX_N_PARAMS && paramTok != NULL)
+            {
+                if (!parseDouble(paramTok, &params[nparams++]))
+                {
+                    fprintf(stderr, "[ERROR] Invalid surface parameter \"%s\" on line %ld.\n", paramTok, lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+                paramTok = strtok(NULL, DELIMS);   
+            }
+
+            /* Create new surface from input */
+
+            Surface S;
+
+            /* Copy all parameters */
+
+            S.n_params = nparams;
+            snprintf(S.name, sizeof(S.name), "%s", name);
+
+            S.params = (double*)calloc(nparams, sizeof(double));
+            if (!S.params)
+            {
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            memcpy(S.params, params, nparams * sizeof(double));
+
+            /* Put correct type */
+
+            if (!strcmp(type, "px"))
+                S.type = SURF_PLANEX;
+            else if (!strcmp(type, "py"))
+                S.type = SURF_PLANEY;
+            else if (!strcmp(type, "pz"))
+                S.type = SURF_PLANEZ;
+            else if (!strcmp(type, "plane"))
+                S.type = SURF_PLANE;
+            else if (!strcmp(type, "sqr"))
+                S.type = SURF_SQR;
+            else if (!strcmp(type, "hexx"))
+                S.type = SURF_HEXX;
+            else if (!strcmp(type, "hexy"))
+                S.type = SURF_HEXY;
+            else if (!strcmp(type, "sph"))
+                S.type = SURF_SPH;
+            else if (!strcmp(type, "cylx"))
+                S.type = SURF_CYLX;
+            else if (!strcmp(type, "cyly"))
+                S.type = SURF_CYLY;
+            else if (!strcmp(type, "cylz") || !strcmp(type, "cyl"))
+                S.type = SURF_CYLZ;
+            else if (!strcmp(type, "cube"))
+                S.type = SURF_CUBE;
+            else if (!strcmp(type, "cuboid"))
+                S.type = SURF_CUBOID;
+            else if (!strcmp(type, "torusx"))
+                S.type = SURF_TORUSX;
+            else if (!strcmp(type, "torusy"))
+                S.type = SURF_TORUSY;
+            else if (!strcmp(type, "torusz"))
+                S.type = SURF_TORUSZ;
+            else
+            {
+                fprintf(stderr, "[ERROR] Unknown surface type \"%s\" on line %ld.\n", type, lnum);
+                free(S.params);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Put surface into DATA */
+
+            if (DATA.n_surf == 0)
+            {
+                DATA.surfs = (Surface*)calloc(1, sizeof(Surface));
+            }
+            else
+            {
+                DATA.surfs = (Surface*)realloc(DATA.surfs, (DATA.n_surf + 1) * sizeof(Surface));
+            }
+            if (!DATA.surfs)
+            {
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            DATA.surfs[DATA.n_surf++] = S;
+            np++;
+
+            if (VERBOSITY >= 1)
+                fprintf(stdout, "Parsed surface \"%s\" of type: %s (%d), with %zu params\n", name, type, S.type, nparams);
+        }
+
+        /* ###################################################################################### */
+        /* --- cell --- (Cell definition) */
+
+        else if (!strcmp(tok, "cell"))
+        {
+            /* Read required parameters */
+            char *name = strtok(NULL, DELIMS);
+            char *uni = strtok(NULL, DELIMS);
+            char *mat = strtok(NULL, DELIMS);
+
+            if (!name || !uni || !mat)
+            {
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Read list of intersections into an array */
+            size_t n_surfs = 0;
+            char surf_names[MAX_N_PARAMS][MAX_STR_LEN];
+            int side[MAX_N_PARAMS];
+
+            char *surfTok = strtok(NULL, DELIMS);
+
+            while (n_surfs < MAX_N_PARAMS && surfTok != NULL)
+            {
+                /* Check if complement specifier given before surface name */
+
+                if (!strncmp(surfTok, "-", 1))
+                {
+                    side[n_surfs] = -1;
+                    surfTok++;
+                }
+                else
+                    side[n_surfs] = 1;
+                
+                strncpy(surf_names[n_surfs++], surfTok, MAX_STR_LEN);
+                surfTok = strtok(NULL, DELIMS);  
+            }
+
+            /* Create new cell from input */
+
+            Cell C;
+            C.mat_idx = -1;
+            /* Copy all parameters */
+
+            C.n_surfs = n_surfs;
+            snprintf(C.name, sizeof(C.name), "%s", name);
+            snprintf(C.uni_name, sizeof(C.uni_name), "%s", uni);
+            snprintf(C.mat_name, sizeof(C.mat_name), "%s", mat);
+
+            /* Allocate arrays */
+
+            C.surf_names = (char*)calloc(n_surfs, MAX_STR_LEN);
+            C.surf_idxs = (int*)calloc(n_surfs, sizeof(int));
+            memset(C.surf_idxs, -1, n_surfs * sizeof(int));
+            C.side = (int*)calloc(n_surfs, sizeof(int));
+            if (!C.surf_names || !C.surf_idxs || !C.side)
+            {
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            memcpy(C.surf_names, surf_names, n_surfs * MAX_STR_LEN);
+            memcpy(C.side, side, n_surfs * sizeof(int));
+
+            /* Put cell into DATA.uni0 */
+
+            if (DATA.n_cells == 0)
+            {
+                DATA.cells = (Cell*)calloc(1, sizeof(Cell));
+            }
+            else
+            {
+                DATA.cells = (Cell*)realloc(DATA.cells, (DATA.n_cells + 1) * sizeof(Cell));
+            }
+            if (!DATA.cells)
+            {
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            DATA.cells[DATA.n_cells++] = C;
+            np++;
+
+            if (VERBOSITY >= 1)
+                fprintf(stdout, "Parsed cell \"%s\", of material \"%s\", in universe \"%s\" with %zu intersecting surfaces given.\n", C.name, C.mat_name, C.uni_name, C.n_surfs);
+        }
 
         /* ###################################################################################### */        
         /* --- set --- (Settings keyword followed by subwords and arguments) */

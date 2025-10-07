@@ -254,7 +254,7 @@ int computeMacroXs(void)
         M->macro_xs = macro;
         M->n_macro_xs = produced;
 
-        if (VERBOSITY >= 1)
+        if (VERBOSITY >= 2)
         {
             fprintf(stdout, "\n  Material \"%s\" macroscopic tables:\n", M->name);
             for (size_t i = 0; i < M->n_macro_xs; ++i) 

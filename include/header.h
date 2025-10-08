@@ -171,6 +171,13 @@ int resolveOuterBounds();
 int resolveUniverses();
 
 /**
+ * @brief Resolve all lattice data, populating the uni_idxs arrays and checking for valid universe names.
+ * 
+ * @return int 0 on success, 1 on failure
+ */
+int resolveLattices();
+
+/**
  * @brief Checks geometry volumes for all materials by sampling random points within the outer boundaries.
  * The routine is parallelized using OpenMP. Results are printed to stdout and saved under each material.
  * 

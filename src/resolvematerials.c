@@ -129,8 +129,8 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib) {
         }
 
         /* Second pass: compute fractions and number densities using AW and mdens */
-        
-        fprintf(stdout, "\n  Calculating densities and fractions:\n");
+        if (VERBOSITY >= 2) 
+            fprintf(stdout, "\n  Calculated densities and fractions:\n");
 
         double sum_atoms = 0.0, sum_w = 0.0;
         for (size_t c = 0; c < M->n_nucs; ++c) 
@@ -269,49 +269,53 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib) {
 
         const double rho_calc   = mass_sum / NA;        /* g/cm^3 */
         const double ndens_calc = Nsum * 1.0e-24;       /* atoms/b*cm */
-
-        fprintf(stdout,
-            "  dens=%.6E %s, T=%.1fK\n"
-            "  components=%zu, sum(x)=%.6f, sum(w)=%.6f\n"
-            "  Abar=%.6f g/mol/atom, N_tot=%.6e 1/cm^3\n"
-            "  mdens_calc=%.6E g/cm^3, adens_calc=%.6E atoms/b*cm\n\n",
-            (M->adens > 0.0) ? M->adens : M->mdens,
-            (M->adens > 0.0) ? "atoms/b*cm" : "g/cm3",
-            M->T,
-            M->n_nucs, 
-            xsum, 
-            wsum,
-            Abar_sum, 
-            Nsum, 
-            rho_calc, 
-            ndens_calc
-        );
-
-        for (size_t c = 0; c < M->n_nucs; ++c) 
+        if (VERBOSITY >= 2) 
         {
-            const MaterialNuclide *mc = &M->nucs[c];
-            size_t n_modes = (mc->nuc_data.n_xs > 0 ? mc->nuc_data.n_xs - 1 : 0);
+            /* Print summary for successfully parsed material*/
             fprintf(stdout,
-                "  %5d - %5s : T=%.0fK, AW=%.6E, afrac=%.6E, mfrac=%.6E, N_i=%.6E atoms/b*cm\n",
-                mc->nuc_data.ZA, 
-                mc->nuc_data.name,
-                mc->nuc_data.T,
-                mc->nuc_data.AW, 
-                mc->atom_frac, 
-                mc->mass_frac, 
-                mc->N_i * 1e-24
-                );
-            if (VERBOSITY >= 2) 
+                "  dens=%.6E %s, T=%.1fK\n"
+                "  components=%zu, sum(x)=%.6f, sum(w)=%.6f\n"
+                "  Abar=%.6f g/mol/atom, N_tot=%.6e 1/cm^3\n"
+                "  mdens_calc=%.6E g/cm^3, adens_calc=%.6E atoms/b*cm\n\n",
+                (M->adens > 0.0) ? M->adens : M->mdens,
+                (M->adens > 0.0) ? "atoms/b*cm" : "g/cm3",
+                M->T,
+                M->n_nucs, 
+                xsum, 
+                wsum,
+                Abar_sum, 
+                Nsum, 
+                rho_calc, 
+                ndens_calc
+            );
+        
+
+            for (size_t c = 0; c < M->n_nucs; ++c) 
             {
-                fprintf(stdout, "  %5zu Reaction modes:\n", n_modes);
-                for (size_t k = 0; k < mc->nuc_data.n_xs; ++k) 
+                const MaterialNuclide *mc = &M->nucs[c];
+                size_t n_modes = (mc->nuc_data.n_xs > 0 ? mc->nuc_data.n_xs - 1 : 0);
+                fprintf(stdout,
+                    "  %5d - %5s : T=%.0fK, AW=%.6E, afrac=%.6E, mfrac=%.6E, N_i=%.6E atoms/b*cm\n",
+                    mc->nuc_data.ZA, 
+                    mc->nuc_data.name,
+                    mc->nuc_data.T,
+                    mc->nuc_data.AW, 
+                    mc->atom_frac, 
+                    mc->mass_frac, 
+                    mc->N_i * 1e-24
+                    );
+                if (VERBOSITY >= 2) 
                 {
-                    XsTable *tab = &mc->nuc_data.xs[k];
-                    fprintf(stdout, "     MT = %3d, Q = %11.4E, points = %zu\n", tab->mt, tab->Q, tab->n);
+                    fprintf(stdout, "  %5zu Reaction modes:\n", n_modes);
+                    for (size_t k = 0; k < mc->nuc_data.n_xs; ++k) 
+                    {
+                        XsTable *tab = &mc->nuc_data.xs[k];
+                        fprintf(stdout, "     MT = %3d, Q = %11.4E, points = %zu\n", tab->mt, tab->Q, tab->n);
+                    }
+                    if (mc->nuc_data.has_nubar)
+                        fprintf(stdout, "    Nubar grid, points = %zu\n", mc->nuc_data.nubar.n);
+                    fprintf(stdout, "\n");
                 }
-                if (mc->nuc_data.has_nubar)
-                    fprintf(stdout, "    Nubar grid, points = %zu\n", mc->nuc_data.nubar.n);
-                fprintf(stdout, "\n");
             }
         }
     } 

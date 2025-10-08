@@ -122,8 +122,8 @@ static int writeXZSlice(const char *filename, size_t width, size_t height, doubl
 long plotGeometry() {
     fprintf(stdout, "\nPlotting geometry...\n");
 
-    const size_t pixx = 500;
-    const size_t pixy = 500;
+    const size_t pixx = 1000;
+    const size_t pixy = 1000;
 
     int status = 0;
     status |= writeXYSlice("geometry_xy.ppm", pixx, pixy, 0.0);

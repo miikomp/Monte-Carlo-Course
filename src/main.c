@@ -166,11 +166,23 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    fprintf(stdout, "\n------------------------\n");
+    fprintf(stdout, "  Processing geometry\n");
+    fprintf(stdout, "------------------------\n");
+
     /* Process geometry universes */
 
     if (resolveUniverses() != 0)
     {
         fprintf(stderr, "[ERROR] Failed to process universes.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Process lattices */
+
+    if (resolveLattices() != 0)
+    {
+        fprintf(stderr, "[ERROR] Failed to process lattices.\n");
         return EXIT_FAILURE;
     }
 
@@ -197,7 +209,6 @@ int main(int argc, char **argv) {
     }
 
     /* Plot geometry */
-    
     if (plotGeometry() != 0) 
     {
         fprintf(stderr, "[ERROR] Could not plot geometry.\n");

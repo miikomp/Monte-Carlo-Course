@@ -889,7 +889,7 @@ long readInput() {
             memcpy(C.surf_names, surf_names, n_surfs * MAX_STR_LEN);
             memcpy(C.sides, sides, n_surfs * sizeof(int));
 
-            /* Put cell into DATA.uni0 */
+            /* Put cell into DATA.cells */
 
             if (DATA.n_cells == 0)
             {
@@ -915,6 +915,112 @@ long readInput() {
                 else
                     fprintf(stdout, "Parsed cell \"%s\", of material \"%s\", in universe \"%s\" with %zu defining surface(s) given.\n", C.name, C.mat_name, C.uni_name, C.n_surfs);
             }
+        }
+
+        /* ###################################################################################### */        
+        /* --- lat --- (Lattice definition) */
+        else if (!strcmp(tok, "lat"))
+        {
+            /* Read required arguments */
+
+            char* latUni = strtok(NULL, DELIMS);
+            char* typeTok = strtok(NULL, DELIMS);
+
+            if (!latUni || !typeTok)
+            {
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Create new lattice item */
+
+            Lattice L = {0};
+            L.uni_idx = -1;
+            snprintf(L.uni_name, sizeof(L.uni_name), "%s", latUni);
+
+            /* Parse type */
+
+            long type = 0;
+            if (!parseLong(typeTok, &type))
+            {
+                fprintf(stderr, "[ERROR] Invalid lattice type \"%s\" on line %ld.\n", typeTok, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            if (type == 1)
+                L.type = LAT_SQUARE_INFINITE;
+            else if (type == 2)
+                L.type = LAT_SQUARE_FINITE;
+            else
+            {
+                fprintf(stderr, "[ERROR] Unknown lattice type \"%s\" on line %ld.\n", typeTok, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Read parameters according to type */
+
+            if (L.type == LAT_SQUARE_INFINITE)
+            {
+                char* x0 = strtok(NULL, DELIMS);
+                char* y0 = strtok(NULL, DELIMS);
+                char* p = strtok(NULL, DELIMS);
+                char* u = strtok(NULL, DELIMS);
+
+                if (!x0 || !y0 || !p || !u)
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                if (!parseDouble(x0, &L.x0) || !parseDouble(y0, &L.y0) || !parseDouble(p, &L.dx))
+                {
+                    fprintf(stderr, "[ERROR] Invalid value for \"lat\" on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                /* Pitch in y is same as x */
+
+                L.dy = L.dx;
+                L.n_unis = 1;
+
+                /* Filling universe */
+                L.uni_names = (char*)calloc(1, MAX_STR_LEN);
+                if (!L.uni_names)
+                {
+                    fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                snprintf(L.uni_names, MAX_STR_LEN, "%s", u);
+            }
+            /* Put cell into DATA.lats */
+
+            if (DATA.n_lats == 0)
+            {
+                DATA.lats = (Lattice*)calloc(1, sizeof(Lattice));
+            }
+            else
+            {
+                DATA.lats = (Lattice*)realloc(DATA.lats, (DATA.n_lats + 1) * sizeof(Lattice));
+            }
+            if (!DATA.lats)
+            {
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            DATA.lats[DATA.n_lats++] = L;
+            np++;
+
+            if (VERBOSITY >= 1)
+                fprintf(stdout, "Parsed a lattice of type %d, filled with %zu universe(s)\n", (int)L.type, L.n_unis);
+            
         }
 
         /* ###################################################################################### */        

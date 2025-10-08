@@ -224,7 +224,7 @@ int processXsData(TempNucDataLib **lib, size_t *nlib) {
         N->var = (Nuclide*)xrealloc(N->var, (N->n_var + 1) * sizeof *N->var);
         N->var[N->n_var++] = var;
 
-        if (VERBOSITY >= 1) 
+        if (VERBOSITY >= 2) 
         {
             /* Print summary line */
             fprintf(stdout,

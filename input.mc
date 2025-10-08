@@ -13,23 +13,26 @@ set xslibpath ./xsdata/xsdata.lib
 
 # Definition of geometry follows a similar syntax to Serpent.
 
-# Define surfaces
+# Define pin universe
+surf s1 cyl 0.0 0.0 0.412
+surf s2 cyl 0.0 0.0 0.475
 
-surf s1 sqr 0.0 0.0 5.0
-surf s2 hexx 0.0 0.0 2.5
-surf s3 cyl 0.0 0.0 0.8
-surf s4 cyl 0.0 0.0 7.5
+cell c01 F fuel -s1
+cell c02 F cladding s1 -s2
+cell c03 F water s2 
 
+# Define root universe
+surf s10 sqr 0.0 0.0 45
+surf s00 cylz 0.0 0.0 70
 
-# Define cells
+cell c10 0 fill C -s10
+cell c11 0 water s10 -s00
+cell c00 0 outside s00
 
-cell c01 0 fill inner -s1
-cell c02 0 water s1 -s4
-cell c03 0 outside s4
+# Define lattices
 
-# Define filling universe
-cell c11 inner fuel -s2
-cell c12 inner cladding s2
+lat A 1 0.0 0.0 1.33 F
+lat C 1 0.0 0.0 22.610 A
 
 # Define material(s)
 # Positive density/fraction means mass density in g/cm^3 or mass fraction

@@ -39,6 +39,14 @@ runData DATA = {
     .src = NULL,
     .src_type = 0,
     .n_detectors = 0,
+    .n_cells = 0ul,
+    .cells = NULL,
+    .n_surf = 0ul,
+    .surfs = NULL,
+    .n_unis = 0ul,
+    .unis = NULL,
+    .n_lats = 0ul,
+    .lats = NULL
 };
 
 ResultsData RES = {

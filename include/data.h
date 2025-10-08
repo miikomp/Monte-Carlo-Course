@@ -39,6 +39,11 @@ typedef enum {
     UNI_LATTICE
 } UniverseTypes;
 
+typedef enum {
+    LAT_SQUARE_INFINITE = 0,
+    LAT_SQUARE_FINITE
+} LatticeTypes;
+
 typedef struct {
     uint64_t s[4];
 } xoshiro256ss_state;
@@ -138,9 +143,23 @@ typedef struct {
 typedef struct {
     char            name[MAX_STR_LEN];
     UniverseTypes   type;
+    int             lat_idx;     // index in DATA.lats, -1 if not a lattice
     size_t          n_cells;
-    int            *cell_idxs; // array of cell indices (in DATA.cells)
+    int            *cell_idxs;  // array of cell indices (in DATA.cells)
 } Universe;
+
+// Struct for a lattice
+typedef struct {
+    char         uni_name[MAX_STR_LEN];  // Lattice universe name given as input
+    LatticeTypes type;
+    double       x0, y0, z0;  // Lattice origin
+    double       dx, dy, dz;  // Lattice pitch
+    int          nx, ny, nz;  // Number of elements in each direction
+    size_t       n_unis;
+    char*        uni_names;   // Array of universe names given to fill lattice with
+    int*         uni_idxs;    // Array of universe indices corresponding to DATA.unis
+    int          uni_idx;     // Index of this lattice universe in DATA.unis (-1 if not resolved)
+} Lattice;
 
 /* --- Particle data structures --- */
 
@@ -326,6 +345,9 @@ typedef struct {
     Cell     *cells;
     size_t    n_unis;
     Universe *unis; 
+    size_t    n_lats;
+    Lattice  *lats;
+
 
     /* Bounds */
     double    x_min, x_max;

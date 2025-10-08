@@ -59,12 +59,12 @@ int processInput() {
        If neither generation nor time cutoffs are set, set generation cutoff to 30.
        */
 
-    if (!(GLOB.time_cutoff < LONG_MAX) && !(GLOB.generation_cutoff < LONG_MAX)) 
-        GLOB.generation_cutoff = 30l;
+        if (!(GLOB.time_cutoff < LONG_MAX) && !(GLOB.generation_cutoff < LONG_MAX)) 
+            GLOB.generation_cutoff = 30l;
 
-    /* Unless rewritten by user, increase neutron buffer size in external source simulation */
-    if (GLOB.nbuf_factor <= 1.0)
-        GLOB.nbuf_factor = 10.0;
+        /* Unless rewritten by user, increase neutron buffer size in external source simulation */
+        if (GLOB.nbuf_factor <= 1.0)
+            GLOB.nbuf_factor = 10.0;
     }
 
     /* Return success */

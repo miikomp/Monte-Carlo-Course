@@ -71,6 +71,22 @@ int main(int argc, char **argv) {
         {
             GLOB.norun = true;
         }
+        else if (!strcmp(argv[i], "-checkvolumes") || !strcmp(argv[i], "--checkvolumes")) 
+        {
+            if (i + 1 >= argc - 1) 
+            {
+                fprintf(stderr, "[ERROR] Number of random points not given for \"%s\".\n", argv[i]);
+                return EXIT_FAILURE;
+            }
+
+            GLOB.n_points = strtol(argv[++i], NULL, 10);
+
+            if (GLOB.n_points <= 0)
+            {
+                fprintf(stderr, "[ERROR] Number of random points must be positive.\n");
+                return EXIT_FAILURE;
+            }
+        }
         else 
         {
             fprintf(stderr, "[ERROR] Unknown commandline argument \"%s\".\n", argv[i]);
@@ -100,6 +116,16 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
 
     fprintf(stdout, "DONE.\n");
+
+    /* Set desired number of threads and put actual number provided */
+
+    omp_set_num_threads(GLOB.n_threads);
+    int nt = omp_get_max_threads();
+    GLOB.n_threads = nt;
+
+    /* Disable dynamic teaming to not mess up thread-private things */
+
+    omp_set_dynamic(0);
 
     /* ########################################################################################## */
 
@@ -140,6 +166,14 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    /* Process geometry universes */
+
+    if (resolveUniverses() != 0)
+    {
+        fprintf(stderr, "[ERROR] Failed to process universes.\n");
+        return EXIT_FAILURE;
+    }
+
     /* Process geometry cells */
 
     if (resolveCells() != 0)
@@ -152,6 +186,21 @@ int main(int argc, char **argv) {
     if (resolveOuterBounds() != 0)
     {
         fprintf(stderr, "[ERROR] Failed to calculate outer bounds.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Check volumes by sampling random points */
+    if (checkVolumes() != 0)
+    {
+        fprintf(stderr, "[ERROR] Volume checking failed.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Plot geometry */
+    
+    if (plotGeometry() != 0) 
+    {
+        fprintf(stderr, "[ERROR] Could not plot geometry.\n");
         return EXIT_FAILURE;
     }
 
@@ -205,27 +254,9 @@ int main(int argc, char **argv) {
 
     /* ########################################################################################## */
 
-    /* Set desired number of threads and put actual number provided */
-
-    omp_set_num_threads(GLOB.n_threads);
-    int nt = omp_get_max_threads();
-    GLOB.n_threads = nt;
-
-    /* Disable dynamic teaming to not mess up thread-private things */
-
-    omp_set_dynamic(0);
-
     /* Initialize look-up tables */
 
     initTrigTables();
-
-    /* Plot geometry */
-    
-    if (plotGeometry() != 0) 
-    {
-        fprintf(stderr, "[ERROR] Could not plot geometry.\n");
-        return EXIT_FAILURE;
-    }
     
     /* If launched in check mode, exit now */
 

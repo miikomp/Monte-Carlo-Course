@@ -31,3 +31,8 @@ callgrind.out.*
 *.out
 *.err
 *.m
+
+## Ignore all geometry plots
+
+*.ppm
+*.png

@@ -76,12 +76,18 @@ enum NEUTRON_STATUS{
     NEUTRON_DEAD_TERMINATED
 };
 
-enum SRC_TYPES{
+enum SRC_TYPES {
     SRC_MONO_POINT = 1
 };
 
 enum DET_TYPES{
     DET_REACTION_RATE = 1
+};
+
+enum CELL_ERRORS {
+    CELL_ERR_OK = 0,
+    CELL_ERR_UNDEFINED,
+    CELL_ERR_OVERLAP
 };
 
 /* --- Function declaration --- */
@@ -135,11 +141,42 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib);
 int resolveCells();
 
 /**
- * @brief Resolve outer boundary of root universe.
+ * @brief Search for the cell containing the point (x, y, z).
+ * Sets error flag to "undefined" if point is outside all cells, and "overlap" if more than one cell
+ * occupy the point. Boundary cases are handled correctly so only true overlaps are flagged.
+ * 
+ * @param x X-coordinate
+ * @param y Y-coordinate
+ * @param z Z-coordinate
+ * @param err Pointer to an error flag
+ * @return int Index of the cell containing the point, or -1 on failure
+ */
+int cellSearch(double x, double y, double z, int *err);
+
+/**
+ * @brief Resolve outer boundary of root universe. Calculates and puts outer bounds into DATA.
+ * At the moment the outer boundary must be defined using a single surface. Axial bounds are
+ * possible using truncated versions of infinite prisms and cylinders.
  * 
  * @return int 0 on success, 1 on failure
  */
 int resolveOuterBounds();
+
+/**
+ * @brief Allocates and populates the universe array in DATA. 
+ * Universes own indeces to cells held in DATA.cells.
+ * 
+ * @return int 0 on success, 1 on failure
+ */
+int resolveUniverses();
+
+/**
+ * @brief Checks geometry volumes for all materials by sampling random points within the outer boundaries.
+ * The routine is parallelized using OpenMP. Results are printed to stdout and saved under each material.
+ * 
+ * @return int 0 on succes, 1 on failure
+ */
+int checkVolumes();
 
 /**
  * @brief Compute macroscopic cross sections for all resolved materials.

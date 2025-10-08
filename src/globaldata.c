@@ -21,11 +21,12 @@ runInfo GLOB = {
 
     .n_generations  = 0l,
     .n_particles    = 0l,
+    .n_points       = -1l,
 
     .energy_cutoff  = 0.0,
     .collision_cutoff = LONG_MAX,
     .generation_cutoff = LONG_MAX,
-    .time_cutoff    = HUGE_VAL,
+    .time_cutoff    = INFINITY,
 };
 
 runData DATA = { 

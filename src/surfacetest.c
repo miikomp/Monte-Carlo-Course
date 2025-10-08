@@ -198,6 +198,8 @@ double surfaceTest(SurfaceTypes type, double *params, size_t n_params, double x,
 
             return res;
         }
+
+        /* Hexagonal prism X-type */
         case SURF_HEXY:
         {
             double dx = x - params[0];
@@ -220,6 +222,34 @@ double surfaceTest(SurfaceTypes type, double *params, size_t n_params, double x,
             }
 
             return res;
+        }
+
+        /* Cube */
+        case SURF_CUBE:
+        {
+            double h = params[3];
+            double dx = fabs(x - params[0]) - h;
+            double dy = fabs(y - params[1]) - h;
+            double dz = fabs(z - params[2]) - h;
+
+            return fmax(dx, fmax(dy, dz));
+        }
+
+        /* Cuboid */
+        case SURF_CUBOID:
+        {
+            double xmin = params[0];
+            double xmax = params[1];
+            double ymin = params[2];
+            double ymax = params[3];
+            double zmin = params[4];
+            double zmax = params[5];
+
+            double fx = fmax(xmin - x, x - xmax);
+            double fy = fmax(ymin - y, y - ymax);
+            double fz = fmax(zmin - z, z - zmax);
+
+            return fmax(fx, fmax(fy, fz));
         }
         default:
         {

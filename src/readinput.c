@@ -93,7 +93,7 @@ long readInput() {
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
-            
+
             snprintf(M.name, sizeof(M.name), "%s", nameTok);
 
             double density;
@@ -792,19 +792,43 @@ long readInput() {
             /* Read required parameters */
             char *name = strtok(NULL, DELIMS);
             char *uni = strtok(NULL, DELIMS);
-            char *mat = strtok(NULL, DELIMS);
+            char *fillTok = strtok(NULL, DELIMS);
 
-            if (!name || !uni || !mat)
+            if (!name || !uni || !fillTok)
             {
                 fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
 
+            /* Check if universe filled or material */
+
+            bool is_filled = false;
+            char *fill_uni;
+            if (!strcmp(fillTok, "fill"))
+            {
+                /* Filled with universe*/
+
+                fill_uni = strtok(NULL, DELIMS);
+                if (!fill_uni)
+                {
+                    fprintf(stderr, "[ERROR] Missing universe name after \"fill\" on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+                is_filled = true;
+            }
+            else 
+            {
+                /* Filled with material */
+
+                is_filled = false;
+            }
+
             /* Read list of intersections into an array */
             size_t n_surfs = 0;
             char surf_names[MAX_N_PARAMS][MAX_STR_LEN];
-            int side[MAX_N_PARAMS];
+            int sides[MAX_N_PARAMS];
 
             char *surfTok = strtok(NULL, DELIMS);
 
@@ -814,11 +838,11 @@ long readInput() {
 
                 if (!strncmp(surfTok, "-", 1))
                 {
-                    side[n_surfs] = -1;
+                    sides[n_surfs] = -1;
                     surfTok++;
                 }
                 else
-                    side[n_surfs] = 1;
+                    sides[n_surfs] = 1;
                 
                 strncpy(surf_names[n_surfs++], surfTok, MAX_STR_LEN);
                 surfTok = strtok(NULL, DELIMS);  
@@ -826,22 +850,36 @@ long readInput() {
 
             /* Create new cell from input */
 
-            Cell C;
+            Cell C = {0};
             C.mat_idx = -1;
+            C.filluni_idx = -1;
+            C.uni_idx = -1;
+
             /* Copy all parameters */
 
             C.n_surfs = n_surfs;
             snprintf(C.name, sizeof(C.name), "%s", name);
             snprintf(C.uni_name, sizeof(C.uni_name), "%s", uni);
-            snprintf(C.mat_name, sizeof(C.mat_name), "%s", mat);
 
+            /* Depending on filling type, put given name */
+
+            if (is_filled)
+            {
+                snprintf(C.filluni_name, sizeof(C.filluni_name), "%s", fill_uni);
+                C.unifilled = true;
+            }
+            else
+            {
+                snprintf(C.mat_name, sizeof(C.mat_name), "%s", fillTok);
+                C.unifilled = false;
+            }
             /* Allocate arrays */
 
             C.surf_names = (char*)calloc(n_surfs, MAX_STR_LEN);
             C.surf_idxs = (int*)calloc(n_surfs, sizeof(int));
             memset(C.surf_idxs, -1, n_surfs * sizeof(int));
-            C.side = (int*)calloc(n_surfs, sizeof(int));
-            if (!C.surf_names || !C.surf_idxs || !C.side)
+            C.sides = (int*)calloc(n_surfs, sizeof(int));
+            if (!C.surf_names || !C.surf_idxs || !C.sides)
             {
                 fprintf(stderr, "[ERROR] Memory allocation failed.\n");
                 fclose(fp);
@@ -849,7 +887,7 @@ long readInput() {
             }
 
             memcpy(C.surf_names, surf_names, n_surfs * MAX_STR_LEN);
-            memcpy(C.side, side, n_surfs * sizeof(int));
+            memcpy(C.sides, sides, n_surfs * sizeof(int));
 
             /* Put cell into DATA.uni0 */
 
@@ -871,7 +909,12 @@ long readInput() {
             np++;
 
             if (VERBOSITY >= 1)
-                fprintf(stdout, "Parsed cell \"%s\", of material \"%s\", in universe \"%s\" with %zu intersecting surfaces given.\n", C.name, C.mat_name, C.uni_name, C.n_surfs);
+            {
+                if (is_filled)
+                    fprintf(stdout, "Parsed cell \"%s\", filled with universe \"%s\", in universe \"%s\" with %zu defining surface(s) given.\n", C.name, C.filluni_name, C.uni_name, C.n_surfs);
+                else
+                    fprintf(stdout, "Parsed cell \"%s\", of material \"%s\", in universe \"%s\" with %zu defining surface(s) given.\n", C.name, C.mat_name, C.uni_name, C.n_surfs);
+            }
         }
 
         /* ###################################################################################### */        

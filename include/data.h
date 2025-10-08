@@ -33,6 +33,12 @@ typedef enum {
     SURF_TORUSZ      // Elliptical torus with major radius perpendicular to Z-axis
 } SurfaceTypes;
 
+typedef enum {
+    UNI_ROOT = 0,
+    UNI_NORMAL,
+    UNI_LATTICE
+} UniverseTypes;
+
 typedef struct {
     uint64_t s[4];
 } xoshiro256ss_state;
@@ -93,6 +99,7 @@ typedef struct {
 typedef struct {
     char     name[MAX_STR_LEN];
     uint32_t rgb[3];  // colour in geometry plots
+    double   vol;     // cm3
     double   mdens;   // g/cm3
     double   adens;   // 1/b*cm2
     double   T;       // K
@@ -114,14 +121,26 @@ typedef struct {
 // Struct for a cell
 typedef struct {
     char    name[MAX_STR_LEN];
+    bool    unifilled;             // true if universe fill, false if material filled
+    char    filluni_name[MAX_STR_LEN]; // Stores universe name given as input
+    int     filluni_idx;               // index in DATA.unis, -1 if not a universe fill
     char    mat_name[MAX_STR_LEN]; // Stores material name given as input
     int     mat_idx;               // index in DATA.mats, -1 if outside cell
-    char    uni_name[MAX_STR_LEN]; // Stores universe name given as input
+    char    uni_name[MAX_STR_LEN]; // Stores root universe name given as input
+    int     uni_idx;               // index in DATA.unis, -1 if not set
     size_t  n_surfs;
     char   *surf_names;            // Defining surface names given as input
     int    *surf_idxs;             // array of surface indices (in DATA.surfs)
-    int    *side;                  // > 0 outside, < 0 inside
+    int    *sides;                  // > 0 outside, < 0 inside
 } Cell;
+
+// Struct for a universe
+typedef struct {
+    char            name[MAX_STR_LEN];
+    UniverseTypes   type;
+    size_t          n_cells;
+    int            *cell_idxs; // array of cell indices (in DATA.cells)
+} Universe;
 
 /* --- Particle data structures --- */
 
@@ -305,6 +324,8 @@ typedef struct {
     Surface  *surfs;
     size_t    n_cells;
     Cell     *cells;
+    size_t    n_unis;
+    Universe *unis; 
 
     /* Bounds */
     double    x_min, x_max;
@@ -355,6 +376,7 @@ typedef struct {
     long        n_cycles;       // external source simulation
     long        n_particles;    // particles per cycle/generation
     long        n_inactive;     // number of inactive generations/cycles
+    long        n_points;       // number of points for volume checking
 
     /* Cutoff parameters */
     double      energy_cutoff; // MeV

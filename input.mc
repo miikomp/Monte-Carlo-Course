@@ -11,16 +11,25 @@ set gcut 10
 # Specify cross section library path
 set xslibpath ./xsdata/xsdata.lib
 
+# Definition of geometry follows a similar syntax to Serpent.
+
 # Define surfaces
 
-surf s1 cylz 0.0 0.0 5.0
-surf s99 cylz 0.0 0.0 10.0
+surf s1 sqr 0.0 0.0 5.0
+surf s2 hexx 0.0 0.0 2.5
+surf s3 cyl 0.0 0.0 0.8
+surf s4 cyl 0.0 0.0 7.5
+
 
 # Define cells
 
-cell c01 0 NAT_U  -s1
-cell c02 0 WATER   s1 -s99
-cell c99 0 outside s99
+cell c01 0 fill inner -s1
+cell c02 0 water s1 -s4
+cell c03 0 outside s4
+
+# Define filling universe
+cell c11 inner fuel -s2
+cell c12 inner cladding s2
 
 # Define material(s)
 # Positive density/fraction means mass density in g/cm^3 or mass fraction
@@ -31,15 +40,15 @@ cell c99 0 outside s99
 # The code computes the missing units (e.g. if mass fractions are given, atomic fractions
 # and atomic density are computed from the mass density, etc.) These are printed for verification.
 
-mat WATER 0.1 300
+mat water 0.1 300 rgb 10 15 125
  1001 2
  8016 1
 
-mat NAT_U -19.1 300
+mat fuel -19.1 300 rgb 30 195 50
  92235 -0.0072
  92238 -0.9928
 
-mat GRAPHITE -1.8 300
+mat cladding -1.8 300 rgb 150 150 150
  6000 1.0
 
 mat H1 -0.07 300

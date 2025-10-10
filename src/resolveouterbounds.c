@@ -150,7 +150,7 @@ int resolveOuterBounds() {
     }
     }
 
-    fprintf(stdout, "X: [%8.4lf, %8.4lf] cm\nY: [%8.4lf, %8.4lf] cm\nZ: [%8.4lf, %8.4lf] cm\n", DATA.x_min, DATA.x_max, DATA.y_min, DATA.y_max, DATA.z_min, DATA.z_max);
+    fprintf(stdout, "  X: [%8.4lf, %8.4lf] cm\n  Y: [%8.4lf, %8.4lf] cm\n  Z: [%8.4lf, %8.4lf] cm\n", DATA.x_min, DATA.x_max, DATA.y_min, DATA.y_max, DATA.z_min, DATA.z_max);
 
     fprintf(stdout, "DONE.\n");
 

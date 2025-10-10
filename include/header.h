@@ -178,12 +178,28 @@ int resolveUniverses();
 int resolveLattices();
 
 /**
- * @brief Checks geometry volumes for all materials by sampling random points within the outer boundaries.
- * The routine is parallelized using OpenMP. Results are printed to stdout and saved under each material.
+ * @brief Resolve all geometric transformations, by linking them to the specified targets.
+ * 
+ * @return int 0 on success, 1 on failure
+ */
+int resolveTransformations();
+
+/**
+ * @brief Determines material volumes by sampling random points within the outer boundaries.
+ * The routine is parallelised using OpenMP. Results are printed to stdout and saved under each material.
  * 
  * @return int 0 on succes, 1 on failure
  */
 int checkVolumes();
+
+
+/**
+ * @brief Determines material volumes by sampling random lines between outer bounds of the geometry.
+ * The routine is parallelised using OpenMP. Results are printed to stdout and saved under each material.
+ * 
+ * @return int 0 on succes, 1 on failure
+ */
+int checkVolumes2();
 
 /**
  * @brief Compute macroscopic cross sections for all resolved materials.
@@ -350,6 +366,19 @@ void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx);
  * @return double < 0 if inside, > 0 if outside, 0 if on surface
  */
 double surfaceTest(SurfaceTypes type, double *params, size_t nparams, double x, double y, double z);
+
+/**
+ * @brief Apply transformation to point and direction vector. Direction vector can be NULL.
+ * 
+ * @param T Pointer to transformation
+ * @param x 
+ * @param y 
+ * @param z 
+ * @param u 
+ * @param v 
+ * @param w 
+ */
+void applyTransformation(Transform* T, double *x, double *y, double *z, double *u, double *v, double *w);
 
 /**
  * @brief Return distance to surface

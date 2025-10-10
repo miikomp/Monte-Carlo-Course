@@ -15,14 +15,14 @@ int checkVolumes() {
     double **vol_bufs = (double **)calloc((size_t)GLOB.n_threads, sizeof(double*));
     if (!vol_bufs)
     {
-        fprintf(stdout, "[ERROR] Memory allocation failed.\n");
+        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
         return EXIT_FAILURE;
     }
 
     long *hit_counts = (long *)calloc((size_t)GLOB.n_threads, sizeof(long));
     if (!hit_counts)
     {
-        fprintf(stdout, "[ERROR] Memory allocation failed.\n");
+        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
         free(vol_bufs);
         return EXIT_FAILURE;
     }
@@ -32,7 +32,7 @@ int checkVolumes() {
         vol_bufs[t] = (double *)calloc(DATA.n_mats, sizeof(double));
         if (!vol_bufs[t])
         {
-            fprintf(stdout, "[ERROR] Memory allocation failed.\n");
+            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
             for (int j = 0; j < t; ++j)
                 free(vol_bufs[j]);
             free(vol_bufs);

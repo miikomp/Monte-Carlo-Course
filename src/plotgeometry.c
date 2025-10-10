@@ -1,6 +1,6 @@
 #include "header.h"
 
-static void getPixelColor(double x, double y, double z, int *r, int *g, int *b)
+void getPixelColor(double x, double y, double z, int *r, int *g, int *b)
 {
     int err = CELL_ERR_OK;
     int cell_idx = cellSearch(x, y, z, &err);
@@ -35,7 +35,7 @@ static void getPixelColor(double x, double y, double z, int *r, int *g, int *b)
     }
 }
 
-static int writeXYSlice(const char *filename, size_t width, size_t height, double z_slice)
+int writeXYSlice(const char *filename, size_t width, size_t height, double z_slice)
 {
     double dimx = DATA.x_max - DATA.x_min;
     double dimy = DATA.y_max - DATA.y_min;
@@ -77,7 +77,7 @@ static int writeXYSlice(const char *filename, size_t width, size_t height, doubl
     return 0;
 }
 
-static int writeXZSlice(const char *filename, size_t width, size_t height, double y_slice)
+int writeXZSlice(const char *filename, size_t width, size_t height, double y_slice)
 {
     double dimx = DATA.x_max - DATA.x_min;
     double dimz = DATA.z_max - DATA.z_min;

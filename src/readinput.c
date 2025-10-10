@@ -10,6 +10,8 @@ static int parseUInt(const char *s, uint32_t *out);
 
 static int parseDouble(const char *s, double *out);
 
+static void readLatticeUniverseNames(FILE *fp, long *lnum, Lattice *lat);
+
 /* small growable array for components while parsing */
 typedef struct {
     MaterialNuclide *v;
@@ -702,8 +704,8 @@ long readInput() {
 
             /* Create new surface from input */
 
-            Surface S;
-
+            Surface S = {0};
+            S.t_idx = -1;
             /* Copy all parameters */
 
             S.n_params = nparams;
@@ -937,59 +939,48 @@ long readInput() {
 
             Lattice L = {0};
             L.uni_idx = -1;
-            snprintf(L.uni_name, sizeof(L.uni_name), "%s", latUni);
+            snprintf(L.name, sizeof(L.name), "%s", latUni);
 
             /* Parse type */
 
-            long type = 0;
-            if (!parseLong(typeTok, &type))
+            if (!parseLong(typeTok, (long*)&L.type))
             {
                 fprintf(stderr, "[ERROR] Invalid lattice type \"%s\" on line %ld.\n", typeTok, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
 
-            if (type == 1)
-                L.type = LAT_SQUARE_INFINITE;
-            else if (type == 2)
-                L.type = LAT_SQUARE_FINITE;
-            else
-            {
-                fprintf(stderr, "[ERROR] Unknown lattice type \"%s\" on line %ld.\n", typeTok, lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-
             /* Read parameters according to type */
 
-            if (L.type == LAT_SQUARE_INFINITE)
+            switch (L.type)
             {
-                char* x0 = strtok(NULL, DELIMS);
-                char* y0 = strtok(NULL, DELIMS);
-                char* p = strtok(NULL, DELIMS);
-                char* u = strtok(NULL, DELIMS);
-
-                if (!x0 || !y0 || !p || !u)
+                case LAT_SQUARE_INFINITE:
                 {
-                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
-                    fclose(fp);
-                    exit(EXIT_FAILURE);
-                }
+                    char* x0 = strtok(NULL, DELIMS);
+                    char* y0 = strtok(NULL, DELIMS);
+                    char* p = strtok(NULL, DELIMS);
+                    char* u = strtok(NULL, DELIMS);
 
-                if (!parseDouble(x0, &L.x0) || !parseDouble(y0, &L.y0) || !parseDouble(p, &L.dx))
-                {
-                    fprintf(stderr, "[ERROR] Invalid value for \"lat\" on line %ld.\n", lnum);
-                    fclose(fp);
-                    exit(EXIT_FAILURE);
-                }
+                    if (!x0 || !y0 || !p || !u)
+                    {
+                        fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
 
-                /* Pitch in y is same as x */
+                    if (!parseDouble(x0, &L.x0) || !parseDouble(y0, &L.y0) || !parseDouble(p, &L.dx))
+                    {
+                        fprintf(stderr, "[ERROR] Invalid value for \"lat\" on line %ld.\n", lnum);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
 
                 L.dy = L.dx;
+                L.dz = 0.0;
+                L.nx = L.ny = L.nz = 1;
                 L.n_unis = 1;
 
-                /* Filling universe */
-                L.uni_names = (char*)calloc(1, MAX_STR_LEN);
+                L.uni_names = (char*)calloc(L.n_unis, MAX_STR_LEN);
                 if (!L.uni_names)
                 {
                     fprintf(stderr, "[ERROR] Memory allocation failed.\n");
@@ -998,7 +989,58 @@ long readInput() {
                 }
 
                 snprintf(L.uni_names, MAX_STR_LEN, "%s", u);
+
+                break;
             }
+                case LAT_SQUARE_FINITE:
+                {
+                    char *x0 = strtok(NULL, DELIMS);
+                    char* y0 = strtok(NULL, DELIMS);
+                    char* nx = strtok(NULL, DELIMS);
+                    char* ny = strtok(NULL, DELIMS);
+                    char* p = strtok(NULL, DELIMS);
+
+                    if (!x0 || !y0 || !nx || !ny || !p)
+                    {
+                        fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (!parseDouble(x0, &L.x0) || !parseDouble(y0, &L.y0) ||
+                        !parseLong(nx, &L.nx) || !parseLong(ny, &L.ny) ||
+                        !parseDouble(p, &L.dx))
+                    {
+                        fprintf(stderr, "[ERROR] Invalid value for \"lat\" on line %ld.\n", lnum);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (L.nx <= 0 || L.ny <= 0)
+                    {
+                        fprintf(stderr, "[ERROR] Invalid lattice dimensions \"%ld x %ld\" on line %ld.\n", L.nx, L.ny, lnum);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    L.dy = L.dx;
+                    L.dz = 0.0;
+                    L.nz = 1;
+                    L.n_unis = (size_t)L.nx * (size_t)L.ny * (size_t)L.nz;
+
+                    readLatticeUniverseNames(fp, &lnum, &L);
+
+                    break;
+                }
+                default:
+                {
+                    fprintf(stderr, "[ERROR] Unknown lattice type \"%s\" on line %ld.\n", typeTok, lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+            }
+            
+
             /* Put cell into DATA.lats */
 
             if (DATA.n_lats == 0)
@@ -1021,6 +1063,136 @@ long readInput() {
             if (VERBOSITY >= 1)
                 fprintf(stdout, "Parsed a lattice of type %d, filled with %zu universe(s)\n", (int)L.type, L.n_unis);
             
+        }
+        
+        /* ###################################################################################### */
+        /* --- trans --- (Geometry transformation) */
+
+        else if (!strcmp(tok, "trans"))
+        {
+            /* Read type and target */
+
+            char* typeTok = strtok(NULL, DELIMS);
+            char* target = strtok(NULL, DELIMS);
+
+            if (!typeTok || !target)
+            {
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Create new transformation and put type and target */
+
+            Transform T = {0};
+            snprintf(T.target_name, sizeof(T.target_name), "%s", target);
+            
+            if (!strcmp(typeTok, "s"))
+                T.type = TRA_SURFACE;
+            else
+            {
+                fprintf(stderr, "[ERROR] Unknown type for transformation \"%s\".\n", typeTok);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Read following params into an array */
+
+            double params[MAX_N_PARAMS];
+            size_t nparams = 0;
+            char* paramTok = strtok(NULL, DELIMS);
+
+            while (nparams < MAX_N_PARAMS && paramTok != NULL)
+            {
+                if (!parseDouble(paramTok, &params[nparams++]))
+                {
+                    fprintf(stderr, "[ERROR] Invalid transformation parameter \"%s\" on line %ld.\n", paramTok, lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+                paramTok = strtok(NULL, DELIMS);   
+            }
+
+            const double eps = 1e-12;
+
+            if (nparams == 3 || nparams == 6)
+            {
+                T.translation[0] = params[0];
+                T.translation[1] = params[1];
+                T.translation[2] = params[2];
+
+                if ((fabs(params[0]) > eps) || (fabs(params[1]) > eps) || (fabs(params[2]) > eps))
+                    T.action = TRA_TRANSLATION;
+            }
+
+            if (nparams == 6)
+            {
+                double ax = params[3];
+                double ay = params[4];
+                double az = params[5];
+
+                double a = ax * (M_PI / 180.0);
+                double b = ay * (M_PI / 180.0);
+                double c = az * (M_PI / 180.0);
+
+                double ca = cos(a), sa = sin(a);
+                double cb = cos(b), sb = sin(b);
+                double cc = cos(c), sc = sin(c);
+
+                T.rotation[0][0] = cb * cc;
+                T.rotation[0][1] = ca * sc + sa * sb * cc;
+                T.rotation[0][2] = sa * sc - ca * sb * cc;
+                T.rotation[1][0] = -cb * sc;
+                T.rotation[1][1] = ca * cc - sa * sb * sc;
+                T.rotation[1][2] = sa * cc + ca * sb * sc;
+                T.rotation[2][0] = sb;
+                T.rotation[2][1] = -sa * cb;
+                T.rotation[2][2] = ca * cb;
+
+                if ((fabs(ax) > eps) || (fabs(ay) > eps) || (fabs(az) > eps))
+                {
+                    if (T.action == TRA_TRANSLATION)
+                        T.action = TRA_BOTH;
+                    else
+                        T.action = TRA_ROTATION;
+                }
+            }
+
+            if (nparams != 3 && nparams != 6)
+            {
+                fprintf(stderr, "[ERROR] Invalid number of parameters for \"trans\" was expecting 3 or 6, got %zu\n", nparams);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            if (T.action == TRA_NONE)
+            {
+                fprintf(stderr, "[ERROR] Empty transformation on line %ld.", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Put cell into DATA.trans */
+
+            if (DATA.n_transforms == 0)
+            {
+                DATA.transforms = (Transform*)calloc(1, sizeof(Transform));
+            }
+            else
+            {
+                DATA.transforms = (Transform*)realloc(DATA.transforms, (DATA.n_transforms + 1) * sizeof(Transform));
+            }
+            if (!DATA.transforms)
+            {
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            DATA.transforms[DATA.n_transforms++] = T;
+            np++;
+
+            if (VERBOSITY >= 1)
+                fprintf(stdout, "Parsed a transformation of type %d, with %s targeting \"%s\"\n", (int)T.type, nparams == 6 ? "rotation and translation" : "translation only", T.target_name);
         }
 
         /* ###################################################################################### */        
@@ -1297,6 +1469,69 @@ long readInput() {
  * @param out ptr where parsed result is put
  * @return int 0 on failure 1 on success
  */
+static void readLatticeUniverseNames(FILE *fp, long *lnum, Lattice *lat)
+{
+    size_t expected = lat->n_unis;
+
+    if (expected == 0)
+        return;
+
+    lat->uni_names = (char*)calloc(expected, MAX_STR_LEN);
+    if (!lat->uni_names)
+    {
+        fprintf(stderr, "[ERROR] Memory allocation failed while reading lattice '%s'.\n",
+                lat->name);
+        fclose(fp);
+        exit(EXIT_FAILURE);
+    }
+
+    size_t count = 0;
+    char *tok = strtok(NULL, DELIMS);
+    char line_buf[4096];
+
+    while (1)
+    {
+        while (tok)
+        {
+            snprintf(lat->uni_names + count * MAX_STR_LEN, MAX_STR_LEN, "%s", tok);
+            if (++count == expected)
+                break;
+            tok = strtok(NULL, DELIMS);
+        }
+
+        if (count == expected)
+            break;
+
+        if (!fgets(line_buf, sizeof line_buf, fp))
+        {
+            fprintf(stderr, "[ERROR] Lattice '%s' expected %zu universe names but reached EOF.\n",
+                    lat->name, expected);
+            fclose(fp);
+            exit(EXIT_FAILURE);
+        }
+
+        (*lnum)++;
+
+        char *cmnt = strchr(line_buf, '#');
+        if (cmnt)
+            *cmnt = '\0';
+
+        char *s = line_buf;
+        while (isspace((unsigned char)*s))
+            s++;
+
+        if (*s == '\0')
+        {
+            fprintf(stderr, "[ERROR] Empty line encountered while reading lattice '%s' (line %ld).\n",
+                    lat->name, *lnum);
+            fclose(fp);
+            exit(EXIT_FAILURE);
+        }
+
+        tok = strtok(s, DELIMS);
+    }
+}
+
 static int parseLong(const char *s, long *out) {
     if (!s || !out)
         return 0;

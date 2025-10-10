@@ -21,7 +21,10 @@ runInfo GLOB = {
 
     .n_generations  = 0l,
     .n_particles    = 0l,
+    .n_cycles       = 0l,
+    .n_inactive     = 0l,
     .n_points       = -1l,
+    .n_lines        = -1l,
 
     .energy_cutoff  = 0.0,
     .collision_cutoff = LONG_MAX,

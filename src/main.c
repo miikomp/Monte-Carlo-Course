@@ -73,17 +73,31 @@ int main(int argc, char **argv) {
         }
         else if (!strcmp(argv[i], "-checkvolumes") || !strcmp(argv[i], "--checkvolumes")) 
         {
-            if (i + 1 >= argc - 1) 
+            if (i + 2 >= argc - 1) 
             {
-                fprintf(stderr, "[ERROR] Number of random points not given for \"%s\".\n", argv[i]);
+                fprintf(stderr, "[ERROR] Not enough arguments given for \"%s\".\n", argv[i]);
                 return EXIT_FAILURE;
             }
 
-            GLOB.n_points = strtol(argv[++i], NULL, 10);
+            long type = strtol(argv[++i], NULL, 10);
+            if (type < 1 || type > 2) 
+            {
+                fprintf(stderr, "[ERROR] Invalid volume check type %ld given for \"%s\".\n", type, argv[i - 1]);
+                return EXIT_FAILURE;
+            }
+            if (type == 1)
+                GLOB.n_points = strtol(argv[++i], NULL, 10);
+            else
+                GLOB.n_lines = strtol(argv[++i], NULL, 10);
 
-            if (GLOB.n_points <= 0)
+            if (GLOB.n_points <= 0 && type == 1) 
             {
                 fprintf(stderr, "[ERROR] Number of random points must be positive.\n");
+                return EXIT_FAILURE;
+            }
+            if (GLOB.n_lines <= 0 && type == 2) 
+            {
+                fprintf(stderr, "[ERROR] Number of random lines must be positive.\n");
                 return EXIT_FAILURE;
             }
         }
@@ -194,7 +208,16 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    /* Process transformations */
+
+    if (resolveTransformations() != 0)
+    {
+        fprintf(stderr, "[ERROR] Failed to process transformations.\n");
+        return EXIT_FAILURE;
+    }
+
     /* Calculate and put outer bounds */
+
     if (resolveOuterBounds() != 0)
     {
         fprintf(stderr, "[ERROR] Failed to calculate outer bounds.\n");
@@ -202,7 +225,16 @@ int main(int argc, char **argv) {
     }
 
     /* Check volumes by sampling random points */
+    
     if (checkVolumes() != 0)
+    {
+        fprintf(stderr, "[ERROR] Volume checking failed.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Check volumes by sampling random lines */
+
+    if (checkVolumes2() != 0)
     {
         fprintf(stderr, "[ERROR] Volume checking failed.\n");
         return EXIT_FAILURE;

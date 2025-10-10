@@ -23,7 +23,7 @@ int resolveCells() {
             }
             if (cell->filluni_idx == -1)
             {
-                fprintf(stdout, "[ERROR] Universe \"%s\" for cell \"%s\" not found.\n", cell->filluni_name, cell->name);
+                fprintf(stderr, "[ERROR] Universe \"%s\" for cell \"%s\" not found.\n", cell->filluni_name, cell->name);
                 return EXIT_FAILURE;
             }
         }
@@ -45,7 +45,7 @@ int resolveCells() {
                     cell->mat_idx = -1; // outside cell
                 else
                 {
-                    fprintf(stdout, "[ERROR] Material \"%s\" for cell \"%s\" not found.\n", cell->mat_name, cell->name);
+                    fprintf(stderr, "[ERROR] Material \"%s\" for cell \"%s\" not found.\n", cell->mat_name, cell->name);
                     return EXIT_FAILURE;
                 }
             }
@@ -69,7 +69,7 @@ int resolveCells() {
             }
             if (cell->surf_idxs[s] == -1)
             {
-                fprintf(stdout, "[ERROR] Surface \"%s\" for cell \"%s\" not found.\n", surf_name, cell->name);
+                fprintf(stderr, "[ERROR] Surface \"%s\" for cell \"%s\" not found.\n", surf_name, cell->name);
                 return EXIT_FAILURE;
             }
         }

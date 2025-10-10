@@ -23,7 +23,7 @@ int cellSearch(double x, double y, double z, int *err) {
 
         Universe *current_uni = &DATA.unis[universe_idx];
 
-        /* If lattice, determine which universe to go to next */
+        /* If lattice, determine which sub-universe to go to next */
 
         if (current_uni->type == UNI_LATTICE)
         {
@@ -56,14 +56,43 @@ int cellSearch(double x, double y, double z, int *err) {
                 {
                     double rel_x = x - lat->x0;
                     double rel_y = y - lat->y0;
-                    long ix = (long)floor(rel_x / lat->dx + 0.5);
-                    long iy = (long)floor(rel_y / lat->dy + 0.5);
+
+                    long ix = floor(rel_x / lat->dx + 0.5);
+                    long iy = floor(rel_y / lat->dy + 0.5);
 
                     x -= (lat->x0 + ix * lat->dx);
                     y -= (lat->y0 + iy * lat->dy);
                     z -= lat->z0;
 
                     universe_idx = (size_t)lat->uni_idxs[0];
+                    break;
+                }
+                case LAT_SQUARE_FINITE:
+                {
+                    double ix_f = (x - lat->x0) / lat->dx + 0.5 * ((double)lat->nx - 1.0);
+                    double iy_f = (y - lat->y0) / lat->dy + 0.5 * ((double)lat->ny - 1.0);
+
+                    long ix = (long)floor(ix_f + 0.5);
+                    long iy = (long)floor(iy_f + 0.5);
+
+                    if (ix < 0 || ix >= lat->nx || iy < 0 || iy >= lat->ny)
+                    {
+                        if (err)
+                            *err = CELL_ERR_UNDEFINED;
+                        return -1;
+                    }
+
+                    size_t idx = (size_t)ix + (size_t)iy * (size_t)lat->nx;
+
+                    double cell_x0 = lat->x0 + ((double)ix - 0.5 * ((double)lat->nx - 1.0)) * lat->dx;
+                    double cell_y0 = lat->y0 + ((double)iy - 0.5 * ((double)lat->ny - 1.0)) * lat->dy;
+
+                    x -= cell_x0;
+                    y -= cell_y0;
+                    z -= lat->z0;
+
+                    universe_idx = (size_t)lat->uni_idxs[idx];
+
                     break;
                 }
                 default:
@@ -151,6 +180,10 @@ int locateCellInUniverse(size_t uni_idx, double x, double y, double z,
     }
 
     Universe *uni = &DATA.unis[uni_idx];
+
+    if (uni->t_idx >= 0)
+        applyTransformation(&DATA.transforms[uni->t_idx], &x, &y, &z, NULL, NULL, NULL);
+
     int best_cell = -1;
     double best_min_abs = INFINITY;
 
@@ -165,7 +198,14 @@ int locateCellInUniverse(size_t uni_idx, double x, double y, double z,
         {
             int side = cell->sides[s];
             Surface *surf = &DATA.surfs[cell->surf_idxs[s]];
-            double res = surfaceTest(surf->type, surf->params, surf->n_params, x, y, z);
+            double tx = x;
+            double ty = y;
+            double tz = z;
+
+            if (surf->t_idx >= 0)
+                applyTransformation(&DATA.transforms[surf->t_idx], &tx, &ty, &tz, NULL, NULL, NULL);
+            
+            double res = surfaceTest(surf->type, surf->params, surf->n_params, tx, ty, tz);
             double abs_res = fabs(res);
             if (abs_res < min_abs)
                 min_abs = abs_res;

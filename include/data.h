@@ -40,9 +40,24 @@ typedef enum {
 } UniverseTypes;
 
 typedef enum {
-    LAT_SQUARE_INFINITE = 0,
+    LAT_UNDEFINED = 0,
+    LAT_SQUARE_INFINITE,
     LAT_SQUARE_FINITE
 } LatticeTypes;
+
+typedef enum {
+    TRA_UNDEFINED = 0,
+    TRA_SURFACE,
+    TRA_CELL,
+    TRA_UNIVERSE
+} TransformTargetTypes;
+
+typedef enum {
+    TRA_NONE = 0,
+    TRA_TRANSLATION,
+    TRA_ROTATION,
+    TRA_BOTH
+} TransformAction;
 
 typedef struct {
     uint64_t s[4];
@@ -121,6 +136,7 @@ typedef struct {
     SurfaceTypes type;
     size_t       n_params;
     double      *params;
+    long         t_idx; // index in DATA.transforms, -1 if no transform
 } Surface;
 
 // Struct for a cell
@@ -136,7 +152,7 @@ typedef struct {
     size_t  n_surfs;
     char   *surf_names;            // Defining surface names given as input
     int    *surf_idxs;             // array of surface indices (in DATA.surfs)
-    int    *sides;                  // > 0 outside, < 0 inside
+    int    *sides;                 // > 0 outside, < 0 inside
 } Cell;
 
 // Struct for a universe
@@ -146,20 +162,30 @@ typedef struct {
     int             lat_idx;     // index in DATA.lats, -1 if not a lattice
     size_t          n_cells;
     int            *cell_idxs;  // array of cell indices (in DATA.cells)
+    long    t_idx;                 // index in DATA.transforms, -1 if no transform
 } Universe;
 
 // Struct for a lattice
 typedef struct {
-    char         uni_name[MAX_STR_LEN];  // Lattice universe name given as input
+    char         name[MAX_STR_LEN];  // Lattice universe name given as input
     LatticeTypes type;
     double       x0, y0, z0;  // Lattice origin
     double       dx, dy, dz;  // Lattice pitch
-    int          nx, ny, nz;  // Number of elements in each direction
+    long         nx, ny, nz;  // Number of elements in each direction
     size_t       n_unis;
     char*        uni_names;   // Array of universe names given to fill lattice with
-    int*         uni_idxs;    // Array of universe indices corresponding to DATA.unis
-    int          uni_idx;     // Index of this lattice universe in DATA.unis (-1 if not resolved)
+    long*        uni_idxs;    // Array of universe indices corresponding to DATA.unis
+    long         uni_idx;     // Index of this lattice universe in DATA.unis (-1 if not resolved)
 } Lattice;
+
+// Struct for a geometric transform (translation + rotation)
+typedef struct {
+    TransformTargetTypes type;
+    char   target_name[MAX_STR_LEN]; // Target of transformation given as input
+    TransformAction action; // Type of transformation translation, rotation or both.
+    double translation[3]; // translation vector
+    double rotation[3][3]; // rotation matrix
+} Transform;
 
 /* --- Particle data structures --- */
 
@@ -347,6 +373,8 @@ typedef struct {
     Universe *unis; 
     size_t    n_lats;
     Lattice  *lats;
+    size_t    n_transforms;
+    Transform *transforms;
 
 
     /* Bounds */
@@ -398,7 +426,8 @@ typedef struct {
     long        n_cycles;       // external source simulation
     long        n_particles;    // particles per cycle/generation
     long        n_inactive;     // number of inactive generations/cycles
-    long        n_points;       // number of points for volume checking
+    long        n_points;       // number of points for volume checking (type 1)
+    long        n_lines;        // number of lines for volume checking (type 2)
 
     /* Cutoff parameters */
     double      energy_cutoff; // MeV

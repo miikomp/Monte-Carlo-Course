@@ -118,6 +118,7 @@ int resolveUniverses() {
         snprintf(uni->name, sizeof(uni->name), "%s", names[u]);
         uni->type = (u == 0) ? UNI_ROOT : UNI_NORMAL;
         uni->lat_idx = -1;
+        uni->t_idx = -1;
         uni->n_cells = 0;
         uni->cell_idxs = NULL;
     }
@@ -158,8 +159,7 @@ int resolveUniverses() {
     {
         fprintf(stdout, "  Geometry consists %zu universe(s):\n", DATA.n_unis);
         for (size_t u = 0; u < DATA.n_unis; ++u)
-            fprintf(stdout, "  %zu: %s%s | %zu cell(s)\n", u, DATA.unis[u].name,
-                    (u == 0) ? " (root)" : "", DATA.unis[u].n_cells);
+            fprintf(stdout, "  %zu: %-3s | %zu cell(s)\n", u, DATA.unis[u].name, DATA.unis[u].n_cells);
     }
 
     fprintf(stdout, "DONE.\n");

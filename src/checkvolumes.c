@@ -152,9 +152,7 @@ int checkVolumes() {
 
         double rel_unc = (p > 0.0) ? sqrt(fmax(0.0, (1.0 - p) / (p * (double)n_points))) : 0.0;
         fprintf(stdout, "%10s: %.4E  +/- %.3E\n", mat->name, mat->vol, rel_unc);
-        
     }
-
 
     free(volumes);
 

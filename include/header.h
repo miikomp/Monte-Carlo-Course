@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <float.h>
 
 /* Other headers */
 #include "rng.h"
@@ -149,9 +150,9 @@ int resolveCells();
  * @param y Y-coordinate
  * @param z Z-coordinate
  * @param err Pointer to an error flag
- * @return int Index of the cell containing the point, or -1 on failure
+ * @return long Index of the cell containing the point, or -1 on failure
  */
-int cellSearch(double x, double y, double z, int *err);
+long cellSearch(double x, double y, double z, int *err);
 
 /**
  * @brief Resolve outer boundary of root universe. Calculates and puts outer bounds into DATA.
@@ -249,6 +250,20 @@ int runCriticalitySimulation(void);
  */
 void processTransportResults(void);
 
+
+/**
+ * @brief Return distance to nearest boundary from point (x, y, z) in direction (u, v, w). INFINITY
+ * 
+ * @param x 
+ * @param y 
+ * @param z 
+ * @param u 
+ * @param v 
+ * @param w 
+ * @return double 
+ */
+double distanceToNearestBoundary(double x, double y, double z, double u, double v, double w);
+
 /**
  * @brief Process detector tallies gathered during transport and write outputs.
  *
@@ -324,9 +339,9 @@ double getMicroscopicXS(const double E, XsTable* xs_table);
  * @param x X-coordinate in cm
  * @param y Y-coordinate in cm
  * @param z Z-coordinate in cm
- * @return int Material index, or -1 if not found
+ * @return long Material index, or -1 if not found
  */
-int getMaterialAtPosition(double x, double y, double z);
+long getMaterialAtPosition(double x, double y, double z);
 
 /**
  * @brief Get the Velocity cm/s for a given neutron energy

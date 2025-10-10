@@ -224,8 +224,16 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    /* Check volumes by sampling random points */
+    /* Plot geometry */
     
+    if (plotGeometry() != 0) 
+    {
+        fprintf(stderr, "[ERROR] Could not plot geometry.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Check volumes by sampling random points */
+
     if (checkVolumes() != 0)
     {
         fprintf(stderr, "[ERROR] Volume checking failed.\n");
@@ -237,13 +245,6 @@ int main(int argc, char **argv) {
     if (checkVolumes2() != 0)
     {
         fprintf(stderr, "[ERROR] Volume checking failed.\n");
-        return EXIT_FAILURE;
-    }
-
-    /* Plot geometry */
-    if (plotGeometry() != 0) 
-    {
-        fprintf(stderr, "[ERROR] Could not plot geometry.\n");
         return EXIT_FAILURE;
     }
 

@@ -32,6 +32,9 @@ callgrind.out.*
 *.err
 *.m
 
+## Ignore input files
+*.mc
+
 ## Ignore all geometry plots
 
 *.ppm

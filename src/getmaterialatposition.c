@@ -1,12 +1,18 @@
 #include "header.h"
 
-int getMaterialAtPosition(double x, double y, double z) {
+long getMaterialAtPosition(double x, double y, double z) {
+    /* Find current cell */
 
-    /* For now there is no geometry so we can just return the first material idx */
-    x = x; y = y; z = z; // suppress unused variable warnings
+    int err;
+    long cell_idx = cellSearch(x, y, z, &err);
+    Cell *cell;
 
-    if (DATA.n_mats > 0)
-        return 0;
+    if (cell_idx >= 0 && err == CELL_ERR_OK)
+        cell = &DATA.cells[cell_idx];
     else
         return -1;
+
+    /* Get material idx */
+    
+    return cell->mat_idx;
 }

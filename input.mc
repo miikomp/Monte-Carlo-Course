@@ -1,4 +1,4 @@
-# Example input file for the "moca" Monte Carlo neutron trasnport code
+# Example input file for the "moca" Monte Carlo neutron transport code
 
 # Set the seed (if not set, a random seed is used)
 # set seed 12165467978
@@ -15,16 +15,12 @@ set xslibpath ./xsdata/xsdata.lib
 
 # Define surfaces
 
-surf s1 cyl 0.0 0.0 0.412
-surf s2 cyl 0.0 0.0 0.475
-surf s3 sqr 0.0 0.0 0.665
+surf s1 cube 0.0 0.0 0.0 5.0
+surf s2 cube 0.0 0.0 0.0 10.0
 
-# Define cells
-
-cell c01 0 Fuel -s1
-cell c02 0 Cladding s1 -s2
-cell c03 0 Water s2 -s3
-cell c04 0 outside s3
+cell c1 0 fuel -s1
+cell c2 0 water s1 -s2
+cell c3 0 outside s2
 
 # Define material(s)
 # Positive density/fraction means mass density in g/cm^3 or mass fraction
@@ -35,15 +31,15 @@ cell c04 0 outside s3
 # The code computes the missing units (e.g. if mass fractions are given, atomic fractions
 # and atomic density are computed from the mass density, etc.) These are printed for verification.
 
-mat Water 0.1 300 rgb 150 150 255
+mat water 0.1 300 rgb 150 150 255
  1001 2
  8016 1
 
-mat Fuel -19.1 300 rgb 30 195 50
+mat fuel -19.1 300 rgb 30 195 50
  92235 -0.0072
  92238 -0.9928
 
-mat Cladding -1.8 300 rgb 150 150 150
+mat cladding -1.8 300 rgb 150 150 150
  6000 1.0
 
 mat H1 -0.07 300

@@ -1,8 +1,8 @@
 #include "header.h"
 
-int locateCellInUniverse(size_t uni_idx, double x, double y, double z, int *err, double *min_abs_out);
+long locateCellInUniverse(size_t uni_idx, double x, double y, double z, int *err, double *min_abs_out);
 
-int cellSearch(double x, double y, double z, int *err) {
+long cellSearch(double x, double y, double z, int *err) {
 
     if (err)
         *err = CELL_ERR_OK;
@@ -160,9 +160,9 @@ int cellSearch(double x, double y, double z, int *err) {
  * @param z z-coordinate of the point
  * @param err pointer to an error code
  * @param min_abs_out pointer to store the minimum absolute distance
- * @return int index of the cell containing the point, or -1 if not found
+ * @return long index of the cell containing the point, or -1 if not found
  */
-int locateCellInUniverse(size_t uni_idx, double x, double y, double z,
+long locateCellInUniverse(size_t uni_idx, double x, double y, double z,
                                 int *err, double *min_abs_out)
 {
     const double EPS = 1e-12;
@@ -184,7 +184,7 @@ int locateCellInUniverse(size_t uni_idx, double x, double y, double z,
     if (uni->t_idx >= 0)
         applyTransformation(&DATA.transforms[uni->t_idx], &x, &y, &z, NULL, NULL, NULL);
 
-    int best_cell = -1;
+    long best_cell = -1;
     double best_min_abs = INFINITY;
 
     for (size_t i = 0; i < uni->n_cells; ++i)

@@ -2,6 +2,8 @@
 
 int resolveOuterBounds() {
 
+    const double EPS = 1e-10;
+
     fprintf(stdout, "\nCalculating outer boundaries...\n");
 
     /* First find the outside cell in the root universe */
@@ -143,11 +145,43 @@ int resolveOuterBounds() {
 
         break;
     }
+    case SURF_SPH:
+    {
+        DATA.x_min = -params[2];
+        DATA.x_max = params[2];
+        DATA.y_min = -params[2];
+        DATA.y_max = params[2];
+        DATA.z_min = -params[2];
+        DATA.z_max = params[2];
+
+        break;
+    }
+
+    case SURF_CUBE:
+    {
+        DATA.x_min = -params[3];
+        DATA.x_max = params[3];
+        DATA.y_min = -params[3];
+        DATA.y_max = params[3];
+        DATA.z_min = -params[3];
+        DATA.z_max = params[3];
+
+        break;
+    }
     default:
     {
         fprintf(stderr, "[ERROR] Surface type %d not implemented for outer boundaries.\n", type);
         return EXIT_FAILURE;
     }
+    }
+
+    /* Check for legal geometry */
+    
+    if (((fabs(DATA.x_min) < EPS) && (fabs(DATA.x_max) < EPS)) || 
+        ((fabs(DATA.y_min) < EPS) && (fabs(DATA.y_max) < EPS)))
+    {
+        fprintf(stderr, "[ERROR] Universe must be finite in the XY plane.\n");
+        return EXIT_FAILURE;
     }
 
     fprintf(stdout, "  X: [%8.4lf, %8.4lf] cm\n  Y: [%8.4lf, %8.4lf] cm\n  Z: [%8.4lf, %8.4lf] cm\n", DATA.x_min, DATA.x_max, DATA.y_min, DATA.y_max, DATA.z_min, DATA.z_max);

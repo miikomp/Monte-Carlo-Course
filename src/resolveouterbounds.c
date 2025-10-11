@@ -156,7 +156,6 @@ int resolveOuterBounds() {
 
         break;
     }
-
     case SURF_CUBE:
     {
         DATA.x_min = -params[3];

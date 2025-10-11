@@ -42,7 +42,11 @@ typedef enum {
 typedef enum {
     LAT_UNDEFINED = 0,
     LAT_SQUARE_INFINITE,
-    LAT_SQUARE_FINITE
+    LAT_HEXX_INFINITE,
+    LAT_HEXY_INFINITE,
+    LAT_SQUARE_FINITE,
+    LAT_HEXX_FINITE,
+    LAT_HEXY_FINITE
 } LatticeTypes;
 
 typedef enum {

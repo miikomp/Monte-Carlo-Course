@@ -52,6 +52,8 @@ int resolveLattices() {
         switch (lat->type)
         {
             case LAT_SQUARE_INFINITE:
+            case LAT_HEXX_INFINITE:
+            case LAT_HEXY_INFINITE:
             {
                 const char *fill_name = lat->uni_names;
                 int fill_idx = -1;
@@ -83,6 +85,8 @@ int resolveLattices() {
                 break;
             }
             case LAT_SQUARE_FINITE:
+            case LAT_HEXX_FINITE:
+            case LAT_HEXY_FINITE:
             {
                 /* Resolve universe indeces */
 

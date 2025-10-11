@@ -685,6 +685,18 @@ long readInput() {
                 exit(EXIT_FAILURE);
             }
 
+            /* Check for duplicate definition */
+            for (size_t s = 0; s < DATA.n_surf; s++)
+            {
+                Surface *S = &DATA.surfs[s];
+                if (!strcmp(name, S->name))
+                {
+                    fprintf(stderr, "[ERROR] Duplicate definition of surface \"%s\" on line %ld\n", name, lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+            }
+
             /* Read all params into an array */
             
             double params[MAX_N_PARAMS];
@@ -706,6 +718,7 @@ long readInput() {
 
             Surface S = {0};
             S.t_idx = -1;
+
             /* Copy all parameters */
 
             S.n_params = nparams;
@@ -801,6 +814,18 @@ long readInput() {
                 fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
+            }
+
+            /* Check for duplicate definition */
+            for (size_t c = 0; c < DATA.n_cells; c++)
+            {
+                Cell *C = &DATA.cells[c];
+                if (!strcmp(name, C->name))
+                {
+                    fprintf(stderr, "[ERROR] Duplicate definition of cell \"%s\" on line %ld\n", name, lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
             }
 
             /* Check if universe filled or material */
@@ -955,6 +980,8 @@ long readInput() {
             switch (L.type)
             {
                 case LAT_SQUARE_INFINITE:
+                case LAT_HEXX_INFINITE:
+                case LAT_HEXY_INFINITE:
                 {
                     char* x0 = strtok(NULL, DELIMS);
                     char* y0 = strtok(NULL, DELIMS);
@@ -975,24 +1002,26 @@ long readInput() {
                         exit(EXIT_FAILURE);
                     }
 
-                L.dy = L.dx;
-                L.dz = 0.0;
-                L.nx = L.ny = L.nz = 1;
-                L.n_unis = 1;
+                    L.dy = L.dx;
+                    L.dz = 0.0;
+                    L.nx = L.ny = L.nz = 1;
+                    L.n_unis = 1;
 
-                L.uni_names = (char*)calloc(L.n_unis, MAX_STR_LEN);
-                if (!L.uni_names)
-                {
-                    fprintf(stderr, "[ERROR] Memory allocation failed.\n");
-                    fclose(fp);
-                    exit(EXIT_FAILURE);
-                }
+                    L.uni_names = (char*)calloc(L.n_unis, MAX_STR_LEN);
+                    if (!L.uni_names)
+                    {
+                        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
 
-                snprintf(L.uni_names, MAX_STR_LEN, "%s", u);
+                    snprintf(L.uni_names, MAX_STR_LEN, "%s", u);
 
-                break;
-            }
+                    break;
+                }   
                 case LAT_SQUARE_FINITE:
+                case LAT_HEXX_FINITE:
+                case LAT_HEXY_FINITE:
                 {
                     char *x0 = strtok(NULL, DELIMS);
                     char* y0 = strtok(NULL, DELIMS);

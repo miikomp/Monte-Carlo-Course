@@ -1,5 +1,30 @@
 #include "header.h"
 
+static void roundHexAxial(double q, double r, long *q_round, long *r_round)
+{
+    double s = -q - r;
+
+    long rq = (long)lround(q);
+    long rr = (long)lround(r);
+    long rs = (long)lround(s);
+
+    double dq = fabs((double)rq - q);
+    double dr = fabs((double)rr - r);
+    double ds = fabs((double)rs - s);
+
+    if (dq > dr && dq > ds)
+        rq = -rr - rs;
+    else if (dr > ds)
+        rr = -rq - rs;
+    else
+        rs = -rq - rr;
+
+    if (q_round)
+        *q_round = rq;
+    if (r_round)
+        *r_round = rr;
+}
+
 long locateCellInUniverse(size_t uni_idx, double x, double y, double z, int *err, double *min_abs_out);
 
 long cellSearch(double x, double y, double z, int *err) {
@@ -67,6 +92,56 @@ long cellSearch(double x, double y, double z, int *err) {
                     universe_idx = (size_t)lat->uni_idxs[0];
                     break;
                 }
+                case LAT_HEXX_INFINITE:
+                {
+                    double rel_x = x - lat->x0;
+                    double rel_y = y - lat->y0;
+
+                    double pitch = lat->dx;
+                    double hex_size = pitch / SQRT3;
+
+                    double q = (SQRT3 / 3.0 * rel_x - rel_y / 3.0) / hex_size;
+                    double r = (2.0 / 3.0 * rel_y) / hex_size;
+
+                    long iq = 0;
+                    long ir = 0;
+                    roundHexAxial(q, r, &iq, &ir);
+
+                    double center_x = hex_size * SQRT3 * ((double)iq + 0.5 * (double)ir);
+                    double center_y = hex_size * 1.5 * (double)ir;
+
+                    x -= (lat->x0 + center_x);
+                    y -= (lat->y0 + center_y);
+                    z -= lat->z0;
+
+                    universe_idx = (size_t)lat->uni_idxs[0];
+                    break;
+                }
+                case LAT_HEXY_INFINITE:
+                {
+                    double rel_x = x - lat->x0;
+                    double rel_y = y - lat->y0;
+
+                    double pitch = lat->dy;
+                    double hex_size = pitch / SQRT3;
+
+                    double q = (2.0 / 3.0 * rel_x) / hex_size;
+                    double r = (-rel_x / 3.0 + SQRT3 / 3.0 * rel_y) / hex_size;
+
+                    long iq = 0;
+                    long ir = 0;
+                    roundHexAxial(q, r, &iq, &ir);
+
+                    double center_x = hex_size * 1.5 * (double)iq;
+                    double center_y = pitch * ((double)ir + 0.5 * (double)iq);
+
+                    x -= (lat->x0 + center_x);
+                    y -= (lat->y0 + center_y);
+                    z -= lat->z0;
+
+                    universe_idx = (size_t)lat->uni_idxs[0];
+                    break;
+                }
                 case LAT_SQUARE_FINITE:
                 {
                     double ix_f = (x - lat->x0) / lat->dx + 0.5 * ((double)lat->nx - 1.0);
@@ -93,6 +168,86 @@ long cellSearch(double x, double y, double z, int *err) {
 
                     universe_idx = (size_t)lat->uni_idxs[idx];
 
+                    break;
+                }
+                case LAT_HEXX_FINITE:
+                {
+                    double rel_x = x - lat->x0;
+                    double rel_y = y - lat->y0;
+
+                    double pitch = lat->dx;
+                    double hex_size = pitch / SQRT3;
+
+                    double q = (SQRT3 / 3.0 * rel_x - rel_y / 3.0) / hex_size;
+                    double r = (2.0 / 3.0 * rel_y) / hex_size;
+
+                    long iq = 0;
+                    long ir = 0;
+                    roundHexAxial(q, r, &iq, &ir);
+
+                    double q_offset = 0.5 * ((double)lat->nx - 1.0);
+                    double r_offset = 0.5 * ((double)lat->ny - 1.0);
+
+                    long ix = (long)floor(((double)iq + q_offset) + 0.5);
+                    long iy = (long)floor(((double)ir + r_offset) + 0.5);
+
+                    if (ix < 0 || ix >= lat->nx || iy < 0 || iy >= lat->ny)
+                    {
+                        if (err)
+                            *err = CELL_ERR_UNDEFINED;
+                        return -1;
+                    }
+
+                    size_t idx = (size_t)ix + (size_t)iy * (size_t)lat->nx;
+
+                    double center_x = hex_size * SQRT3 * ((double)iq + 0.5 * (double)ir);
+                    double center_y = hex_size * 1.5 * (double)ir;
+
+                    x -= (lat->x0 + center_x);
+                    y -= (lat->y0 + center_y);
+                    z -= lat->z0;
+
+                    universe_idx = (size_t)lat->uni_idxs[idx];
+                    break;
+                }
+                case LAT_HEXY_FINITE:
+                {
+                    double rel_x = x - lat->x0;
+                    double rel_y = y - lat->y0;
+
+                    double pitch = lat->dy;
+                    double hex_size = pitch / SQRT3;
+
+                    double q = (2.0 / 3.0 * rel_x) / hex_size;
+                    double r = (-rel_x / 3.0 + SQRT3 / 3.0 * rel_y) / hex_size;
+
+                    long iq = 0;
+                    long ir = 0;
+                    roundHexAxial(q, r, &iq, &ir);
+
+                    double q_offset = 0.5 * ((double)lat->nx - 1.0);
+                    double r_offset = 0.5 * ((double)lat->ny - 1.0);
+
+                    long ix = (long)floor(((double)iq + q_offset) + 0.5);
+                    long iy = (long)floor(((double)ir + r_offset) + 0.5);
+
+                    if (ix < 0 || ix >= lat->nx || iy < 0 || iy >= lat->ny)
+                    {
+                        if (err)
+                            *err = CELL_ERR_UNDEFINED;
+                        return -1;
+                    }
+
+                    size_t idx = (size_t)ix + (size_t)iy * (size_t)lat->nx;
+
+                    double center_x = hex_size * 1.5 * (double)iq;
+                    double center_y = pitch * ((double)ir + 0.5 * (double)iq);
+
+                    x -= (lat->x0 + center_x);
+                    y -= (lat->y0 + center_y);
+                    z -= lat->z0;
+
+                    universe_idx = (size_t)lat->uni_idxs[idx];
                     break;
                 }
                 default:

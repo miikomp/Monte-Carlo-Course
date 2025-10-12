@@ -150,9 +150,12 @@ int resolveCells();
  * @param y Y-coordinate
  * @param z Z-coordinate
  * @param err Pointer to an error flag
+ * @param lx ptr to output resolved local X-coordinate
+ * @param ly ptr to output resolved local Y-coordinate
+ * @param lz ptr to output resolved local Z-coordinate
  * @return long Index of the cell containing the point, or -1 on failure
  */
-long cellSearch(double x, double y, double z, int *err);
+long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz);
 
 /**
  * @brief Resolve outer boundary of root universe. Calculates and puts outer bounds into DATA.

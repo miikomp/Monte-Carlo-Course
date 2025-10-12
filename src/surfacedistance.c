@@ -756,7 +756,7 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             return (t_hit > EPS && t_hit < INFINITY) ? t_hit : INFINITY;
         }
 
-        /* Cuboid */
+        /* Cuboid between (x1, x2) & (y1 y2) & (z1 z2) */
         case SURF_CUBOID:
         {
             double xmin = params[0];

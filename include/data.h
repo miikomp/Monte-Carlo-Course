@@ -163,10 +163,11 @@ typedef struct {
 typedef struct {
     char            name[MAX_STR_LEN];
     UniverseTypes   type;
-    int             lat_idx;     // index in DATA.lats, -1 if not a lattice
+    long            lat_idx;     // index in DATA.lats, -1 if not a lattice
+    long            parent_lat_idx; // Index of parent universe in DATA.unis if this universe is used to fill another, -1 if not.
     size_t          n_cells;
     int            *cell_idxs;  // array of cell indices (in DATA.cells)
-    long    t_idx;                 // index in DATA.transforms, -1 if no transform
+    long            t_idx;      // index in DATA.transforms, -1 if no transform
 } Universe;
 
 // Struct for a lattice
@@ -174,12 +175,13 @@ typedef struct {
     char         name[MAX_STR_LEN];  // Lattice universe name given as input
     LatticeTypes type;
     double       x0, y0, z0;  // Lattice origin
-    double       dx, dy, dz;  // Lattice pitch
+    double       pitch;       // Lattice pitch
     long         nx, ny, nz;  // Number of elements in each direction
     size_t       n_unis;
     char*        uni_names;   // Array of universe names given to fill lattice with
-    long*        uni_idxs;    // Array of universe indices corresponding to DATA.unis
+    long*        uni_idxs;    // Array of universe indices corresponding to DATA.unis filling the lattice
     long         uni_idx;     // Index of this lattice universe in DATA.unis (-1 if not resolved)
+    long         bb_surf_idx; // Idx of lattice element bounding surface in DATA.surfs
 } Lattice;
 
 // Struct for a geometric transform (translation + rotation)

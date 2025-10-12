@@ -78,7 +78,7 @@ int checkVolumes() {
 
             /* Get current cell */
             int err = CELL_ERR_OK;
-            int c = cellSearch(x, y, z, &err);
+            int c = cellSearch(x, y, z, &err, NULL, NULL, NULL);
             if (c < 0 || err != CELL_ERR_OK)
                 continue;
 

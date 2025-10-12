@@ -37,6 +37,7 @@ int resolveLattices() {
         uni->type = UNI_LATTICE;
         uni->lat_idx = (int)l;
         uni->t_idx = -1;
+        uni->parent_lat_idx = -1;
         uni->n_cells = 0;
         uni->cell_idxs = NULL;
 
@@ -45,7 +46,7 @@ int resolveLattices() {
     }
 
     /* Second pass: resolve fills */
-    for (size_t l = 0; l < DATA.n_lats; ++l)
+    for (size_t l = 0; l < DATA.n_lats; l++)
     {
         Lattice *lat = &DATA.lats[l];
 
@@ -73,6 +74,12 @@ int resolveLattices() {
                     return EXIT_FAILURE;
                 }
 
+                /* Put parent idx to filling universe */
+
+                DATA.unis[fill_idx].parent_lat_idx = DATA.unis[lat->uni_idx].lat_idx;
+
+                /* Put filling universe idxs to lattice */
+
                 lat->uni_idxs = (long*)calloc(1, sizeof(long));
                 if (!lat->uni_idxs)
                 {
@@ -80,6 +87,7 @@ int resolveLattices() {
                             lat->name);
                     return EXIT_FAILURE;
                 }
+
                 lat->uni_idxs[0] = fill_idx;
 
                 break;
@@ -113,30 +121,35 @@ int resolveLattices() {
                         fprintf(stderr, "[ERROR] Universe \"%s\" for lattice \"%s\" not found.\n", uname, lat->name);
                         return EXIT_FAILURE;
                     }
+
+                    /* Put parent lattice idx to filling universe */
+
+                    DATA.unis[lat->uni_idxs[n]].parent_lat_idx = DATA.unis[lat->uni_idx].lat_idx;
                 }
 
                 break;
             }
             default:
+            {
                 fprintf(stderr, "[ERROR] Unsupported lattice type %d for lattice '%s'.\n",
                         (int)lat->type, lat->name);
                 return EXIT_FAILURE;
+            }
         }
 
         Universe *uni = &DATA.unis[lat->uni_idx];
         uni->type = UNI_LATTICE;
         uni->lat_idx = (int)l;
         uni->n_cells = 0;
-        free(uni->cell_idxs);
         uni->cell_idxs = NULL;
 
         if (VERBOSITY >= 1)
         {
             fprintf(stdout,
-                    "  Lattice %zu: %s (type=%d, origin=(%.3f, %.3f, %.3f), pitch=(%.3f, %.3f, %.3f), size=(%ld %ld %ld))\n",
+                    "  Lattice %zu: %s (type=%d, origin=(%.3f, %.3f, %.3f), pitch=%.3f, size=(%ld %ld %ld))\n",
                     l, lat->name, (int)lat->type,
                     lat->x0, lat->y0, lat->z0,
-                    lat->dx, lat->dy, lat->dz,
+                    lat->pitch,
                     lat->nx, lat->ny, lat->nz);
         }
         if (VERBOSITY >= 2 && lat->nz == 1)
@@ -154,6 +167,77 @@ int resolveLattices() {
                 fprintf(stdout, "\n");
             }
         }
+    }
+
+    /* Third pass resolve bounding surfaces */
+    for (size_t l = 0; l < DATA.n_lats; l++)
+    {
+        Lattice *lat = &DATA.lats[l];
+        Surface S = {0};
+        switch (lat->type)
+        {
+            case LAT_SQUARE_INFINITE:
+            case LAT_SQUARE_FINITE:
+            {
+                S.type = SURF_SQR;
+                S.n_params = 3;
+                S.params = (double*)calloc(S.n_params, sizeof(double));
+                S.params[0] = lat->x0;
+                S.params[1] = lat->y0;
+                S.params[2] = 0.5 * lat->pitch;
+
+                break;
+            }
+            case LAT_HEXX_INFINITE:
+            case LAT_HEXX_FINITE:
+            {
+                S.type = SURF_HEXX;
+                S.n_params = 3;
+                S.params = (double*)calloc(S.n_params, sizeof(double));
+                S.params[0] = lat->x0;
+                S.params[1] = lat->y0;
+                S.params[2] = 0.5 * lat->pitch;
+
+                break;
+            }
+            case LAT_HEXY_INFINITE:
+            case LAT_HEXY_FINITE:
+            {
+                S.type = SURF_HEXY;
+                S.n_params = 3;
+                S.params = (double*)calloc(S.n_params, sizeof(double));
+                S.params[0] = lat->x0;
+                S.params[1] = lat->y0;
+                S.params[2] = 0.5 * lat->pitch;
+                
+                break;
+            }
+            default:
+            {
+                fprintf(stderr, "[ERROR] Unsupported lattice type %d for lattice '%s'.\n",
+                        (int)lat->type, lat->name);
+                return EXIT_FAILURE;
+            }
+        }
+
+        /* Put Surface to DATA */
+
+        if (DATA.n_surf == 0)
+        {
+            DATA.surfs = (Surface*)calloc(1, sizeof(Surface));
+        }
+        else
+        {
+            DATA.surfs = (Surface*)realloc(DATA.surfs, (DATA.n_surf + 1) * sizeof(Surface));
+        }
+        if (!DATA.surfs)
+        {
+            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        lat->bb_surf_idx = DATA.n_surf;
+        DATA.surfs[DATA.n_surf++] = S;
     }
 
     fprintf(stdout, "DONE.\n");

@@ -57,7 +57,7 @@ int checkVolumes2()
     double step_eps = 1e-8 * fmax(max_dim, 1.0);
 
     #pragma omp parallel default(none) \
-            shared(length_bufs, tot_lengths, n_lines, xmin, xmax, ymin, ymax, zmin, zmax, dx, dy, dz, planar, step_eps, DATA)
+            shared(length_bufs, tot_lengths, n_lines, xmin, xmax, ymin, ymax, zmin, zmax, dx, dy, dz, planar, step_eps, DATA, stdout)
     {
         int tid = omp_get_thread_num();
         double *lengths = length_bufs[tid];
@@ -119,7 +119,7 @@ int checkVolumes2()
 
             /* Track ray forwards and backwards to geometry boundary */
 
-            for (int k = 0; k < 2; ++k)
+            for (int k = 0; k < 2; k++)
             {
                 double ru = dirs[k][0];
                 double rv = dirs[k][1];
@@ -134,12 +134,13 @@ int checkVolumes2()
                 while (1)
                 {
                     int err;
-                    long cell_idx = cellSearch(rx, ry, rz, &err);
+                    long cell_idx = cellSearch(rx, ry, rz, &err, NULL, NULL, NULL);
                     if (cell_idx < 0 || err != CELL_ERR_OK)
                         break;
 
                     Cell *cell = &DATA.cells[cell_idx];
                     double d = distanceToNearestBoundary(rx, ry, rz, ru, rv, rw);
+
                     if (!(d > 0.0 && isfinite(d)))
                         break;
 

@@ -964,6 +964,7 @@ long readInput() {
 
             Lattice L = {0};
             L.uni_idx = -1;
+            L.bb_surf_idx = -1;
             snprintf(L.name, sizeof(L.name), "%s", latUni);
 
             /* Parse type */
@@ -995,15 +996,13 @@ long readInput() {
                         exit(EXIT_FAILURE);
                     }
 
-                    if (!parseDouble(x0, &L.x0) || !parseDouble(y0, &L.y0) || !parseDouble(p, &L.dx))
+                    if (!parseDouble(x0, &L.x0) || !parseDouble(y0, &L.y0) || !parseDouble(p, &L.pitch))
                     {
                         fprintf(stderr, "[ERROR] Invalid value for \"lat\" on line %ld.\n", lnum);
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
 
-                    L.dy = L.dx;
-                    L.dz = 0.0;
                     L.nx = L.ny = L.nz = 1;
                     L.n_unis = 1;
 
@@ -1037,8 +1036,7 @@ long readInput() {
                     }
 
                     if (!parseDouble(x0, &L.x0) || !parseDouble(y0, &L.y0) ||
-                        !parseLong(nx, &L.nx) || !parseLong(ny, &L.ny) ||
-                        !parseDouble(p, &L.dx))
+                        !parseLong(nx, &L.nx) || !parseLong(ny, &L.ny) || !parseDouble(p, &L.pitch))
                     {
                         fprintf(stderr, "[ERROR] Invalid value for \"lat\" on line %ld.\n", lnum);
                         fclose(fp);
@@ -1052,8 +1050,6 @@ long readInput() {
                         exit(EXIT_FAILURE);
                     }
 
-                    L.dy = L.dx;
-                    L.dz = 0.0;
                     L.nz = 1;
                     L.n_unis = (size_t)L.nx * (size_t)L.ny * (size_t)L.nz;
 

@@ -27,7 +27,7 @@ static void roundHexAxial(double q, double r, long *q_round, long *r_round)
 
 long locateCellInUniverse(size_t uni_idx, double x, double y, double z, int *err, double *min_abs_out);
 
-long cellSearch(double x, double y, double z, int *err) {
+long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz) {
 
     if (err)
         *err = CELL_ERR_OK;
@@ -35,7 +35,6 @@ long cellSearch(double x, double y, double z, int *err) {
     /* Start at the root universe 0 */
 
     size_t universe_idx = 0;
-    size_t safety_counter = 0;
 
     while (true)
     {
@@ -68,7 +67,7 @@ long cellSearch(double x, double y, double z, int *err) {
                 return -1;
             }
 
-            if (lat->dx == 0.0 || lat->dy == 0.0)
+            if (lat->pitch == 0.0)
             {
                 if (err)
                     *err = CELL_ERR_UNDEFINED;
@@ -82,11 +81,11 @@ long cellSearch(double x, double y, double z, int *err) {
                     double rel_x = x - lat->x0;
                     double rel_y = y - lat->y0;
 
-                    long ix = floor(rel_x / lat->dx + 0.5);
-                    long iy = floor(rel_y / lat->dy + 0.5);
+                    long ix = floor(rel_x / lat->pitch + 0.5);
+                    long iy = floor(rel_y / lat->pitch + 0.5);
 
-                    x -= (lat->x0 + ix * lat->dx);
-                    y -= (lat->y0 + iy * lat->dy);
+                    x -= (lat->x0 + ix * lat->pitch);
+                    y -= (lat->y0 + iy * lat->pitch);
                     z -= lat->z0;
 
                     universe_idx = (size_t)lat->uni_idxs[0];
@@ -97,8 +96,7 @@ long cellSearch(double x, double y, double z, int *err) {
                     double rel_x = x - lat->x0;
                     double rel_y = y - lat->y0;
 
-                    double pitch = lat->dx;
-                    double hex_size = pitch / SQRT3;
+                    double hex_size = lat->pitch / SQRT3;
 
                     double q = (SQRT3 / 3.0 * rel_x - rel_y / 3.0) / hex_size;
                     double r = (2.0 / 3.0 * rel_y) / hex_size;
@@ -122,8 +120,7 @@ long cellSearch(double x, double y, double z, int *err) {
                     double rel_x = x - lat->x0;
                     double rel_y = y - lat->y0;
 
-                    double pitch = lat->dy;
-                    double hex_size = pitch / SQRT3;
+                    double hex_size = lat->pitch / SQRT3;
 
                     double q = (2.0 / 3.0 * rel_x) / hex_size;
                     double r = (-rel_x / 3.0 + SQRT3 / 3.0 * rel_y) / hex_size;
@@ -133,7 +130,7 @@ long cellSearch(double x, double y, double z, int *err) {
                     roundHexAxial(q, r, &iq, &ir);
 
                     double center_x = hex_size * 1.5 * (double)iq;
-                    double center_y = pitch * ((double)ir + 0.5 * (double)iq);
+                    double center_y = lat->pitch * ((double)ir + 0.5 * (double)iq);
 
                     x -= (lat->x0 + center_x);
                     y -= (lat->y0 + center_y);
@@ -144,8 +141,8 @@ long cellSearch(double x, double y, double z, int *err) {
                 }
                 case LAT_SQUARE_FINITE:
                 {
-                    double ix_f = (x - lat->x0) / lat->dx + 0.5 * ((double)lat->nx - 1.0);
-                    double iy_f = (y - lat->y0) / lat->dy + 0.5 * ((double)lat->ny - 1.0);
+                    double ix_f = (x - lat->x0) / lat->pitch + 0.5 * ((double)lat->nx - 1.0);
+                    double iy_f = (y - lat->y0) / lat->pitch + 0.5 * ((double)lat->ny - 1.0);
 
                     long ix = (long)floor(ix_f + 0.5);
                     long iy = (long)floor(iy_f + 0.5);
@@ -159,8 +156,8 @@ long cellSearch(double x, double y, double z, int *err) {
 
                     size_t idx = (size_t)ix + (size_t)iy * (size_t)lat->nx;
 
-                    double cell_x0 = lat->x0 + ((double)ix - 0.5 * ((double)lat->nx - 1.0)) * lat->dx;
-                    double cell_y0 = lat->y0 + ((double)iy - 0.5 * ((double)lat->ny - 1.0)) * lat->dy;
+                    double cell_x0 = lat->x0 + ((double)ix - 0.5 * ((double)lat->nx - 1.0)) * lat->pitch;
+                    double cell_y0 = lat->y0 + ((double)iy - 0.5 * ((double)lat->ny - 1.0)) * lat->pitch;
 
                     x -= cell_x0;
                     y -= cell_y0;
@@ -175,8 +172,7 @@ long cellSearch(double x, double y, double z, int *err) {
                     double rel_x = x - lat->x0;
                     double rel_y = y - lat->y0;
 
-                    double pitch = lat->dx;
-                    double hex_size = pitch / SQRT3;
+                    double hex_size = lat->pitch / SQRT3;
 
                     double q = (SQRT3 / 3.0 * rel_x - rel_y / 3.0) / hex_size;
                     double r = (2.0 / 3.0 * rel_y) / hex_size;
@@ -215,8 +211,7 @@ long cellSearch(double x, double y, double z, int *err) {
                     double rel_x = x - lat->x0;
                     double rel_y = y - lat->y0;
 
-                    double pitch = lat->dy;
-                    double hex_size = pitch / SQRT3;
+                    double hex_size = lat->pitch / SQRT3;
 
                     double q = (2.0 / 3.0 * rel_x) / hex_size;
                     double r = (-rel_x / 3.0 + SQRT3 / 3.0 * rel_y) / hex_size;
@@ -241,7 +236,7 @@ long cellSearch(double x, double y, double z, int *err) {
                     size_t idx = (size_t)ix + (size_t)iy * (size_t)lat->nx;
 
                     double center_x = hex_size * 1.5 * (double)iq;
-                    double center_y = pitch * ((double)ir + 0.5 * (double)iq);
+                    double center_y = lat->pitch * ((double)ir + 0.5 * (double)iq);
 
                     x -= (lat->x0 + center_x);
                     y -= (lat->y0 + center_y);
@@ -279,11 +274,15 @@ long cellSearch(double x, double y, double z, int *err) {
 
         Cell *cell = &DATA.cells[cell_idx];
 
-        /* If material filled, return cell index */
+        /* If material filled, put local coordinates, universe index and return cell index */
 
         if (!cell->unifilled)
+        {
+            if (lx) *lx = x;
+            if (ly) *ly = y;
+            if (lz) *lz = z;
             return cell_idx;
-
+        }
         /* if filled with universe get the filling universe */
 
         if (cell->filluni_idx < 0 || (size_t)cell->filluni_idx >= DATA.n_unis)
@@ -295,13 +294,6 @@ long cellSearch(double x, double y, double z, int *err) {
 
         /* Next universe (material or further fills) */
         universe_idx = (size_t)cell->filluni_idx;
-
-        if (++safety_counter > DATA.n_unis * 16UL)
-        {
-            if (err && *err == CELL_ERR_OK)
-                *err = CELL_ERR_OVERLAP;
-            return cell_idx;
-        }
     }
 }
 

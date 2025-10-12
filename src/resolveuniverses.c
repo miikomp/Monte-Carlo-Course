@@ -118,6 +118,7 @@ int resolveUniverses() {
         snprintf(uni->name, sizeof(uni->name), "%s", names[u]);
         uni->type = (u == 0) ? UNI_ROOT : UNI_NORMAL;
         uni->lat_idx = -1;
+        uni->parent_lat_idx = -1;
         uni->t_idx = -1;
         uni->n_cells = 0;
         uni->cell_idxs = NULL;

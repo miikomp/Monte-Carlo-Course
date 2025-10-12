@@ -5,7 +5,7 @@ static const int DRAW_CELL_BOUNDARIES = 1;
 void getPixelColor(double x, double y, double z, int *r, int *g, int *b, long *cell_idx_out)
 {
     int err = CELL_ERR_OK;
-    long cell_idx = cellSearch(x, y, z, &err);
+    long cell_idx = cellSearch(x, y, z, &err, NULL, NULL, NULL);
     if (cell_idx_out)
         *cell_idx_out = cell_idx;
 

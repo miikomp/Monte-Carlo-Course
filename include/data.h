@@ -384,6 +384,7 @@ typedef struct {
 
 
     /* Bounds */
+    long      outside_surf_idx;
     double    x_min, x_max;
     double    y_min, y_max;
     double    z_min, z_max;

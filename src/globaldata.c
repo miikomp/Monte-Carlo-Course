@@ -49,7 +49,8 @@ runData DATA = {
     .n_unis = 0ul,
     .unis = NULL,
     .n_lats = 0ul,
-    .lats = NULL
+    .lats = NULL,
+    .outside_surf_idx = -1,
 };
 
 ResultsData RES = {

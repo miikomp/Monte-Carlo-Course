@@ -36,6 +36,24 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
         }
     }
 
+    /* Compute distance to system bounding surface */
+
+    Surface *S = &DATA.surfs[DATA.outside_surf_idx];
+    double tx = x;
+    double ty = y;
+    double tz = z;
+    double tu = u;
+    double tv = v;
+    double tw = w;
+
+    if (S->t_idx >= 0)
+        applyTransformation(&DATA.transforms[S->t_idx], &tx, &ty, &tz, &tu, &tv, &tw);
+
+    double d0 = surfaceDistance(S->type, S->params, S->n_params, tx, ty, tz, tu, tv, tw);
+
+    if (dmax > d0)
+        dmax = d0;
+
     /* Find nearest surface in cell */
 
     double d = INFINITY;

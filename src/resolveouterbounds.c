@@ -52,9 +52,16 @@ int resolveOuterBounds() {
         }
     }
 
-    /* Get the bounding surface */
+    if (j < 0 || j > (int)DATA.n_surf)
+    {
+        fprintf(stderr, "[ERROR] Outer bounding surface not found.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* Get the bounding surface and save it */
 
     Surface *s0 = &DATA.surfs[j];
+    DATA.outside_surf_idx = j;
 
     /* Set the outer bounds */
     size_t n_params = s0->n_params;

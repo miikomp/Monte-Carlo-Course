@@ -28,9 +28,7 @@ typedef enum {
     SURF_HEXY,       // Hexagonal prism Y-type
     SURF_CUBE,       // Cube
     SURF_CUBOID,     // Cuboid
-    SURF_TORUSX,     // Elliptical torus with major radius perpendicular to X-axis
-    SURF_TORUSY,     // Elliptical torus with major radius perpendicular to Y-axis
-    SURF_TORUSZ      // Elliptical torus with major radius perpendicular to Z-axis
+    SURF_TORUS      // Elliptical torus with major radius perpendicular to Z-axis
 } SurfaceTypes;
 
 typedef enum {

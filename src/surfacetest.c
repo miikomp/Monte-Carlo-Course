@@ -251,6 +251,26 @@ double surfaceTest(SurfaceTypes type, double *params, size_t n_params, double x,
 
             return fmax(fx, fmax(fy, fz));
         }
+
+        /* Elliptical torus with major radius perpendicular to Z-axis */
+        case SURF_TORUS:
+        {
+            double dx = x - params[0];
+            double dy = y - params[1];
+            double dz = z - params[2];
+            double R = params[3];
+            double a = params[4];
+            double b = params[5];
+
+            if (a <= 0.0 || b <= 0.0)
+                return INFINITY;
+
+            double rho = sqrt(dx * dx + dy * dy);
+            double radial = rho - R;
+            double term1 = (radial * radial) / (a * a);
+            double term2 = (dz * dz) / (b * b);
+            return term1 + term2 - 1.0;
+        }
         default:
         {
             fprintf(stderr, "[ERROR] Surface type %d not implemented.\n", type);

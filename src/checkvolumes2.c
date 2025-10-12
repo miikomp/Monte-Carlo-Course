@@ -145,9 +145,11 @@ int checkVolumes2()
                         break;
 
                     if (cell->mat_idx >= 0)
+                    {
                         line_lengths[cell->mat_idx] += d;
-
-                    dir_len += d;
+                        dir_len += d;
+                    }
+                    
 
                     rx += ru * d;
                     ry += rv * d;

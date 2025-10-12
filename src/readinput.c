@@ -762,12 +762,8 @@ long readInput() {
                 S.type = SURF_CUBE;
             else if (!strcmp(type, "cuboid"))
                 S.type = SURF_CUBOID;
-            else if (!strcmp(type, "torusx"))
-                S.type = SURF_TORUSX;
-            else if (!strcmp(type, "torusy"))
-                S.type = SURF_TORUSY;
-            else if (!strcmp(type, "torusz"))
-                S.type = SURF_TORUSZ;
+            else if (!strcmp(type, "torus"))
+                S.type = SURF_TORUS;
             else
             {
                 fprintf(stderr, "[ERROR] Unknown surface type \"%s\" on line %ld.\n", type, lnum);

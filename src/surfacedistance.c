@@ -1,5 +1,11 @@
 #include "header.h"
 
+static double torusImplicit(double dx, double dy, double dz, double R, double a, double b);
+
+static double torusImplicitRay(double t, double dx0, double dy0, double dz0,
+                               double u, double v, double w,
+                               double R, double a, double b);
+
 double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
                        double x, double y, double z,
                        double u, double v, double w)
@@ -821,10 +827,115 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
 
             return d;
         }
+
+        /* Elliptical torus with major radius perpendicular to Z-axis */
+        case SURF_TORUS:
+        {
+            double x0 = params[0];
+            double y0 = params[1];
+            double z0 = params[2];
+            double R = params[3];
+            double a = params[4];
+            double b = params[5];
+
+            if (R <= 0.0 || a <= 0.0 || b <= 0.0)
+                return INFINITY;
+
+            double dx0 = x - x0;
+            double dy0 = y - y0;
+            double dz0 = z - z0;
+
+            double f0 = torusImplicit(dx0, dy0, dz0, R, a, b);
+
+            double step = 0.25 * fmin(a, b);
+            if (step < 1e-4)
+                step = 1e-4;
+
+            double t_limit = fabs(dx0) + fabs(dy0) + fabs(dz0) + 2.0 * (R + a + b);
+            if (t_limit < step)
+                t_limit = step;
+
+            double t_prev = 0.0;
+            double f_prev = f0;
+            double low = 0.0;
+            double high = 0.0;
+            double f_low = f_prev;
+            bool bracket_found = false;
+
+            for (int i = 0; i < 1024 && t_prev <= t_limit; ++i)
+            {
+                double t_curr = t_prev + step;
+                double f_curr = torusImplicitRay(t_curr, dx0, dy0, dz0, u, v, w, R, a, b);
+
+                if (f_prev == 0.0)
+                {
+                    return (t_prev > EPS) ? t_prev : INFINITY;
+                }
+
+                if (f_prev * f_curr <= 0.0)
+                {
+                    low = t_prev;
+                    high = t_curr;
+                    f_low = f_prev;
+                    bracket_found = true;
+                    break;
+                }
+
+                t_prev = t_curr;
+                f_prev = f_curr;
+            }
+
+            if (!bracket_found)
+                return INFINITY;
+
+            for (int i = 0; i < 100; ++i)
+            {
+                double mid = 0.5 * (low + high);
+                double f_mid = torusImplicitRay(mid, dx0, dy0, dz0, u, v, w, R, a, b);
+
+                if (fabs(f_mid) < 1e-12 || (high - low) < 1e-10)
+                    return (mid > EPS) ? mid : INFINITY;
+
+                if ((f_mid > 0.0 && f_low > 0.0) || (f_mid < 0.0 && f_low < 0.0))
+                {
+                    low = mid;
+                    f_low = f_mid;
+                }
+                else
+                {
+                    high = mid;
+                }
+            }
+
+            double result = 0.5 * (low + high);
+            return (result > EPS) ? result : INFINITY;
+        }
         default:
         {
             fprintf(stderr, "[ERROR] Surface type %d not implemented.\n", type);
             return INFINITY;
         }
     }
+}
+
+
+static double torusImplicit(double dx, double dy, double dz, double R, double a, double b) {
+    if (a <= 0.0 || b <= 0.0)
+        return INFINITY;
+
+    double rho = sqrt(dx * dx + dy * dy);
+    double radial = rho - R;
+    double term1 = (radial * radial) / (a * a);
+    double term2 = (dz * dz) / (b * b);
+    return term1 + term2 - 1.0;
+}
+
+static double torusImplicitRay(double t, double dx0, double dy0, double dz0,
+                               double u, double v, double w,
+                               double R, double a, double b)
+{
+    double dx = dx0 + u * t;
+    double dy = dy0 + v * t;
+    double dz = dz0 + w * t;
+    return torusImplicit(dx, dy, dz, R, a, b);
 }

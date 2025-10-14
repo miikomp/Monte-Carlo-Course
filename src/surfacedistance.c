@@ -1,11 +1,5 @@
 #include "header.h"
 
-static double torusImplicit(double dx, double dy, double dz, double R, double a, double b);
-
-static double torusImplicitRay(double t, double dx0, double dy0, double dz0,
-                               double u, double v, double w,
-                               double R, double a, double b);
-
 double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
                        double x, double y, double z,
                        double u, double v, double w)
@@ -841,11 +835,16 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             if (R <= 0.0 || a <= 0.0 || b <= 0.0)
                 return INFINITY;
 
+            /* Shift ray origin into torus reference frame */
+
             double dx0 = x - x0;
             double dy0 = y - y0;
             double dz0 = z - z0;
 
-            double f0 = torusImplicit(dx0, dy0, dz0, R, a, b);
+            /* Evaluate implicit surface at ray start */
+            double f0 = surfaceTest(SURF_TORUS, params, n_params, x, y, z);
+
+            /* Choose step size and travel bound for ray marching */
 
             double step = 0.25 * fmin(a, b);
             if (step < 1e-4)
@@ -854,6 +853,8 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             double t_limit = fabs(dx0) + fabs(dy0) + fabs(dz0) + 2.0 * (R + a + b);
             if (t_limit < step)
                 t_limit = step;
+
+            /* March forward to bracket a sign change */
 
             double t_prev = 0.0;
             double f_prev = f0;
@@ -865,7 +866,7 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             for (int i = 0; i < 1024 && t_prev <= t_limit; ++i)
             {
                 double t_curr = t_prev + step;
-                double f_curr = torusImplicitRay(t_curr, dx0, dy0, dz0, u, v, w, R, a, b);
+                double f_curr = surfaceTest(SURF_TORUS, params, n_params, x + u * t_curr, y + v * t_curr, z + w * t_curr);
 
                 if (f_prev == 0.0)
                 {
@@ -888,10 +889,12 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             if (!bracket_found)
                 return INFINITY;
 
+            /* Refine intersection with bisection */
+
             for (int i = 0; i < 100; ++i)
             {
                 double mid = 0.5 * (low + high);
-                double f_mid = torusImplicitRay(mid, dx0, dy0, dz0, u, v, w, R, a, b);
+                double f_mid = surfaceTest(SURF_TORUS, params, n_params, x + u * mid, y + v * mid, z + w * mid);
 
                 if (fabs(f_mid) < 1e-12 || (high - low) < 1e-10)
                     return (mid > EPS) ? mid : INFINITY;
@@ -907,8 +910,17 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
                 }
             }
 
+            /* Fallback: midpoint of final bracket */
+
             double result = 0.5 * (low + high);
             return (result > EPS) ? result : INFINITY;
+        }
+
+        case SURF_INF:
+        {
+            return INFINITY;
+
+            break;
         }
         default:
         {
@@ -916,26 +928,4 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             return INFINITY;
         }
     }
-}
-
-
-static double torusImplicit(double dx, double dy, double dz, double R, double a, double b) {
-    if (a <= 0.0 || b <= 0.0)
-        return INFINITY;
-
-    double rho = sqrt(dx * dx + dy * dy);
-    double radial = rho - R;
-    double term1 = (radial * radial) / (a * a);
-    double term2 = (dz * dz) / (b * b);
-    return term1 + term2 - 1.0;
-}
-
-static double torusImplicitRay(double t, double dx0, double dy0, double dz0,
-                               double u, double v, double w,
-                               double R, double a, double b)
-{
-    double dx = dx0 + u * t;
-    double dy = dy0 + v * t;
-    double dz = dz0 + w * t;
-    return torusImplicit(dx, dy, dz, R, a, b);
 }

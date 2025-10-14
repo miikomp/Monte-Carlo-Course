@@ -271,6 +271,13 @@ double surfaceTest(SurfaceTypes type, double *params, size_t n_params, double x,
             double term2 = (dz * dz) / (b * b);
             return term1 + term2 - 1.0;
         }
+
+        case SURF_INF:
+        {
+            return -1;
+
+            break;
+        }
         default:
         {
             fprintf(stderr, "[ERROR] Surface type %d not implemented.\n", type);

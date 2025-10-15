@@ -18,6 +18,7 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <float.h>
+#include <gd.h>
 
 /* Other headers */
 #include "rng.h"

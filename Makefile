@@ -10,7 +10,7 @@
 
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -pedantic -g -fopenmp -Iinclude -MMD -MP -O3 -march=native -funroll-loops -flto
-LDFLAGS = -fopenmp -lm
+LDFLAGS = -fopenmp -lgd -lm
 SRC_DIR = src
 OBJ_DIR = build
 BIN = moca

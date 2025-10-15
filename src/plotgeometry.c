@@ -82,19 +82,41 @@ long plotGeometry() {
             gpl->pixy = (dimx > 0.0 && dimy > 0.0) ? pix * (dimy / dimx) : pix;
         }
 
-        /* Create image file (.ppm format) */
+        /* Create image file (.png format) */
 
-        char filename[MAX_STR_LEN];
-        snprintf(filename, sizeof(filename), "%s_geom%zu.ppm", GLOB.inputfname, g + 1);
-
-        FILE *imgf = fopen(filename, "w");
-        if (!imgf)
+        gdImagePtr img = gdImageCreateTrueColor(gpl->pixx, gpl->pixy);
+        if (!img)
         {
-            fprintf(stderr, "[ERROR] Could not open file \"%s\" for writing", filename);
+            fprintf(stderr, "[ERROR] Could not create image file.\n");
             return EXIT_FAILURE;
         }
 
-        fprintf(imgf, "P3\n%ld %ld\n255\n", gpl->pixx, gpl->pixy);
+        /* Create colour palette, colour for each material + special colours for overlap, undefined and outside */
+        
+        int *palette = calloc(DATA.n_mats + 3, sizeof(int));
+        if (!palette)
+        {
+            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+            return EXIT_FAILURE;
+        }
+
+        for (size_t m = 0; m < DATA.n_mats; m++)
+        {
+            Material *mat = &DATA.mats[m];
+            palette[m] = gdImageColorAllocate(img, mat->rgb[0], mat->rgb[1], mat->rgb[2]);
+        }
+
+        /* Add the special colours after the material colours */
+        size_t idx = DATA.n_mats - 1;
+
+        size_t overlap_colour_idx = idx;
+        palette[idx++] = gdImageColorAllocate(img, 255, 0, 0);
+
+        size_t undefined_colour_idx = idx;
+        palette[idx++] = gdImageColorAllocate(img, 0, 255, 0);
+        
+        size_t outside_colour_idx = idx;
+        palette[idx++] = gdImageColorAllocate(img, 0, 0, 0);
 
         /* Plot image */
 
@@ -144,30 +166,20 @@ long plotGeometry() {
 
                 /* Get material colour at position */
 
-                int r = 0, g = 0, b = 0, err = CELL_ERR_OK;
+                int err = CELL_ERR_OK;
                 long mat_idx = getMaterialAtPosition(x, y, z, &err);
+                int colour;
 
                 if (err == CELL_ERR_OVERLAP)
-                {
-                    r = 255;
-                    g = 0;
-                    b = 0;
-                }
+                    colour = palette[overlap_colour_idx];
                 else if (err == CELL_ERR_UNDEFINED)
-                {
-                    r = 0;
-                    g = 255;
-                    b = 0;
-                }
+                    colour = palette[undefined_colour_idx];
                 else
                 {
-                    if (mat_idx >= 0)
-                    {
-                        Material *mat = &DATA.mats[mat_idx];
-                        r = (int)mat->rgb[0];
-                        g = (int)mat->rgb[1];
-                        b = (int)mat->rgb[2];
-                    }
+                    if (mat_idx >= 0 && mat_idx < (long)DATA.n_mats)
+                        colour = palette[mat_idx];
+                    else
+                        colour = palette[outside_colour_idx];
                 }
 
                 /* Check if boundary crossed and draw black pixel */
@@ -186,9 +198,7 @@ long plotGeometry() {
                         {
                             prev_row[i] = mat_idx;
                             last_mat = mat_idx;
-                            r = 0;
-                            g = 0;
-                            b = 0;
+                            colour = palette[outside_colour_idx];
                         }
                         break;
                     }
@@ -205,18 +215,30 @@ long plotGeometry() {
                         {
                             prev_row[i] = cell_idx;
                             last_cell = cell_idx;
-                            r = 0;
-                            g = 0;
-                            b = 0;
+                            colour = palette[outside_colour_idx];
                         }
                         break;
                     }
                 }
 
-                fprintf(imgf, "%d %d %d ", r, g, b);
+                gdImageSetPixel(img, i, j, colour);
             }
-            fprintf(imgf, "\n");
         }
+
+        /* Save to image file*/
+
+        char filename[MAX_STR_LEN];
+        snprintf(filename, sizeof(filename), "%s_geom%zu.png", GLOB.inputfname, g + 1);
+        FILE *fp = fopen(filename, "wb");
+        if (!fp)
+        {
+            fprintf(stderr, "[ERROR] Could not open file \"%s\" for editing.\n", filename);
+            return EXIT_FAILURE;
+        }
+
+        gdImagePng(img, fp);
+        fclose(fp);
+        gdImageDestroy(img);
 
         fprintf(stdout, "  %5.1lf%%\n", (100 * (g + 1.0) / (double)DATA.n_gpls));
     }

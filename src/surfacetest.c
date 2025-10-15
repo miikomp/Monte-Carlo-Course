@@ -174,6 +174,33 @@ double surfaceTest(SurfaceTypes type, double *params, size_t n_params, double x,
             return a;
         }
 
+        /* Equilateral triangular prism along the Z-axis */
+        case SURF_TRI:
+        {
+            double x0 = params[0];
+            double y0 = params[1];
+            double d = params[2];
+            double dx = x - x0;
+            double dy = y - y0;
+
+            double base = -dy - 0.5 * d;
+            double left = dy - SQRT3 * dx - d;
+            double right = dy + SQRT3 * dx - d;
+
+            double res = fmax(base, fmax(left, right));
+
+            if (n_params == 5)
+            {
+                double zmin = params[3];
+                double zmax = params[4];
+                double lower = zmin - z;
+                double upper = z - zmax;
+                res = fmax(res, fmax(lower, upper));
+            }
+
+            return res;
+        }
+
         /* Hexagonal prism X-type */
         case SURF_HEXX:
         {
@@ -222,6 +249,32 @@ double surfaceTest(SurfaceTypes type, double *params, size_t n_params, double x,
             }
 
             return res;
+        }
+
+        /* Semi-infinite cone parallel to z-axis */
+        case SURF_CONE:
+        {
+            double x0 = params[0];
+            double y0 = params[1];
+            double z_section = params[2];
+            double r = params[3];
+            double h = params[4];
+
+            if (h <= 0.0)
+                return INFINITY;
+
+            double z_apex = z_section + h;
+            double slope = r / h;
+
+            if (z > z_apex)
+                return z - z_apex;
+
+            double dx = x - x0;
+            double dy = y - y0;
+            double rho = sqrt(dx * dx + dy * dy);
+            double radius = slope * (z_apex - z);
+
+            return rho - radius;
         }
 
         /* Cube */

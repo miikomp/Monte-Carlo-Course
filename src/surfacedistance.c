@@ -490,6 +490,97 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             return d;
         }
 
+        /* Equilateral triangular prism along the Z-axis */
+        case SURF_TRI:
+        {
+            double x0 = params[0];
+            double y0 = params[1];
+            double d = params[2];
+
+            double normals[5][3];
+            double constants[5];
+            size_t plane_count = 0;
+
+            normals[plane_count][0] = 0.0;
+            normals[plane_count][1] = -1.0;
+            normals[plane_count][2] = 0.0;
+            constants[plane_count] = -y0 + 0.5 * d;
+            plane_count++;
+
+            normals[plane_count][0] = -SQRT3;
+            normals[plane_count][1] = 1.0;
+            normals[plane_count][2] = 0.0;
+            constants[plane_count] = y0 - SQRT3 * x0 + d;
+            plane_count++;
+
+            normals[plane_count][0] = SQRT3;
+            normals[plane_count][1] = 1.0;
+            normals[plane_count][2] = 0.0;
+            constants[plane_count] = y0 + SQRT3 * x0 + d;
+            plane_count++;
+
+            if (n_params == 5)
+            {
+                double zmin = params[3];
+                double zmax = params[4];
+
+                normals[plane_count][0] = 0.0;
+                normals[plane_count][1] = 0.0;
+                normals[plane_count][2] = 1.0;
+                constants[plane_count] = zmax;
+                plane_count++;
+
+                normals[plane_count][0] = 0.0;
+                normals[plane_count][1] = 0.0;
+                normals[plane_count][2] = -1.0;
+                constants[plane_count] = -zmin;
+                plane_count++;
+            }
+
+            double t_enter = -INFINITY;
+            double t_exit = INFINITY;
+
+            for (size_t i = 0; i < plane_count; ++i)
+            {
+                double nx = normals[i][0];
+                double ny = normals[i][1];
+                double nz = normals[i][2];
+
+                double numer = constants[i] - (nx * x + ny * y + nz * z);
+                double denom = nx * u + ny * v + nz * w;
+
+                if (fabs(denom) < EPS)
+                {
+                    if (numer < -EPS)
+                        return INFINITY;
+                    else
+                        continue;
+                }
+
+                double t = numer / denom;
+
+                if (denom > 0.0)
+                {
+                    if (t < t_exit)
+                        t_exit = t;
+                }
+                else
+                {
+                    if (t > t_enter)
+                        t_enter = t;
+                }
+
+                if (t_enter - t_exit > EPS)
+                    return INFINITY;
+            }
+
+            if (t_exit <= EPS)
+                return INFINITY;
+
+            double t_hit = (t_enter > EPS) ? t_enter : t_exit;
+            return (t_hit > EPS) ? t_hit : INFINITY;
+        }
+
         /* Hexagonal prism X-type along the Z-axis */
         case SURF_HEXX:
         {
@@ -662,6 +753,93 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             }
 
             return d;
+        }
+
+        /* Semi-infinite cone parallel to z-axis */
+        case SURF_CONE:
+        {
+            double x0 = params[0];
+            double y0 = params[1];
+            double z0 = params[2];
+            double r = params[3];
+            double h = params[4];
+
+            if (h <= EPS)
+                return INFINITY;
+
+            double z_apex = z0 + h;
+            double s = r / h;
+            double s2 = s * s;
+
+            double X = x - x0;
+            double Y = y - y0;
+            double Zdiff = z_apex - z;
+
+            double A = (u * u + v * v) - s2 * (w * w);
+            double B = 2.0 * (X * u + Y * v + s2 * Zdiff * w);
+            double C = X * X + Y * Y - s2 * Zdiff * Zdiff;
+
+            double t_best = INFINITY;
+
+            if (fabs(A) < EPS)
+            {
+                if (fabs(B) < EPS)
+                    return INFINITY;
+
+                double t = -C / B;
+                if (t > EPS)
+                {
+                    double z_hit = z + w * t;
+                    if (z_hit <= z_apex + EPS)
+                        t_best = t;
+                }
+            }
+            else
+            {
+                double disc = B * B - 4.0 * A * C;
+                if (disc >= -EPS)
+                {
+                    if (disc < 0.0)
+                        disc = 0.0;
+
+                    double sqrt_disc = sqrt(disc);
+                    double inv = 0.5 / A;
+                    double t1 = (-B - sqrt_disc) * inv;
+                    double t2 = (-B + sqrt_disc) * inv;
+
+                    if (t1 > EPS)
+                    {
+                        double z_hit = z + w * t1;
+                        if (z_hit <= z_apex + EPS)
+                            t_best = t1;
+                    }
+
+                    if (t2 > EPS)
+                    {
+                        double z_hit = z + w * t2;
+                        if (z_hit <= z_apex + EPS && t2 < t_best)
+                            t_best = t2;
+                    }
+                }
+            }
+
+            if (t_best == INFINITY)
+                return INFINITY;
+
+            double x_hit = x + u * t_best;
+            double y_hit = y + v * t_best;
+            double z_hit = z + w * t_best;
+
+            if (z_hit > z_apex + EPS)
+                return INFINITY;
+
+            double rho = sqrt((x_hit - x0) * (x_hit - x0) + (y_hit - y0) * (y_hit - y0));
+            double radius = s * fmax(0.0, z_apex - z_hit);
+
+            if (rho > radius + EPS)
+                return INFINITY;
+
+            return t_best;
         }
 
         /* Cube */

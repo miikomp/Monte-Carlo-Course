@@ -746,6 +746,8 @@ long readInput() {
                 S.type = SURF_PLANE;
             else if (!strcmp(type, "sqr"))
                 S.type = SURF_SQR;
+            else if (!strcmp(type, "tri"))
+                S.type = SURF_TRI;
             else if (!strcmp(type, "hexx"))
                 S.type = SURF_HEXX;
             else if (!strcmp(type, "hexy"))
@@ -758,6 +760,8 @@ long readInput() {
                 S.type = SURF_CYLY;
             else if (!strcmp(type, "cylz") || !strcmp(type, "cyl"))
                 S.type = SURF_CYLZ;
+            else if (!strcmp(type, "cone"))
+                S.type = SURF_CONE;
             else if (!strcmp(type, "cube"))
                 S.type = SURF_CUBE;
             else if (!strcmp(type, "cuboid"))

@@ -24,8 +24,10 @@ typedef enum {
     SURF_CYLY,       // Cylinder along Y-axis
     SURF_CYLZ,       // Cylinder along Z-axis
     SURF_SQR,        // Square prism
+    SURF_TRI,        // Equilateral triangular prism
     SURF_HEXX,       // Hexagonal prism X-type
     SURF_HEXY,       // Hexagonal prism Y-type
+    SURF_CONE,       // Semi-infinite one sided cone parallel to z-axis
     SURF_CUBE,       // Cube
     SURF_CUBOID,     // Cuboid
     SURF_TORUS,      // Elliptical torus with major radius perpendicular to Z-axis

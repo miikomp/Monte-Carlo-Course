@@ -1,5 +1,5 @@
 # Monte Carlo Particle Transport code course project
-This project implements my personal Monte Carlo particle transport simulation code as part of a course held at Aalto University. The current implementation is capable of simulating infinite homogeneus media. The simulation is setup using an input file, many of the input options borrow their syntax from Serpent, but the implementation is often a much simplified version. The input file is also much stricter to line breaks, e.g., the *mat* material input card requires the entire header line to be on the same line and the following nuclide-fractions to be followed by an empty, or commented line.
+This project implements my personal Monte Carlo particle transport simulation code as part of a course held at Aalto University. The current implementation includes an universe based constructive solid geometry based system definition method with lattices and transformations. The simulation is setup using an input file, many of the input options borrow their syntax from Serpent, but the implementation is often a much simplified version. The input file is also much stricter to line breaks, e.g., the *mat* material input card requires the entire header line to be on the same line and the following nuclide-fractions to be followed by an empty, or commented line.
 
 ## Requirements
 - **Compiler**: GCC with Open-MP support.
@@ -13,8 +13,14 @@ This project implements my personal Monte Carlo particle transport simulation co
 - **Multi-threading**: Parallelisation using Open-MP.
 - **Configurable Input**: Parameters are set via an input file.
 - **Parsing of xsdata**: From simplified ENDF style data files indexed into via a .lib file
-- **Reaction rate scoring**: Support for nuclide and interaction group-wise reaction rate scoring with detectors.
 - **Material definitions** Support for both mass and atomic units for defining material densities and fractions.
+- **Constructive Solid Geometry** System geometry is defined using CSG, surfaces with the `surf` card, cells defined by those cells using the `cell` card. Universes are interpreted from the universes given for each cell. Root universe `0` must be present.
+- **Surfaces**: Extended surface catalogue, most standard surfaces, infinite prisms, elliptical toroids etc.
+-- **Outer boundary** Most 3D surfaces, including truncated prisms, can be set as the outside surface for 3D calculations. At this time the outside perimeter must be defined using a single surface definition.
+- **Lattices** Infinite and finite square and hexagonal lattices can be defined using the `lat` input card.
+- **Coordinate transformation** Surface translations and rotations can be defined using the `trans` input card.
+- **Volume checking** Both point sampling and ray-based volume checking algorithms are implemented and can be invoked with the `-checkvolumes` commandline argument.
+- **Geometry plotting**: Input-driven 2D slice definitions for visualising material regions in simulation geometry.
 - **Output**: Writes output to stdout in a summary and fully into MATLAB-type files
 
 ---
@@ -30,40 +36,6 @@ This project implements my personal Monte Carlo particle transport simulation co
    make all
    ```
 3. Create an input file (or use the 'input' in the repo)
-   ```Docker
-   # Example input file for the "moca" Monte Carlo neutron trasnport code
-
-   # Set the seed (if not set, a random seed is used)
-   seed 12165467978
-
-   # Set number of neutrons in a generation and number of generations
-   pop 100000 100
-
-   # Specify cross section library path
-   xslibpath ./xsdata/xsdata.lib
-
-   # Define material(s)
-   # Positive density/fraction means mass density in g/cm^3 or mass fraction
-   # Negative density/fraction means atomic density in atoms/barn-cm or atomic fraction
-   # Fractions are normalized to unity in all cases.
-   # Temperature is in Kelvin
-   # Nuclide identifiers are ZA (e.g. U-235 is 92235, H-1 is 1001, etc.)
-   # The code computes the missing units (e.g. if mass fractions are given, atomic fractions
-   # and atomic density are computed from the mass density, etc.) These are printed for verification.
-
-   mat NAT_U_WATER -8.387314 300
-   1001 -0.0078724
-   8016 -0.0624704
-   92235 -0.0066096
-   92238 -0.9230476
-
-   # Specify a monoenergetic neutron source at origo (0,0,0) with 1 MeV neutrons
-   src 1 0.0 0.0 0.0 1.0
-
-   # Specify a detector for material to score nuclide wise reaction rates over all reaction modes
-   # This combines MTs into: elastic scattering, inelastic scattering, fission, and capture
-   det reactionrate_grouped dr all dm NAT_U_WATER
-   ```
 4. Run the calculation:
    ```Docker
    ./moca -[KWARGS] [INPUTFILE]
@@ -71,9 +43,43 @@ This project implements my personal Monte Carlo particle transport simulation co
 
 ---
 
+## Geometry plotting
+
+Define on-demand cross-section renders of the model with the `plot` card in the input file:
+```Docker
+# plot <axis> <boundary-mode> <pixels> [min1 max1 min2 max2]
+plot 2 1 1000 -5.0 5.0 -5.0 5.0
+```
+The `axis` selects the normal of the slice plane (1 = YZ, 2 = XZ, 3 = XY). The optional bounds restrict the plotting window, while the `boundary-mode` determines whether the image includes explicit boundaries for materials, cells or both (0 = None, 1 = Materials, 2 = Cells). Omitted boundaries fall back to automatic extents detected from the geometry. The `pixels` defines the image resolution along the long edge, aspect ratio of the boundaries is enforced. Multiple plot cards can be supplied to export several slices in one run. 
+
+## Lattice definitions
+
+Replicate repeating universes with the `lat` card:
+```Docker
+# lat <name> <type> <x0> <y0> <nx> <ny> <pitch> 
+lat CORE 1 0.0 0.0 17 17 1.26
+A A ...
+```
+`type` selects the pattern (1 = square, 2 = hexagonal X-type, 3 = hexagonal Y-Type, negative value applies infinite lattice filled with a single universe), `<x0>, <y0>` locate the lattice origin, and `<nx>, <ny>` give the finite dimensions. After the header line, list exactly `nx * ny` universe names in row-major order to populate the lattice (hexagonal layouts follow their canonical indexing). Infinite lattices require only the origin, pitch, and a single background universe. Lattices can be embedded inside universes to build hierarchical geometries.
+
+---
+
+## Transformations
+
+Move and rotate surface definitions at new locations via the `trans` card:
+```Docker
+# trans s <surface-name> <dx> <dy> <dz> [alpha beta gamma]
+trans s CYL_1 0.0 0.0 10.0 0.0 0.0 15.0
+```
+Specify `s` for surface targets, then provide translations (`dx`, `dy`, `dz`) and optional rotations in degrees about the X (`alpha`), Y (`beta`), and Z (`gamma`) axes. Supplying only three values performs a pure shift; adding angles composes the rotation matrix automatically. Transformations are processed in input order, so multiple `trans` cards can chain to position complex assemblies, however assigning multiple transformations to the same surface is not currently supported.
+
+---
+
 ## List of commandline arguments
-- ```-omp N``` Where N specifies the number of threads to use
-- ```-v L``` Where L specifies the level of babble, 0 is default, 1 is increased, and 2 is debug output.
+- `-omp [N]` Where N specifies the number of threads to use
+- `-v [LEVEL]` Where LEVEL specifies the level of babble, 0 is default, 1 is increased, and 2 is debug output.
+- `-norun` Stops the calculation before the transport routines, used to check input for errors.
+- `-checkvolumes [MODE] [N]` Calculate material volumes. MODE 1 uses random points and 2 draws random lines across the geometry. N sets the number of samples.
 
 ---
 
@@ -100,47 +106,83 @@ Wrote all microscopic XS tables and nubar to "input_xs.m".
 
 Processing materials...
 
-Adding 4 nuclide(s) to material "NAT_U_WATER":
+Adding 2 nuclide(s) to material "water":
    1001 - H-1 with 2 reaction modes (using 300K data).
    8016 - O-16 with 43 reaction modes (using 300K data).
+
+Adding 2 nuclide(s) to material "fuel":
   92235 - U-235 with 37 reaction modes (using 300K data).
   92238 - U-238 with 29 reaction modes (using 300K data).
 
-  Calculating densities and fractions:
-  dens=8.387314E+00 g/cm3, T=300.0K
-  components=4, sum(x)=1.000000, sum(w)=1.000000
-  Abar=64.009985 g/mol/atom, N_tot=7.890892e+22 1/cm^3
-  mdens_calc=8.387314E+00 g/cm^3, adens_calc=7.890892E-02 atoms/b*cm
+Adding 1 nuclide(s) to material "cladding":
+   6000 - C-nat with 23 reaction modes (using 300K data).
 
-   1001 -   H-1 : T=300K, AW=1.007825E+00, afrac=4.999997E-01, mfrac=7.872400E-03, N_i=3.945444E-02 atoms/b*cm
-   8016 -  O-16 : T=300K, AW=1.599492E+01, afrac=2.500000E-01, mfrac=6.247040E-02, N_i=1.972723E-02 atoms/b*cm
-  92235 - U-235 : T=300K, AW=2.350439E+02, afrac=1.800005E-03, mfrac=6.609600E-03, N_i=1.420365E-04 atoms/b*cm
-  92238 - U-238 : T=300K, AW=2.380508E+02, afrac=2.482002E-01, mfrac=9.230476E-01, N_i=1.958521E-02 atoms/b*cm
+Adding 1 nuclide(s) to material "H1":
+   1001 - H-1 with 2 reaction modes (using 300K data).
 
 DONE.
 
 Computing macroscopic cross sections...
-  Material "NAT_U_WATER": 45 macroscopic cross section groups.
+  Material "water": 44 macroscopic cross section groups.
+  Material "fuel": 38 macroscopic cross section groups.
+  Material "cladding": 24 macroscopic cross section groups.
+  Material "H1": 3 macroscopic cross section groups.
 
 DONE.
 
-Memory allocated for XS-data: 9.56 MB
+Memory allocated for XS-data: 9.78 MB
 
 Wrote all macroscopic XS-tables to "input_macroxs.m".
+
+------------------------
+  Processing geometry
+------------------------
+
+Processing universes...
+DONE.
+
+Processing lattices...
+DONE.
+
+Processing geometry cells...
+DONE.
+
+Processing transformations...
+DONE.
+
+Calculating outer boundaries...
+  X: [-11.0000,  11.0000] cm
+  Y: [-11.0000,  11.0000] cm
+  Z: [-11.0000,  11.0000] cm
+DONE.
+
+Plotting geometry...
+Wrote XY slice image to geometry_xy.ppm (1000x1000).
+Wrote XZ slice image to geometry_xz.ppm (1000x1000).
+DONE.
+
+Checking material volumes by sampling 100000000 random lines...
+     water: 8.9385E+03  +/- 4.373E-05
+      fuel: 1.7095E+03  +/- 2.287E-04
+  cladding: 0.0000E+00  +/- 0.000E+00
+        H1: 0.0000E+00  +/- 0.000E+00
+
+Time elapsed: 20.189 s
+DONE.
 
 ----------------------------
   Preparing simulation
 ----------------------------
 
 Clearing results...
-Memory allocated for results: 1.92 MB
+Memory allocated for results: 0.19 MB
 DONE.
 
 Processing detectors...
 DONE.
 
 Sampling initial neutron source...
-Memory allocated for neutron bank: 16.78 MB
+Memory allocated for neutron bank: 1.92 MB
 DONE.
 
 ------------------------
@@ -163,30 +205,16 @@ Simulating 99937 neutrons.
 Generation 100 k-eff: 0.892202
 
 ------------------------
-  Runtime: 11.4271s
+  Runtime: 29.4271s
 ------------------------
 
 Processing results...
-
-Transport per-history statistics (95% Confidence-interval):
-  Path length           mean = 3.038537e+01 +/- 4.219e-02 (0.138837%)
-  Fast path length      mean = 2.609136e+01 +/- 4.683e-02 (0.179495%)
-  Flight time           mean = 1.619419e-05 +/- 2.514e-08 (0.155217%)
-  Fast flight time      mean = 1.417814e-06 +/- 1.997e-09 (0.140876%)
-  Fission yield         mean = 8.818530e-01 +/- 2.538e-03 (0.287760%)
-  Collisions            mean = 2.516141e+01 +/- 2.327e-02 (0.092500%)
-  Captures              mean = 6.471010e-01 +/- 8.672e-04 (0.134006%)
-  Elastic scatters      mean = 2.365006e+01 +/- 2.511e-02 (0.106190%)
-  Inelastic scatters    mean = 5.113692e-01 +/- 2.097e-03 (0.410112%)
-  Fissions              mean = 3.528822e-01 +/- 8.668e-04 (0.245641%)
-  Thermal Fissions      mean = 2.598108e-01 +/- 4.218e-04 (0.162332%)
-  Fast Fissions         mean = 6.368657e-02 +/- 1.208e-03 (1.896540%)
-  Leakages              mean = 0.000000e+00 +/- 0.000e+00 (-nan%)
-  Unknown outcomes      mean = 0.000000e+00 +/- 0.000e+00 (-nan%)
+DONE.
 
 Wrote transport results to 'input_res.m'.
 
 Processing detector results...
+DONE.
 
 Wrote detector results to 'input_det.m'.
 

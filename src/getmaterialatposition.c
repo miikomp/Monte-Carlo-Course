@@ -1,13 +1,13 @@
 #include "header.h"
 
-long getMaterialAtPosition(double x, double y, double z) {
+long getMaterialAtPosition(double x, double y, double z, int* err) {
+
     /* Find current cell */
 
-    int err;
-    long cell_idx = cellSearch(x, y, z, &err, NULL, NULL, NULL);
+    long cell_idx = cellSearch(x, y, z, err, NULL, NULL, NULL);
     Cell *cell;
 
-    if (cell_idx >= 0 && err == CELL_ERR_OK)
+    if (cell_idx >= 0 && err && *err == CELL_ERR_OK)
         cell = &DATA.cells[cell_idx];
     else
         return -1;

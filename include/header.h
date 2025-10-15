@@ -342,9 +342,10 @@ double getMicroscopicXS(const double E, XsTable* xs_table);
  * @param x X-coordinate in cm
  * @param y Y-coordinate in cm
  * @param z Z-coordinate in cm
+ * @param err ptr to error flag set by cellSearch
  * @return long Material index, or -1 if not found
  */
-long getMaterialAtPosition(double x, double y, double z);
+long getMaterialAtPosition(double x, double y, double z, int* err);
 
 /**
  * @brief Get the Velocity cm/s for a given neutron energy

@@ -764,6 +764,8 @@ long readInput() {
                 S.type = SURF_CUBOID;
             else if (!strcmp(type, "torus"))
                 S.type = SURF_TORUS;
+            else if (!strcmp(type, "inf"))
+                S.type = SURF_INF;
             else
             {
                 fprintf(stderr, "[ERROR] Unknown surface type \"%s\" on line %ld.\n", type, lnum);
@@ -964,13 +966,26 @@ long readInput() {
             snprintf(L.name, sizeof(L.name), "%s", latUni);
 
             /* Parse type */
-
-            if (!parseLong(typeTok, (long*)&L.type))
+            long type;
+            if (!parseLong(typeTok, &type))
             {
                 fprintf(stderr, "[ERROR] Invalid lattice type \"%s\" on line %ld.\n", typeTok, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
+
+            if (type == 1)
+                L.type = LAT_SQUARE_FINITE;
+            else if (type == 2)
+                L.type = LAT_HEXX_FINITE;
+            else if (type == 3)
+                L.type = LAT_HEXY_FINITE;
+            else if (type == -1)
+                L.type = LAT_SQUARE_INFINITE;
+            else if (type == -2)
+                L.type = LAT_HEXX_INFINITE;
+            else if (type == -3)
+                L.type = LAT_HEXY_INFINITE;
 
             /* Read parameters according to type */
 
@@ -1214,6 +1229,129 @@ long readInput() {
 
             if (VERBOSITY >= 1)
                 fprintf(stdout, "Parsed a transformation of type %d, with %s targeting \"%s\"\n", (int)T.type, nparams == 6 ? "rotation and translation" : "translation only", T.target_name);
+        }
+
+        /* ###################################################################################### */
+        /* --- plot --- (Geometry plot definition) */
+
+        else if (!strcmp(tok, "plot"))
+        {
+            /* Read plot axis and nominal image size in pixels (pixel count of long side)*/
+
+            char *axTok = strtok(NULL, DELIMS);
+            char *boundTok = strtok(NULL, DELIMS);
+            char *pixTok = strtok(NULL, DELIMS);
+
+            if (!axTok || !boundTok || !pixTok)
+            {
+                fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Create new GeometryPlotter item */
+
+            GeometryPlotter gpl = {0};
+            
+            /* Parse axis */
+
+            if (!parseLong(axTok, &gpl.axis) || gpl.axis < 0 || gpl.axis > 3)
+            {
+                fprintf(stderr, "[ERROR] Invalid axis specifier \"%s\"on line %ld.\n", axTok, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            if (!parseLong(boundTok, &gpl.bounds) || gpl.bounds < 0 || gpl.bounds > 3)
+            {
+                fprintf(stderr, "[ERROR] Invalid boundary specifier \"%s\"on line %ld.\n", boundTok, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Parse and  out pixels to pixx, pixy will be defined later to match the aspect ratio */
+
+            if (!parseLong(pixTok, &gpl.pixx) || gpl.pixx <= 0)
+            {
+                fprintf(stderr, "[ERROR] Invalid pixel size \"%s\"on line %ld.\n", axTok, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Try to read four more parameters for bounds */
+
+            char *min1Tok = strtok(NULL, DELIMS);
+            char *max1Tok = strtok(NULL, DELIMS);
+            char *min2Tok = strtok(NULL, DELIMS);
+            char *max2Tok = strtok(NULL, DELIMS);
+
+            double min1, max1, min2, max2;
+
+            if (!min1Tok || !max1Tok || !min2Tok ||!max2Tok)
+                min1 = max1 = min2 = max2 = 0;
+            else
+            {
+                if (!parseDouble(min1Tok, &min1) || !parseDouble(max1Tok, &max1) ||
+                    !parseDouble(min2Tok, &min2) || !parseDouble(max2Tok, &max2))
+                {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                if ((min1 >= max1) || (min2 >= max2))
+                {
+                    fprintf(stderr, "[ERROR] Invalid boundaries for plot on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);    
+                }
+            }
+
+            /* Put to gpl */
+
+            if (gpl.axis == 1) // YZ-plane
+            {
+                gpl.ymin = min1;
+                gpl.ymax = max1;
+                gpl.zmin = min2;
+                gpl.zmax = max2;
+            }
+            else if (gpl.axis == 2) // XZ-plane
+            {
+                gpl.xmin = min1;
+                gpl.xmax = max1;
+                gpl.zmin = min2;
+                gpl.zmax = max2;
+            }
+            else // XY-plane
+            {
+                gpl.xmin = min1;
+                gpl.xmax = max1;
+                gpl.ymin = min2;
+                gpl.ymax = max2;
+            }
+
+            /* Put gpl into DATA.gpls */
+
+            if (DATA.n_gpls == 0)
+            {
+                DATA.gpls = (GeometryPlotter*)calloc(1, sizeof(GeometryPlotter));
+            }
+            else
+            {
+                DATA.gpls = (GeometryPlotter*)realloc(DATA.gpls, (DATA.n_gpls + 1) * sizeof(GeometryPlotter));
+            }
+            if (!DATA.gpls)
+            {
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            DATA.gpls[DATA.n_gpls++] = gpl;
+            np++;
+
+            if (VERBOSITY >= 1)
+                fprintf(stdout, "Parsed a geometry plot on axis \"%ld\", with limits (%lf %lf %lf %lf), boundaries \"%ld\".\n", gpl.axis, min1, max1, min2, max2, gpl.bounds);
         }
 
         /* ###################################################################################### */        

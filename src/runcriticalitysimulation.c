@@ -235,7 +235,8 @@ int runCriticalitySimulation(void)
 
                     /* Get material at position moved to */
 
-                    n->mat_idx = getMaterialAtPosition(n->x, n->y, n->z);
+                    int err;
+                    n->mat_idx = getMaterialAtPosition(n->x, n->y, n->z, &err);
 
                     if (do_detectors && d > 0.0)
                     {

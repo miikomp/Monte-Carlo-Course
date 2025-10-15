@@ -18,6 +18,7 @@ runInfo GLOB = {
     .n_threads      = 1,
     .nbuf_factor    = 1.0,
     .norun          = false,
+    .noplot         = false,
 
     .n_generations  = 0l,
     .n_particles    = 0l,
@@ -50,6 +51,8 @@ runData DATA = {
     .unis = NULL,
     .n_lats = 0ul,
     .lats = NULL,
+    .n_gpls = 0ul,
+    .gpls = NULL,
     .outside_surf_idx = -1,
 };
 

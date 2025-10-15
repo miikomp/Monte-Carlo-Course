@@ -132,7 +132,8 @@ int runExternalSourceSimulation(void)
 
                         /* Get material at current position */
 
-                        n->mat_idx = getMaterialAtPosition(n->x, n->y, n->z);
+                        int err;
+                        n->mat_idx = getMaterialAtPosition(n->x, n->y, n->z, &err);
 
                         /* Sample collision nuclide */
 

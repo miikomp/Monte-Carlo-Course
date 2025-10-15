@@ -71,6 +71,10 @@ int main(int argc, char **argv) {
         {
             GLOB.norun = true;
         }
+        else if (!strcmp(argv[i], "-noplot") || !strcmp(argv[i], "--noplot"))
+        {
+            GLOB.noplot = true;
+        }
         else if (!strcmp(argv[i], "-checkvolumes") || !strcmp(argv[i], "--checkvolumes")) 
         {
             if (i + 2 >= argc - 1) 
@@ -390,7 +394,7 @@ int main(int argc, char **argv) {
     processTransportResults();
     processDetectorResults();
 
-    fprintf(stdout, "\nDONE.\n");
+    fprintf(stdout, "\nSimulation completed without errors.\n");
     
 
     /* Prepare for termination */

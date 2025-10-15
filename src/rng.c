@@ -50,8 +50,8 @@ void sampleNeutronDirection(Neutron *n) {
 double sampleDistanceToCollision(Neutron *n)
 {
     /* First we need to get the material we are in */
-
-    int mat_idx = getMaterialAtPosition(n->x, n->y, n->z);
+    int err;
+    int mat_idx = getMaterialAtPosition(n->x, n->y, n->z, &err);
 
     if (mat_idx < 0 || mat_idx >= (int)DATA.n_mats)
     {

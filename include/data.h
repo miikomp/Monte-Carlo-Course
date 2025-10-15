@@ -28,7 +28,8 @@ typedef enum {
     SURF_HEXY,       // Hexagonal prism Y-type
     SURF_CUBE,       // Cube
     SURF_CUBOID,     // Cuboid
-    SURF_TORUS      // Elliptical torus with major radius perpendicular to Z-axis
+    SURF_TORUS,      // Elliptical torus with major radius perpendicular to Z-axis
+    SURF_INF         // Infite surface, fills all space
 } SurfaceTypes;
 
 typedef enum {
@@ -106,7 +107,7 @@ typedef struct {
     NubarTable nubar;
 } Nuclide;
 
-/* --- Material data structures ---*/
+/* --- Material data structures --- */
 
 // Struct for material nuclide component data
 typedef struct {
@@ -131,6 +132,8 @@ typedef struct {
     size_t   n_macro_xs;
     MacroXsTable *macro_xs; // 1/cm idx 0 is total
 } Material;
+
+/* --- CSG Geometry structures --- */
 
 // Struct for a surface
 typedef struct {
@@ -190,6 +193,18 @@ typedef struct {
     double translation[3]; // translation vector
     double rotation[3][3]; // rotation matrix
 } Transform;
+
+/* --- Geometry plotter structure --- */
+
+typedef struct {
+    long    axis;       // Normal axis of plot plane
+    long    bounds;     // Boundary type (or none)
+    long    pixx, pixy; // Image size in pixels
+    double  pos;        // Plot plane position along the normal axis
+    double  xmin, xmax; 
+    double  ymin, ymax;
+    double  zmin, zmax;
+} GeometryPlotter;
 
 /* --- Particle data structures --- */
 
@@ -367,18 +382,20 @@ typedef union {
 // Collection data structure for all of the data needed during a run
 typedef struct {
     /* System */
-    size_t    n_mats;
-    Material *mats;
-    size_t    n_surf;
-    Surface  *surfs;
-    size_t    n_cells;
-    Cell     *cells;
-    size_t    n_unis;
-    Universe *unis; 
-    size_t    n_lats;
-    Lattice  *lats;
-    size_t    n_transforms;
-    Transform *transforms;
+    size_t           n_mats;
+    Material        *mats;
+    size_t           n_surf;
+    Surface         *surfs;
+    size_t           n_cells;
+    Cell            *cells;
+    size_t           n_unis;
+    Universe        *unis; 
+    size_t           n_lats;
+    Lattice         *lats;
+    size_t           n_transforms;
+    Transform       *transforms;
+    size_t           n_gpls;
+    GeometryPlotter *gpls;
 
 
     /* Bounds */
@@ -425,6 +442,7 @@ typedef struct {
     int         n_threads;
     double      nbuf_factor;
     bool        norun;
+    bool        noplot;
 
     /* Iteration parameters */
     long        n_generations;  // criticality simulation

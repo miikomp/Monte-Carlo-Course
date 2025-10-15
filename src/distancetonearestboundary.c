@@ -6,7 +6,7 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
 
     int err;
     double lx, ly, lz;
-    long cell_idx = cellSearch(x, y, z, &err, &lx, &ly, &lz);
+    long cell_idx = cellSearch(x, y, z, &err, &lx, &ly, &lz, NULL);
     Cell *cell;
 
     if (cell_idx >= 0 && err == CELL_ERR_OK)

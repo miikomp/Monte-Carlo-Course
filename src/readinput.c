@@ -1259,7 +1259,14 @@ long readInput() {
             
             /* Parse axis */
 
-            if (!parseLong(axTok, &gpl.axis) || gpl.axis < 0 || gpl.axis > 3)
+            long ax;
+            if (!strcmp(axTok, "xy") || !strcmp(axTok, "XY") || (parseLong(axTok, &ax) && ax == 3))
+                gpl.axis = 3;
+            else if (!strcmp(axTok, "xz") || !strcmp(axTok, "XZ") || (parseLong(axTok, &ax) && ax == 2))
+                gpl.axis = 2;
+            else if (!strcmp(axTok, "yz") || !strcmp(axTok, "YZ") || (parseLong(axTok, &ax) && ax == 1))
+                gpl.axis = 1;
+            else
             {
                 fprintf(stderr, "[ERROR] Invalid axis specifier \"%s\"on line %ld.\n", axTok, lnum);
                 fclose(fp);

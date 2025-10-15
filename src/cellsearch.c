@@ -1,33 +1,10 @@
 #include "header.h"
 
-static void roundHexAxial(double q, double r, long *q_round, long *r_round)
-{
-    double s = -q - r;
-
-    long rq = (long)lround(q);
-    long rr = (long)lround(r);
-    long rs = (long)lround(s);
-
-    double dq = fabs((double)rq - q);
-    double dr = fabs((double)rr - r);
-    double ds = fabs((double)rs - s);
-
-    if (dq > dr && dq > ds)
-        rq = -rr - rs;
-    else if (dr > ds)
-        rr = -rq - rs;
-    else
-        rs = -rq - rr;
-
-    if (q_round)
-        *q_round = rq;
-    if (r_round)
-        *r_round = rr;
-}
+void roundHexAxial(double q, double r, long *q_round, long *r_round);
 
 long locateCellInUniverse(size_t uni_idx, double x, double y, double z, int *err, double *min_abs_out);
 
-long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz) {
+long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz, long* lidx) {
 
     if (err)
         *err = CELL_ERR_OK;
@@ -164,7 +141,7 @@ long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, 
                     z -= lat->z0;
 
                     universe_idx = (size_t)lat->uni_idxs[idx];
-
+                    if (lidx) *lidx = idx;
                     break;
                 }
                 case LAT_HEXX_FINITE:
@@ -204,6 +181,7 @@ long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, 
                     z -= lat->z0;
 
                     universe_idx = (size_t)lat->uni_idxs[idx];
+                    if (lidx) *lidx = idx;
                     break;
                 }
                 case LAT_HEXY_FINITE:
@@ -243,6 +221,7 @@ long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, 
                     z -= lat->z0;
 
                     universe_idx = (size_t)lat->uni_idxs[idx];
+                    if (lidx) *lidx = idx;
                     break;
                 }
                 default:
@@ -395,4 +374,29 @@ long locateCellInUniverse(size_t uni_idx, double x, double y, double z,
     }
 
     return best_cell;
+}
+
+void roundHexAxial(double q, double r, long *q_round, long *r_round)
+{
+    double s = -q - r;
+
+    long rq = (long)lround(q);
+    long rr = (long)lround(r);
+    long rs = (long)lround(s);
+
+    double dq = fabs((double)rq - q);
+    double dr = fabs((double)rr - r);
+    double ds = fabs((double)rs - s);
+
+    if (dq > dr && dq > ds)
+        rq = -rr - rs;
+    else if (dr > ds)
+        rr = -rq - rs;
+    else
+        rs = -rq - rr;
+
+    if (q_round)
+        *q_round = rq;
+    if (r_round)
+        *r_round = rr;
 }

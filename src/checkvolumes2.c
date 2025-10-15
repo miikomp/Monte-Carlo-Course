@@ -133,8 +133,10 @@ int checkVolumes2()
 
                 while (1)
                 {
-                    int err;
-                    long cell_idx = cellSearch(rx, ry, rz, &err, NULL, NULL, NULL);
+                    cellSearchRes res = cellSearch(rx, ry, rz, ru, rv, rw);
+                    long cell_idx = res.cell_idx;
+                    int err = res.err;
+
                     if (cell_idx < 0 || err != CELL_ERR_OK)
                         break;
 

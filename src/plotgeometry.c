@@ -116,9 +116,14 @@ long plotGeometry() {
 
         /* Allocate buffer for mat or cell indeces of a single row to use for boundary checking */
         
-        int *prev_row = (int*)calloc(gpl->pixx, sizeof(int));
-        memset(prev_row, -1, sizeof(int) * gpl->pixx);
-        int last_mat = -1, last_cell = -1;
+        long *prev_row = (long*)calloc(gpl->pixx, sizeof(long));
+        memset(prev_row, -1, sizeof(long) * gpl->pixx);
+
+        /* Cell boundary plotting requires tracking lattice boundaries as well */
+        long *prev_row2 = (long*)calloc(gpl->pixx, sizeof(long));
+        memset(prev_row2, -1, sizeof(long) * gpl->pixx);
+        
+        long last_mat = -1, last_cell = -1, last_lat_elem = -1;
 
         for (long j = 0; j < gpl->pixy; j++)
         {
@@ -194,21 +199,33 @@ long plotGeometry() {
                     }
                     case BOUNDS_CELL:
                     {
-                        long cell_idx = cellSearch(x, y, z, NULL, NULL, NULL, NULL);
+                        cellSearchRes res = cellSearch(x, y, z, 0.0, 0.0, 0.0);
+                        long cell_idx = res.cell_idx;
+                        long lat_elem_idx = res.lattice_eidx;
+
                         if (j == 0)
                         {
                             prev_row[i] = cell_idx;
+                            prev_row2[i] = lat_elem_idx;
                             if (i == 0)
+                            {
                                 last_cell = cell_idx;
+                                last_lat_elem = lat_elem_idx;
+                            }
                         }
-                        else if (prev_row[i] != cell_idx || last_cell != cell_idx)
+                        else if ((prev_row[i] != cell_idx || last_cell != cell_idx) ||
+                                 (prev_row2[i] >= 0 && prev_row2[i] != lat_elem_idx) ||
+                                 (last_lat_elem >= 0 && last_lat_elem != lat_elem_idx))
                         {
-                            prev_row[i] = cell_idx;
-                            last_cell = cell_idx;
                             r = 0;
                             g = 0;
                             b = 0;
                         }
+
+                        last_lat_elem = lat_elem_idx;
+                        last_cell = cell_idx;
+                        prev_row[i] = cell_idx;
+                        prev_row2[i] = lat_elem_idx;
                         break;
                     }
                 }

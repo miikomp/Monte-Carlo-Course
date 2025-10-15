@@ -55,6 +55,7 @@ int resolveLattices() {
             case LAT_SQUARE_INFINITE:
             case LAT_HEXX_INFINITE:
             case LAT_HEXY_INFINITE:
+            case LAT_TRI_INFINITE:
             {
                 const char *fill_name = lat->uni_names;
                 int fill_idx = -1;
@@ -95,6 +96,7 @@ int resolveLattices() {
             case LAT_SQUARE_FINITE:
             case LAT_HEXX_FINITE:
             case LAT_HEXY_FINITE:
+            case LAT_TRI_FINITE:
             {
                 /* Resolve universe indeces */
 
@@ -210,6 +212,17 @@ int resolveLattices() {
                 S.params[1] = lat->y0;
                 S.params[2] = 0.5 * lat->pitch;
                 
+                break;
+            }
+            case LAT_TRI_INFINITE:
+            case LAT_TRI_FINITE:
+            {
+                S.type = SURF_TRI;
+                S.n_params = 3;
+                S.params = (double*)calloc(S.n_params, sizeof(double));
+                S.params[0] = lat->x0;
+                S.params[1] = lat->y0;
+                S.params[2] = lat->pitch / SQRT3;
                 break;
             }
             default:

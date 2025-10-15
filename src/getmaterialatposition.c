@@ -4,7 +4,9 @@ long getMaterialAtPosition(double x, double y, double z, int* err) {
 
     /* Find current cell */
 
-    long cell_idx = cellSearch(x, y, z, err, NULL, NULL, NULL);
+    cellSearchRes res = cellSearch(x, y, z, 0.0, 0.0, 0.0);
+    long cell_idx = res.cell_idx;
+    *err = res.err;
     Cell *cell;
 
     if (cell_idx >= 0 && err && *err == CELL_ERR_OK)

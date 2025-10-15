@@ -77,8 +77,9 @@ int checkVolumes() {
             double z = zmin + randd(&state) * (zmax - zmin);
 
             /* Get current cell */
-            int err = CELL_ERR_OK;
-            int c = cellSearch(x, y, z, &err, NULL, NULL, NULL);
+            cellSearchRes res = cellSearch(x, y, z, 0.0, 0.0, 0.0);
+            long c = res.cell_idx;
+            int err = res.err;
             if (c < 0 || err != CELL_ERR_OK)
                 continue;
 

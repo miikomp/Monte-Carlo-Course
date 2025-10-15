@@ -984,12 +984,21 @@ long readInput() {
                 L.type = LAT_HEXX_FINITE;
             else if (type == 3)
                 L.type = LAT_HEXY_FINITE;
+            else if (type == 4)
+                L.type = LAT_TRI_FINITE;
             else if (type == -1)
                 L.type = LAT_SQUARE_INFINITE;
             else if (type == -2)
                 L.type = LAT_HEXX_INFINITE;
             else if (type == -3)
                 L.type = LAT_HEXY_INFINITE;
+            else if (type == -4)
+                L.type = LAT_TRI_INFINITE;
+            else
+            {
+                fprintf(stderr, "[ERROR] Unknown lattice type \"%ld\" on line %ld", type, lnum);
+                return EXIT_FAILURE;
+            }
 
             /* Read parameters according to type */
 
@@ -998,6 +1007,7 @@ long readInput() {
                 case LAT_SQUARE_INFINITE:
                 case LAT_HEXX_INFINITE:
                 case LAT_HEXY_INFINITE:
+                case LAT_TRI_INFINITE:
                 {
                     char* x0 = strtok(NULL, DELIMS);
                     char* y0 = strtok(NULL, DELIMS);
@@ -1036,6 +1046,7 @@ long readInput() {
                 case LAT_SQUARE_FINITE:
                 case LAT_HEXX_FINITE:
                 case LAT_HEXY_FINITE:
+                case LAT_TRI_FINITE:
                 {
                     char *x0 = strtok(NULL, DELIMS);
                     char* y0 = strtok(NULL, DELIMS);
@@ -1101,7 +1112,7 @@ long readInput() {
             np++;
 
             if (VERBOSITY >= 1)
-                fprintf(stdout, "Parsed a lattice of type %d, filled with %zu universe(s)\n", (int)L.type, L.n_unis);
+                fprintf(stdout, "Parsed a lattice of type %d, filled with %zu universe(s) with pitch of %.2lf cm.\n", (int)L.type, L.n_unis, L.pitch);
             
         }
         

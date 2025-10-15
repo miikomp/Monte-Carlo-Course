@@ -4,9 +4,16 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
 
     /* Find current cell */
 
-    int err;
-    double lx, ly, lz;
-    long cell_idx = cellSearch(x, y, z, &err, &lx, &ly, &lz);
+    cellSearchRes res = cellSearch(x, y, z, u, v, w);
+    long cell_idx = res.cell_idx;
+    int err = res.err;
+    double lx = res.lx;
+    double ly = res.ly;
+    double lz = res.lz;
+    double lu = res.lu;
+    double lv = res.lv;
+    double lw = res.lw;
+
     Cell *cell;
 
     if (cell_idx >= 0 && err == CELL_ERR_OK)
@@ -27,7 +34,7 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
         if (bb_idx >= 0)
         {
             Surface *S = &DATA.surfs[bb_idx];
-            dmax = surfaceDistance(S->type, S->params, S->n_params, lx, ly, lz, u, v, w);
+            dmax = surfaceDistance(S->type, S->params, S->n_params, lx, ly, lz, lu, lv, lw);
         }
         else
         {
@@ -66,9 +73,9 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
         double tx = lx;
         double ty = ly;
         double tz = lz;
-        double tu = u;
-        double tv = v;
-        double tw = w;
+        double tu = lu;
+        double tv = lv;
+        double tw = lw;
 
         if (S->t_idx >= 0)
             applyTransformation(&DATA.transforms[S->t_idx], &tx, &ty, &tz, &tu, &tv, &tw);

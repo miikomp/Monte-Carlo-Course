@@ -141,6 +141,14 @@ int resolveMaterials(TempNucDataLib *lib, size_t nlib);
  */
 int resolveCells();
 
+typedef struct {
+    long cell_idx;
+    double lx, ly, lz;
+    double lu, lv, lw;
+    int err;
+    long lattice_eidx;
+} cellSearchRes;
+
 /**
  * @brief Search for the cell containing the point (x, y, z).
  * Sets error flag to "undefined" if point is outside all cells, and "overlap" if more than one cell
@@ -149,13 +157,12 @@ int resolveCells();
  * @param x X-coordinate
  * @param y Y-coordinate
  * @param z Z-coordinate
- * @param err Pointer to an error flag
- * @param lx ptr to output resolved local X-coordinate
- * @param ly ptr to output resolved local Y-coordinate
- * @param lz ptr to output resolved local Z-coordinate
- * @return long Index of the cell containing the point, or -1 on failure
+ * @param u X-component of direction vector
+ * @param v Y-component of direction vector
+ * @param w Z-component of direction vector
+ * @return a struct containing the found cell idx, local coordinates, error flag and other info.
  */
-long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz);
+cellSearchRes cellSearch(double x, double y, double z, double u, double v, double w);
 
 /**
  * @brief Resolve outer boundary of root universe. Calculates and puts outer bounds into DATA.

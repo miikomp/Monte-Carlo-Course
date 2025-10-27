@@ -53,8 +53,7 @@ int checkVolumes2()
     double dz = zmax - zmin;
 
     bool planar = (fabs(dz) < 1e-12);
-    double max_dim = fmax(fmax(dx, dy), fmax(dz, 1.0));
-    double step_eps = 1e-8 * fmax(max_dim, 1.0);
+    double step_eps = 1e-6;
 
     #pragma omp parallel default(none) \
             shared(length_bufs, tot_lengths, n_lines, xmin, xmax, ymin, ymax, zmin, zmax, dx, dy, dz, planar, step_eps, DATA, stdout)
@@ -117,7 +116,7 @@ int checkVolumes2()
                 dirs[1][2] = -w;
             }
 
-            /* Track ray forwards and backwards to geometry boundary */
+            /* Track ray forwards and backwards to geometry boundaries */
 
             for (int k = 0; k < 2; k++)
             {
@@ -134,7 +133,7 @@ int checkVolumes2()
                 while (1)
                 {
                     int err;
-                    long cell_idx = cellSearch(rx, ry, rz, &err, NULL, NULL, NULL, NULL);
+                    long cell_idx = cellSearch(rx, ry, rz, &err, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
                     if (cell_idx < 0 || err != CELL_ERR_OK)
                         break;
 
@@ -178,7 +177,7 @@ int checkVolumes2()
         free(line_lengths);
     }
 
-    /* combine buffers */
+    /* Combine buffers */
 
     double *lengths = (double *)calloc(DATA.n_mats, sizeof(double));
     double total_length = 0.0;
@@ -195,17 +194,15 @@ int checkVolumes2()
     free(length_bufs);
     free(tot_lengths);
 
-    /* Calculate total volume/area */
+    /* Get bounding surface volume */
 
-    double vol0;
-    if (dx == 0.0)
-        vol0 = dy * dz;
-    else if (dy == 0.0)
-        vol0 = dx * dz;
-    else if (dz == 0.0)
-        vol0 = dx * dy;
-    else
-        vol0 = dx * dy * dz;
+    double vol0 = DATA.tot_vol;
+
+    if (vol0 < 0.0)
+    {
+        fprintf(stderr, "[ERROR] Invalid bounding box volume.\n");
+        return EXIT_FAILURE;
+    }
 
     if (total_length == 0.0)
     {

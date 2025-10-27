@@ -944,60 +944,56 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             double zmin = params[4];
             double zmax = params[5];
 
-            double d = INFINITY;
+            double t_enter = -INFINITY;
+            double t_exit  = INFINITY;
 
-            if (fabs(u) >= EPS)
+            if (fabs(u) < EPS)
             {
-                double x_plane = (u > 0.0) ? xmax : xmin;
-                double tx = (x_plane - x) / u;
-                if (tx > EPS)
-                {
-                    double y_hit = y + v * tx;
-                    double z_hit = z + w * tx;
-                    if (y_hit >= ymin - EPS && y_hit <= ymax + EPS &&
-                        z_hit >= zmin - EPS && z_hit <= zmax + EPS &&
-                        tx < d)
-                        d = tx;
-                }
+                if (x < xmin - EPS || x > xmax + EPS)
+                    return INFINITY;
             }
-            else if (x < xmin - EPS || x > xmax + EPS)
+            else
+            {
+                double t1 = (xmin - x) / u;
+                double t2 = (xmax - x) / u;
+                if (t1 > t2) { double tmp = t1; t1 = t2; t2 = tmp; }
+                if (t1 > t_enter) t_enter = t1;
+                if (t2 < t_exit)  t_exit  = t2;
+            }
+
+            if (fabs(v) < EPS)
+            {
+                if (y < ymin - EPS || y > ymax + EPS)
+                    return INFINITY;
+            }
+            else
+            {
+                double t1 = (ymin - y) / v;
+                double t2 = (ymax - y) / v;
+                if (t1 > t2) { double tmp = t1; t1 = t2; t2 = tmp; }
+                if (t1 > t_enter) t_enter = t1;
+                if (t2 < t_exit)  t_exit  = t2;
+            }
+
+            if (fabs(w) < EPS)
+            {
+                if (z < zmin - EPS || z > zmax + EPS)
+                    return INFINITY;
+            }
+            else
+            {
+                double t1 = (zmin - z) / w;
+                double t2 = (zmax - z) / w;
+                if (t1 > t2) { double tmp = t1; t1 = t2; t2 = tmp; }
+                if (t1 > t_enter) t_enter = t1;
+                if (t2 < t_exit)  t_exit  = t2;
+            }
+
+            if (t_enter > t_exit || t_exit <= EPS)
                 return INFINITY;
 
-            if (fabs(v) >= EPS)
-            {
-                double y_plane = (v > 0.0) ? ymax : ymin;
-                double ty = (y_plane - y) / v;
-                if (ty > EPS)
-                {
-                    double x_hit = x + u * ty;
-                    double z_hit = z + w * ty;
-                    if (x_hit >= xmin - EPS && x_hit <= xmax + EPS &&
-                        z_hit >= zmin - EPS && z_hit <= zmax + EPS &&
-                        ty < d)
-                        d = ty;
-                }
-            }
-            else if (y < ymin - EPS || y > ymax + EPS)
-                return INFINITY;
-
-            if (fabs(w) >= EPS)
-            {
-                double z_plane = (w > 0.0) ? zmax : zmin;
-                double tz = (z_plane - z) / w;
-                if (tz > EPS)
-                {
-                    double x_hit = x + u * tz;
-                    double y_hit = y + v * tz;
-                    if (x_hit >= xmin - EPS && x_hit <= xmax + EPS &&
-                        y_hit >= ymin - EPS && y_hit <= ymax + EPS &&
-                        tz < d)
-                            d = tz;
-                }
-            }
-            else if (z < zmin - EPS || z > zmax + EPS)
-                return INFINITY;
-
-            return d;
+            double t_hit = (t_enter > EPS) ? t_enter : t_exit;
+            return (t_hit > EPS) ? t_hit : INFINITY;
         }
 
         /* Elliptical torus with major radius perpendicular to Z-axis */
@@ -1013,6 +1009,36 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             if (R <= 0.0 || a <= 0.0 || b <= 0.0)
                 return INFINITY;
 
+            /* Form bounding cuboid for the torus */
+            
+            double bb_params[6] = {
+                x0 - (R + a), 
+                x0 + (R + a), 
+                y0 - (R + a), 
+                y0 + (R + a), 
+                z0 - b, 
+                z0 + b
+            };
+
+            /* If starting point is outside the bounding box, move to bounding box surface */
+
+            double t_offset = 0;
+            if (surfaceTest(SURF_CUBOID, bb_params, 6, x, y, z) > 0)
+            {
+                t_offset = surfaceDistance(SURF_CUBOID, bb_params, 6, x, y, z, u, v, w);
+                
+                /* If bounding box is out of the line of sight so is the torus */
+
+                if (!isfinite(t_offset))
+                    return INFINITY;
+
+                /* Move to surface */
+                
+                x += u * t_offset;
+                y += v * t_offset;
+                z += w * t_offset;
+            }
+
             /* Shift ray origin into torus reference frame */
 
             double dx0 = x - x0;
@@ -1020,13 +1046,14 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             double dz0 = z - z0;
 
             /* Evaluate implicit surface at ray start */
+
             double f0 = surfaceTest(SURF_TORUS, params, n_params, x, y, z);
 
             /* Choose step size and travel bound for ray marching */
 
             double step = 0.25 * fmin(a, b);
-            if (step < 1e-4)
-                step = 1e-4;
+            if (step < 1e-3)
+                step = 1e-3;
 
             double t_limit = fabs(dx0) + fabs(dy0) + fabs(dz0) + 2.0 * (R + a + b);
             if (t_limit < step)
@@ -1041,14 +1068,14 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             double f_low = f_prev;
             bool bracket_found = false;
 
-            for (int i = 0; i < 1024 && t_prev <= t_limit; ++i)
+            for (int i = 0; i < 1024 && t_prev <= t_limit; i++)
             {
                 double t_curr = t_prev + step;
                 double f_curr = surfaceTest(SURF_TORUS, params, n_params, x + u * t_curr, y + v * t_curr, z + w * t_curr);
 
                 if (f_prev == 0.0)
                 {
-                    return (t_prev > EPS) ? t_prev : INFINITY;
+                    return (t_offset + t_prev > EPS) ? t_offset + t_prev : INFINITY;
                 }
 
                 if (f_prev * f_curr <= 0.0)
@@ -1069,13 +1096,13 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
 
             /* Refine intersection with bisection */
 
-            for (int i = 0; i < 100; ++i)
+            for (int i = 0; i < 100; i++)
             {
                 double mid = 0.5 * (low + high);
                 double f_mid = surfaceTest(SURF_TORUS, params, n_params, x + u * mid, y + v * mid, z + w * mid);
 
                 if (fabs(f_mid) < 1e-12 || (high - low) < 1e-10)
-                    return (mid > EPS) ? mid : INFINITY;
+                    return (t_offset + mid > EPS) ? t_offset + mid : INFINITY;
 
                 if ((f_mid > 0.0 && f_low > 0.0) || (f_mid < 0.0 && f_low < 0.0))
                 {
@@ -1091,7 +1118,7 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params,
             /* Fallback: midpoint of final bracket */
 
             double result = 0.5 * (low + high);
-            return (result > EPS) ? result : INFINITY;
+            return (t_offset + result > EPS) ? t_offset + result : INFINITY;
         }
 
         case SURF_INF:

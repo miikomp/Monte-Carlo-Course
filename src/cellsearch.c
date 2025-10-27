@@ -4,10 +4,17 @@ void roundHexAxial(double q, double r, long *q_round, long *r_round);
 
 long locateCellInUniverse(size_t uni_idx, double x, double y, double z, int *err, double *min_abs_out);
 
-long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz, long* lidx) {
+long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz, long* lidx,
+                double *plx, double *ply, double *plz, long *p_cell_idx) {
 
     if (err)
         *err = CELL_ERR_OK;
+    
+    if (lidx)
+        *lidx = -1;
+    
+    if (p_cell_idx)
+        *p_cell_idx = -1;
 
     /* Start at the root universe 0 */
 
@@ -253,7 +260,7 @@ long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, 
 
         Cell *cell = &DATA.cells[cell_idx];
 
-        /* If material filled, put local coordinates, universe index and return cell index */
+        /* If material filled, put local coordinates and return cell index */
 
         if (!cell->unifilled)
         {
@@ -271,7 +278,13 @@ long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, 
             return -1;
         }
 
+        if (plx) *plx = x;
+        if (ply) *ply = y;
+        if (plz) *plz = z;
+        if (p_cell_idx) *p_cell_idx = cell_idx;
+
         /* Next universe (material or further fills) */
+
         universe_idx = (size_t)cell->filluni_idx;
     }
 }

@@ -327,9 +327,7 @@ double surfaceTest(SurfaceTypes type, double *params, size_t n_params, double x,
 
         case SURF_INF:
         {
-            return -1;
-
-            break;
+            return -INFINITY;
         }
         default:
         {

@@ -8,58 +8,64 @@ set nps 1E4 10
 
 set gcut 10
 
+# Specify geometry plot
+plot xy c 2000 0 -15 15 -15 15
+plot xz c 2000 0
+
+# Define boundary condition
+set bc 3
+
 # Specify cross section library path
 set xslibpath ./xsdata/xsdata.lib
 
 # Definition of geometry follows a similar syntax to Serpent.
 
-# Define pin universes
-surf s1 cyl 0.0 0.0 0.412
-surf s2 cyl 0.0 0.0 0.475
-
-cell c01 F fuel -s1
-cell c02 F cladding s1 -s2
-cell c03 F water s2 
-
-cell c04 G fuel2 -s1
-cell c05 G cladding s1 -s2
-cell c06 G water s2
-
-cell c07 W water -s10
-
 # Define root universe
-surf s10 sqr 0.0 0.0 45.22
-surf s00 cylz 0.0 0.0 65
 
-cell c10 0 fill C -s10
-cell c11 0 water s10 -s00
-cell c00 0 outside s00
+surf s1 hexy 0.0 0.0 8.0
+surf s2 hexy 0.0 0.0 8.5
 
-# Define lattices
-lat A 2 0.0 0.0 17 17 1.33
-W W W W W W W W W W W W W W W W W
-W F F F F F F F F F F F F F F F W
-W F G F F F F F F F F F F F G F W
-W F F F F F F F G F F F F F F F W
-W F F F G F F F F F F F G F F F W
-W F F F F F F F F F F F F F F F W
-W F F F F F G F F F G F F F F F W
-W F F F F F F F G F F F F F F F W
-W F F G F F F G F G F F F G F F W
-W F F F F F F F G F F F F F F F W
-W F F F F F G F F F G F F F F F W
-W F F F F F F F F F F F F F F F W
-W F F F G F F F F F F F G F F F W
-W F F F F F F F G F F F F F F F W
-W F G F F F F F F F F F F F G F W
-W F F F F F F F F F F F F F F F W
-W W W W W W W W W W W W W W W W W
+cell c1 0 fill lat1 -s1
+cell c2 0 cladding s1 -s2
+cell c3 0 outside s2
 
-lat C 1 0.0 0.0 22.61 A
+# Define fuel pin universe
 
-# Define transformation
+surf s4 cyl 0.0 0.0 0.412
+surf s5 cyl 0.0 0.0 0.475
 
-trans s s10 0 0 0 0 0 25
+cell c01 F fuel -s4
+cell c02 F cladding s4 -s5
+cell c03 F water s5
+
+# Define another pin universe
+
+surf s6 cyl 0.0 0.0 0.612
+surf s7 cyl 0.0 0.0 0.675
+
+cell c04 C H1 -s6
+cell c05 C cladding s6 -s7
+cell c06 C water s7
+
+# Define water universe for lattice boundaries
+surf s99 inf
+cell c07 W water -s99
+
+lat lat1 2 0.0 0.0 13 13 2
+W W W W W W W W W W W W W
+ W W W W W W W W W W W W W
+  W W W W W W F F F F F W W
+   W W W W W F F F F F F W W
+    W W W W F F C F C F F W W
+     W W W F F F F F F F F W W
+      W W F F C F C F C F F W W
+       W W F F F F F F F F W W W
+        W W F F C F C F F W W W W
+         W W F F F F F F W W W W W
+          W W F F F F F W W W W W W
+           W W W W W W W W W W W W W
+            W W W W W W W W W W W W W
+
 
 # Define material(s)
 # Positive density/fraction means mass density in g/cm^3 or mass fraction
@@ -77,10 +83,6 @@ mat water 0.1 300 rgb 150 150 255
 mat fuel -19.1 300 rgb 30 195 50
  92235 -0.0072
  92238 -0.9928
-
-mat fuel2 -19.1 300 rgb 189 150 25
- 92235 -0.0072
- 92238 -0.9928 
 
 mat cladding -1.8 300 rgb 150 150 150
  6000 1.0

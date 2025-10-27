@@ -5,8 +5,9 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
     /* Find current cell */
 
     int err;
-    double lx, ly, lz;
-    long cell_idx = cellSearch(x, y, z, &err, &lx, &ly, &lz, NULL);
+    double lx, ly, lz, plx, ply, plz;
+    long parent_cell_idx;
+    long cell_idx = cellSearch(x, y, z, &err, &lx, &ly, &lz, NULL, &plx, &ply, &plz, &parent_cell_idx);
     Cell *cell;
 
     if (cell_idx >= 0 && err == CELL_ERR_OK)
@@ -22,6 +23,8 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
     double dmax = INFINITY;
     if (parent_lat_idx >= 0 && parent_lat_idx < (long)DATA.n_lats)
     {
+        /* Get distance to lattice element boundary */
+
         Lattice *lat = &DATA.lats[parent_lat_idx];
         long bb_idx = lat->bb_surf_idx;
         if (bb_idx >= 0)
@@ -33,6 +36,36 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
         {
             fprintf(stderr, "[ERROR] Lattice \"%s\" without element boundaries.\n", lat->name);
             exit(EXIT_FAILURE);
+        }
+    }
+
+    /* If filled cell, compute distance to cell boundary */
+
+    if (parent_cell_idx != cell_idx && parent_cell_idx >= 0 && parent_cell_idx < (long)DATA.n_cells)
+    {
+        /* Find nearest surface in parent cell */
+
+        Cell *p_cell = &DATA.cells[parent_cell_idx];
+
+        for (size_t s = 0; s < p_cell->n_surfs; s++)
+        {
+            size_t idx = p_cell->surf_idxs[s];
+            Surface *S = &DATA.surfs[idx];
+
+            double tx = plx;
+            double ty = ply;
+            double tz = plz;
+            double tu = u;
+            double tv = v;
+            double tw = w;
+
+            if (S->t_idx >= 0)
+                applyTransformation(&DATA.transforms[S->t_idx], &tx, &ty, &tz, &tu, &tv, &tw);
+
+            double d = surfaceDistance(S->type, S->params, S->n_params, tx, ty, tz, tu, tv, tw);
+
+            if (d < dmax)
+                dmax = d;
         }
     }
 
@@ -51,7 +84,7 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
 
     double d0 = surfaceDistance(S->type, S->params, S->n_params, tx, ty, tz, tu, tv, tw);
 
-    if (dmax > d0)
+    if (d0 < dmax)
         dmax = d0;
 
     /* Find nearest surface in cell */
@@ -83,5 +116,3 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
 
     return d;
 }
-
-/* Cell search should return lattice index!*/

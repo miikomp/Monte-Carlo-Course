@@ -33,28 +33,28 @@ long plotGeometry() {
         {
             case PLOT_YZ:
             {
-                min1 = (gpl->ymin != 0) ? gpl->ymin : DATA.y_min;
-                max1 = (gpl->ymax != 0) ? gpl->ymax : DATA.y_max;
-                min2 = (gpl->zmin != 0) ? gpl->zmin : DATA.z_min;
-                max2 = (gpl->zmax != 0) ? gpl->zmax : DATA.z_max;
+                min1 = isnan(gpl->ymin) ? DATA.y_min : gpl->ymin;
+                max1 = isnan(gpl->ymax) ? DATA.y_max : gpl->ymax;
+                min2 = isnan(gpl->zmin) ? DATA.z_min : gpl->zmin;
+                max2 = isnan(gpl->zmax) ? DATA.z_max : gpl->zmax;
 
                 break;
             }
             case PLOT_XZ:
             {
-                min1 = (gpl->xmin != 0) ? gpl->xmin : DATA.x_min;
-                max1 = (gpl->xmax != 0) ? gpl->xmax : DATA.x_max;
-                min2 = (gpl->zmin != 0) ? gpl->zmin : DATA.z_min;
-                max2 = (gpl->zmax != 0) ? gpl->zmax : DATA.z_max;
+                min1 = isnan(gpl->xmin) ? DATA.x_min : gpl->xmin;
+                max1 = isnan(gpl->xmax) ? DATA.x_max : gpl->xmax;
+                min2 = isnan(gpl->zmin) ? DATA.z_min : gpl->zmin;
+                max2 = isnan(gpl->zmax) ? DATA.z_max : gpl->zmax;
 
                 break;
             }
             case PLOT_XY:
             {
-                min1 = (gpl->xmin != 0) ? gpl->xmin : DATA.x_min;
-                max1 = (gpl->xmax != 0) ? gpl->xmax : DATA.x_max;
-                min2 = (gpl->ymin != 0) ? gpl->ymin : DATA.y_min;
-                max2 = (gpl->ymax != 0) ? gpl->ymax : DATA.y_max;
+                min1 = isnan(gpl->xmin) ? DATA.x_min : gpl->xmin;
+                max1 = isnan(gpl->xmax) ? DATA.x_max : gpl->xmax;
+                min2 = isnan(gpl->ymin) ? DATA.y_min : gpl->ymin;
+                max2 = isnan(gpl->ymax) ? DATA.y_max : gpl->ymax;
 
                 break;
             }
@@ -210,7 +210,7 @@ long plotGeometry() {
                     case BOUNDS_CELL:
                     {
                         long lat_idx = -1;
-                        long cell_idx = cellSearch(x, y, z, NULL, NULL, NULL, NULL, &lat_idx);
+                        long cell_idx = cellSearch(x, y, z, NULL, NULL, NULL, NULL, &lat_idx, NULL, NULL, NULL, NULL);
                         if (j == 0)
                         {
                             prev_row[i] = cell_idx;

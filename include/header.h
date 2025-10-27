@@ -157,7 +157,21 @@ int resolveCells();
  * @param lidx ptr to output lattice element idx
  * @return long Index of the cell containing the point, or -1 on failure
  */
-long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz, long* lidx);
+long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz, long* lidx,
+                double *plx, double *ply, double *plz, long *p_cell_idx);
+
+
+/**
+ * @brief Apply boundary condition to the coordinate and direction vector.
+ * 
+ * @param x 
+ * @param y 
+ * @param z 
+ * @param u 
+ * @param v 
+ * @param w 
+ */
+void applyBoundaryConditions(double *x, double *y, double *z, double *u, double *v, double *w);
 
 /**
  * @brief Resolve outer boundary of root universe. Calculates and puts outer bounds into DATA.

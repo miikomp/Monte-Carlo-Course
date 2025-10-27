@@ -12,7 +12,7 @@
 #define MAX_TIME_BINS 1000
 #define MAX_NUM_DETECTORS 16
 
-/* --- Surface types --- */
+/* --- Enums for types --- */
 typedef enum {
     SURF_UNKNOWN = 0,
     SURF_PLANEX,     // YZ-plane
@@ -63,6 +63,12 @@ typedef enum {
     TRA_ROTATION,
     TRA_BOTH
 } TransformAction;
+
+typedef enum {
+    BC_BLACK = 1,
+    BC_REFLECTIVE,
+    BC_PERIODIC
+} BoundaryCoefficents;
 
 typedef struct {
     uint64_t s[4];
@@ -401,7 +407,9 @@ typedef struct {
 
 
     /* Bounds */
+    BoundaryCoefficents boundary_coef;
     long      outside_surf_idx;
+    double    tot_vol;
     double    x_min, x_max;
     double    y_min, y_max;
     double    z_min, z_max;

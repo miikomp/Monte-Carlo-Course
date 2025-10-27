@@ -1245,8 +1245,9 @@ long readInput() {
             char *axTok = strtok(NULL, DELIMS);
             char *boundTok = strtok(NULL, DELIMS);
             char *pixTok = strtok(NULL, DELIMS);
+            char *posTok = strtok(NULL, DELIMS);
 
-            if (!axTok || !boundTok || !pixTok)
+            if (!axTok || !boundTok || !pixTok || !posTok)
             {
                 fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                 fclose(fp);
@@ -1268,14 +1269,23 @@ long readInput() {
                 gpl.axis = 1;
             else
             {
-                fprintf(stderr, "[ERROR] Invalid axis specifier \"%s\"on line %ld.\n", axTok, lnum);
+                fprintf(stderr, "[ERROR] Invalid axis specifier \"%s\" on line %ld.\n", axTok, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
 
-            if (!parseLong(boundTok, &gpl.bounds) || gpl.bounds < 0 || gpl.bounds > 3)
+            /* Parse boundary type */
+
+            long bound;
+            if (!strcmp(boundTok, "c") || !strcmp(boundTok, "C") || (parseLong(boundTok, &bound) && bound == 2))
+                gpl.bounds = 2;
+            else if (!strcmp(boundTok, "m") || !strcmp(boundTok, "M") || (parseLong(boundTok, &bound) && bound == 1))
+                gpl.bounds = 1;
+            else if ((parseLong(boundTok, &bound) && bound == 0))
+                gpl.bounds = 0;
+            else
             {
-                fprintf(stderr, "[ERROR] Invalid boundary specifier \"%s\"on line %ld.\n", boundTok, lnum);
+                fprintf(stderr, "[ERROR] Invalid boundary specifier \"%s\" on line %ld.\n", boundTok, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
@@ -1284,7 +1294,16 @@ long readInput() {
 
             if (!parseLong(pixTok, &gpl.pixx) || gpl.pixx <= 0)
             {
-                fprintf(stderr, "[ERROR] Invalid pixel size \"%s\"on line %ld.\n", axTok, lnum);
+                fprintf(stderr, "[ERROR] Invalid pixel size \"%s\" on line %ld.\n", axTok, lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+
+            /* Parse position along normal axis */
+
+            if (!parseDouble(posTok, &gpl.pos))
+                        {
+                fprintf(stderr, "[ERROR] Invalid plot plane position \"%s\" on line %ld.\n", posTok, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
@@ -1299,7 +1318,7 @@ long readInput() {
             double min1, max1, min2, max2;
 
             if (!min1Tok || !max1Tok || !min2Tok ||!max2Tok)
-                min1 = max1 = min2 = max2 = 0;
+                min1 = max1 = min2 = max2 = NAN;
             else
             {
                 if (!parseDouble(min1Tok, &min1) || !parseDouble(max1Tok, &max1) ||
@@ -1468,6 +1487,29 @@ long readInput() {
                 }
 
                 GLOB.time_cutoff = tcut;
+                np++;
+            }
+
+            /* --- Boundary coefficent */
+            else if (!strcmp(subkey, "bc"))
+            {
+                char *a1 = strtok(NULL, DELIMS);
+                if (!a1) 
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                long bc;
+                if (!parseLong(a1, &bc) || bc < BC_BLACK || bc > BC_PERIODIC) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid value for \"set bc\" on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                DATA.boundary_coef = bc;
                 np++;
             }
             /* --- Cross section library file path */

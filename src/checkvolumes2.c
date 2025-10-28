@@ -68,7 +68,7 @@ int checkVolumes2()
         uint64_t seed = (uint64_t)time(NULL) ^ ((uint64_t)tid << 32);
         xoshiro256ss_seed(&state, seed);
 
-        /* Allocate a material-wise line length array for normalising track lengths */
+        /* Allocate a material-wise line length arrays */
 
         double *line_lengths = (double *)malloc(DATA.n_mats * sizeof(double));
         if (!line_lengths)
@@ -77,11 +77,20 @@ int checkVolumes2()
         #pragma omp for schedule(static)
         for (long i = 0; i < n_lines; i++)
         {
-            /* Sample a random point in XYZ or XY */
+            /* Sample a random point in XYZ or XY within the defined geometry*/
 
-            double x = xmin + randd(&state) * dx;
-            double y = ymin + randd(&state) * dy;
-            double z = planar ? 0.0 : (zmin + randd(&state) * dz);
+            double x, y, z, f;
+            Surface *bb_surf = &DATA.surfs[DATA.outside_surf_idx];
+            
+            do 
+            {
+                x = xmin + randd(&state) * dx;
+                y = ymin + randd(&state) * dy;
+                z = planar ? 0.0 : (zmin + randd(&state) * dz);
+
+                f = surfaceTest(bb_surf->type, bb_surf->params, bb_surf->n_params, x, y, z);
+            } 
+            while (f >= 0.0);
 
             /* Clear scores */
 
@@ -134,22 +143,21 @@ int checkVolumes2()
                 {
                     int err;
                     long cell_idx = cellSearch(rx, ry, rz, &err, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-                    if (cell_idx < 0 || err != CELL_ERR_OK)
+                    if (cell_idx < 0 || err != CELL_ERR_OK || cell_idx >= (long)DATA.n_cells)
                         break;
 
-                    Cell *cell = &DATA.cells[cell_idx];
                     double d = distanceToNearestBoundary(rx, ry, rz, ru, rv, rw);
 
                     if (!(d > 0.0 && isfinite(d)))
                         break;
 
+                    Cell *cell = &DATA.cells[cell_idx];
                     if (cell->mat_idx >= 0)
                     {
                         line_lengths[cell->mat_idx] += d;
                         dir_len += d;
                     }
                     
-
                     rx += ru * d;
                     ry += rv * d;
                     rz += rw * d;
@@ -216,8 +224,7 @@ int checkVolumes2()
     for (size_t m = 0; m < DATA.n_mats; ++m)
     {
         Material *mat = &DATA.mats[m];
-        double len = lengths[m];
-        double p = len / total_length;
+        double p = lengths[m] / total_length;
         mat->vol = vol0 * p;
 
         double rel_unc = (p > 0.0) ? sqrt(fmax(0.0, (1.0 - p) / (p * total_length))) : 0.0;

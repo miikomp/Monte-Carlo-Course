@@ -271,7 +271,8 @@ void processTransportResults(void);
 
 
 /**
- * @brief Return distance to nearest boundary from point (x, y, z) in direction (u, v, w). INFINITY
+ * @brief Return distance to nearest boundary from point (x, y, z) in direction (u, v, w) or INFINITY
+ * when no boundary is in line of sight.
  * 
  * @param x 
  * @param y 

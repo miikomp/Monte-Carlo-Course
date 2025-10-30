@@ -4,7 +4,7 @@ This project implements my personal Monte Carlo particle transport simulation co
 ## Requirements
 - **Compiler**: GCC with Open-MP support.
 - **Operating System**: Linux (tested on WSL system).
-- **Libraries**: Standard C99 libraries.
+- **Libraries**: Standard C99 libraries + LibGD
 
 ---
 
@@ -21,6 +21,7 @@ This project implements my personal Monte Carlo particle transport simulation co
 - **Coordinate transformation** Surface translations and rotations can be defined using the `trans` input card.
 - **Volume checking** Both point sampling and ray-based volume checking algorithms are implemented and can be invoked with the `-checkvolumes` commandline argument.
 - **Geometry plotting**: Input-driven 2D slice definitions for visualising material regions in simulation geometry.
+- **Track plotting**: Support for drawing particle tracks onto defined geometry plot images.
 - **Output**: Writes output to stdout in a summary and fully into MATLAB-type files
 
 ---
@@ -80,6 +81,7 @@ Specify `s` for surface targets, then provide translations (`dx`, `dy`, `dz`) an
 - `-v [LEVEL]` Where LEVEL specifies the level of babble, 0 is default, 1 is increased, and 2 is debug output.
 - `-norun` Stops the calculation before the transport routines, used to check input for errors.
 - `-checkvolumes [MODE] [N]` Calculate material volumes. MODE 1 uses random points and 2 draws random lines across the geometry. N sets the number of samples.
+- `-tracks N` Draw N oarticle tracks onto geometry visualisation defined with the **plot** input option.
 
 ---
 

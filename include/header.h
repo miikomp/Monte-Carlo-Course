@@ -158,6 +158,11 @@ int resolveCells();
  * @param ly ptr to output resolved local Y-coordinate
  * @param lz ptr to output resolved local Z-coordinate
  * @param lidx ptr to output lattice element idx
+ * @param plx ptr to put parent cell local X-coordinate
+ * @param ply ptr to put parent cell local Y-coordinate
+ * @param plz ptr to put parent cell local Z-coordinate
+ * @param p_cell_idx ptr to put parent cell idx in DATA.cells
+ * 
  * @return long Index of the cell containing the point, or -1 on failure
  */
 long cellSearch(double x, double y, double z, int *err, double *lx, double *ly, double *lz, long* lidx,
@@ -436,7 +441,8 @@ void applyTransformation(Transform* T, double *x, double *y, double *z, double *
 double surfaceDistance(SurfaceTypes type, double* params, size_t n_params, double x, double y, double z, double u, double v, double w);
 
 /**
- * @brief Plot geometry according to specified plotter instances
+ * @brief Plot geometry according to specified plotter instances. 
+ * Track plotting is also handled here conditionally
  * 
  * @return long 0 success, 1 on failure
  */

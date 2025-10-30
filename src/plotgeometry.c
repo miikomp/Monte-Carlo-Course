@@ -17,7 +17,10 @@ long plotGeometry() {
     if (GLOB.noplot)
         return EXIT_SUCCESS;
 
-    fprintf(stdout, "\nPlotting geometry...\n");
+    if (GLOB.trackplotmode && DATA.tracks != NULL)
+        fprintf(stdout, "\nPlotting tracks...\n");
+    else
+        fprintf(stdout, "\nPlotting geometry...\n");
 
     /* Loop over geometryPlotters */
 
@@ -239,10 +242,187 @@ long plotGeometry() {
             }
         }
 
-        /* Save to image file*/
+        /* If doing tracks, draw them onto the image now */
+        
+        if (GLOB.trackplotmode && DATA.tracks != NULL && DATA.track_counts != NULL)
+        {
+            const size_t points_per_track = (size_t)(MAX_COLLISION_BINS + 1u);
+            const int track_colour = gdTrueColor(255, 255, 255); // White
+            const int start_colour = gdTrueColor(0, 255, 0); // Green
+            const int end_colour   = gdTrueColor(255, 0, 0); // Red
+            const int mark_size  = (pix > 1500) ? 12 : 4;
+
+            if (dimx > 0.0 && dimy > 0.0 && di > 0.0 && dj > 0.0)
+            {
+                for (size_t t = 0; t < (size_t)GLOB.n_tracks; t++)
+                {
+                    size_t count = DATA.track_counts[t];
+                    if (count < 2)
+                        continue;
+
+                    double *points = DATA.tracks + t * points_per_track * 3u;
+
+                    /* --- Draw track segments as lines --- */
+
+                    for (size_t p = 0; p < count - 1; p++)
+                    {
+                        double *p1 = points + p * 3u;
+                        double *p2 = p1 + 3u;
+
+                        double coord1_start = 0.0, coord2_start = 0.0;
+                        double coord1_end = 0.0, coord2_end = 0.0;
+
+                        switch (gpl->axis)
+                        {
+                            case PLOT_YZ:
+                            {
+                                coord1_start = p1[1];
+                                coord2_start = p1[2];
+                                coord1_end   = p2[1];
+                                coord2_end   = p2[2];
+                                break;
+                            }
+                            case PLOT_XZ:
+                            {
+                                coord1_start = p1[0];
+                                coord2_start = p1[2];
+                                coord1_end   = p2[0];
+                                coord2_end   = p2[2];
+                                break;
+                            }
+                            case PLOT_XY:
+                            default:
+                            {
+                                coord1_start = p1[0];
+                                coord2_start = p1[1];
+                                coord1_end   = p2[0];
+                                coord2_end   = p2[1];
+                                break;
+                            }
+                        }
+
+                        double fx1 = (max1 - coord1_start) / di - 0.5;
+                        double fy1 = (max2 - coord2_start) / dj - 0.5;
+                        double fx2 = (max1 - coord1_end) / di - 0.5;
+                        double fy2 = (max2 - coord2_end) / dj - 0.5;
+
+                        if (!isfinite(fx1) || !isfinite(fy1) ||
+                            !isfinite(fx2) || !isfinite(fy2))
+                            continue;
+
+                        int x1 = (int)lround(fx1);
+                        int y1 = (int)lround(fy1);
+                        int x2 = (int)lround(fx2);
+                        int y2 = (int)lround(fy2);
+
+                        if (x1 < 0) 
+                            x1 = 0;
+                        if (x1 >= gpl->pixx) 
+                            x1 = gpl->pixx - 1;
+                        if (x2 < 0) 
+                            x2 = 0;
+                        if (x2 >= gpl->pixx) 
+                            x2 = gpl->pixx - 1;
+
+                        if (y1 < 0) 
+                            y1 = 0;
+                        if (y1 >= gpl->pixy) 
+                            y1 = gpl->pixy - 1;
+                        if (y2 < 0) 
+                            y2 = 0;
+                        if (y2 >= gpl->pixy) 
+                            y2 = gpl->pixy - 1;
+
+                        gdImageLine(img, x1, y1, x2, y2, track_colour);
+                    }
+
+                    /* --- Draw points at the start and end of the tracks --- */
+
+                    double *p_start = points;
+                    double *p_end   = points + (count - 1u) * 3u;
+
+                    double start_c1 = 0.0, start_c2 = 0.0;
+                    double end_c1   = 0.0, end_c2   = 0.0;
+
+                    switch (gpl->axis)
+                    {
+                        case PLOT_YZ:
+                        {
+                            start_c1 = p_start[1]; 
+                            start_c2 = p_start[2];
+                            end_c1   = p_end[1];   
+                            end_c2   = p_end[2];
+                            break;
+                        }
+                        case PLOT_XZ:
+                        {
+                            start_c1 = p_start[0]; 
+                            start_c2 = p_start[2];
+                            end_c1   = p_end[0];   
+                            end_c2   = p_end[2];
+                            break;
+                        }
+                        case PLOT_XY:
+                        default:
+                        {
+                            start_c1 = p_start[0]; 
+                            start_c2 = p_start[1];
+                            end_c1   = p_end[0];   
+                            end_c2   = p_end[1];
+                            break;
+                        }
+                    }
+
+                    double fx = (max1 - start_c1) / di - 0.5;
+                    double fy = (max2 - start_c2) / dj - 0.5;
+
+                    if (isfinite(fx) && isfinite(fy))
+                    {
+                        int sx = (int)lround(fx);
+                        int sy = (int)lround(fy);
+                        if (sx < 0) 
+                            sx = 0;
+                        else if (sx >= gpl->pixx) 
+                            sx = gpl->pixx - 1;
+                        if (sy < 0) 
+                            sy = 0;
+                        else if (sy >= gpl->pixy) 
+                            sy = gpl->pixy - 1;
+
+                        gdImageFilledEllipse(img, sx, sy, mark_size, mark_size, start_colour);
+                    }
+
+                    fx = (max1 - end_c1) / di - 0.5;
+                    fy = (max2 - end_c2) / dj - 0.5;
+
+                    if (isfinite(fx) && isfinite(fy))
+                    {
+                        int ex = (int)lround(fx);
+                        int ey = (int)lround(fy);
+                        if (ex < 0) 
+                            ex = 0;
+                        else if (ex >= gpl->pixx) 
+                            ex = gpl->pixx - 1;
+                        if (ey < 0) 
+                            ey = 0;
+                        else if (ey >= gpl->pixy) 
+                            ey = gpl->pixy - 1;
+                        
+                        gdImageFilledEllipse(img, ex, ey, mark_size, mark_size, end_colour);
+                    }
+
+                }
+            }
+        }
+
+        /* Save image to file*/
 
         char filename[MAX_STR_LEN];
-        snprintf(filename, sizeof(filename), "%s_geom%zu.png", GLOB.inputfname, g + 1);
+        if (GLOB.trackplotmode && DATA.tracks != NULL)
+            snprintf(filename, sizeof(filename), "%s_tracks%zu.png", GLOB.inputfname, g + 1);
+        else
+            snprintf(filename, sizeof(filename), "%s_geom%zu.png", GLOB.inputfname, g + 1);
+        
         FILE *fp = fopen(filename, "wb");
         if (!fp)
         {
@@ -258,5 +438,13 @@ long plotGeometry() {
     }
 
     fprintf(stdout, "DONE.\n");
-    return EXIT_SUCCESS;
+
+    if (GLOB.trackplotmode && DATA.tracks != NULL)
+    {
+        free(DATA.tracks);
+        free(DATA.track_counts);
+        exit(EXIT_SUCCESS);
+    }
+    else
+        return EXIT_SUCCESS;
 }

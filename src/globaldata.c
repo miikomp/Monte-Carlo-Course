@@ -16,9 +16,10 @@ runInfo GLOB = {
     .t0             = 0.0,
     .t1             = 0.0,
     .n_threads      = 1,
-    .nbuf_factor    = 1.0,
+    .nbuf_factor    = 1.25,
     .norun          = false,
     .noplot         = false,
+    .trackplotmode  = false,
 
     .n_generations  = 0l,
     .n_particles    = 0l,
@@ -55,7 +56,9 @@ runData DATA = {
     .gpls = NULL,
     .outside_surf_idx = -1,
     .tot_vol = -1,
-    .boundary_coef = BC_BLACK
+    .boundary_coef = BC_BLACK,
+    .tracks = NULL,
+    .track_counts = NULL
 };
 
 ResultsData RES = {

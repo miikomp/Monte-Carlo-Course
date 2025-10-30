@@ -3,16 +3,17 @@
 # Set the seed (if not set, a random seed is used)
 # set seed 12165467978
 
-# Set number of neutrons in a generation and number of generations
+# Set number of neutrons in a cycle and number of cycles
 set nps 1E4 10
 
-set gcut 10
+# Define fission source in fuel
+src 18 fuel
 
 # Specify geometry plot
 plot xy c 2000 0 -15 15 -15 15
 plot xz c 2000 0
 
-# Define boundary condition
+# Define boundary conditions
 set bc 3
 
 # Specify cross section library path

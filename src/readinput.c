@@ -370,11 +370,8 @@ long readInput() {
             /* Read input parameters */
 
             char *a1 = strtok(NULL, DELIMS);
-            char *a2 = strtok(NULL, DELIMS);
-            char *a3 = strtok(NULL, DELIMS);
-            char *a4 = strtok(NULL, DELIMS);
-            char *a5 = strtok(NULL, DELIMS);
-            if (!a1 || !a2 || !a3 || !a4 || !a5) 
+
+            if (!a1) 
             {
                 fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                 fclose(fp);
@@ -382,22 +379,15 @@ long readInput() {
             }
 
             uint32_t src_type;
-            double x, y, z, E;
-            if (!parseUInt(a1, &src_type) ||!parseDouble(a2, &x) ||!parseDouble(a3, &y) ||!parseDouble(a4, &z) ||!parseDouble(a5, &E)) 
+            if (!parseUInt(a1, &src_type)) 
             {
                 fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
             
-            /* Check for valid values. For now only type 1, monoenergetic point source is supported */
+            /* Allocate new source */
 
-            if (src_type < 1 || E <= 0.0) 
-            {
-                fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
             if (DATA.src == NULL) 
             {
                 DATA.src = (SourceDefinition*)malloc(sizeof(SourceDefinition));
@@ -413,22 +403,83 @@ long readInput() {
             DATA.src_type = (int)src_type;
 
             /* Monoenergetic point source */
-            if (src_type == 1) 
+
+            if (src_type == SRC_MONO_POINT) 
             {
-                DATA.src->mono.E = E;
-                DATA.src->mono.x = x;
-                DATA.src->mono.y = y;
-                DATA.src->mono.z = z;
-            } 
+                char *a2 = strtok(NULL, DELIMS);
+                char *a3 = strtok(NULL, DELIMS);
+                char *a4 = strtok(NULL, DELIMS);
+                char *a5 = strtok(NULL, DELIMS);
+
+                if (!a2 || !a3 || !a4 || !a5)
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                parseDouble(a2, &DATA.src->mono.E);
+                parseDouble(a3, &DATA.src->mono.x);
+                parseDouble(a4, &DATA.src->mono.y);
+                parseDouble(a5, &DATA.src->mono.z);
+            }
+            /* Fissile material source */
+
+            else if (src_type == SRC_FISS_MAT)
+            {
+                char *a2 = strtok(NULL, DELIMS);
+
+                if (!a2)
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                /* Put material name */
+
+                snprintf(DATA.src->fmat.mat_name, sizeof(DATA.src->fmat.mat_name), "%s", a2);
+                DATA.src->fmat.mat_idx = -1;
+
+                /* Try to read boundaries */
+                char *a3 = strtok(NULL, DELIMS);
+                char *a4 = strtok(NULL, DELIMS);
+                char *a5 = strtok(NULL, DELIMS);
+                char *a6 = strtok(NULL, DELIMS);
+                char *a7 = strtok(NULL, DELIMS);
+                char *a8 = strtok(NULL, DELIMS);
+
+                if (!a3 || !a4 || !a5 || !a6 || !a7 || !a8)
+                {
+                    /* Default to geometry bounds */
+
+                    DATA.src->fmat.xmin = NAN;
+                    DATA.src->fmat.xmax = NAN;
+                    DATA.src->fmat.ymin = NAN;
+                    DATA.src->fmat.ymax = NAN;
+                    DATA.src->fmat.zmin = NAN;
+                    DATA.src->fmat.zmax = NAN;
+                }
+                else
+                {
+                    parseDouble(a3, &DATA.src->fmat.xmin);
+                    parseDouble(a4, &DATA.src->fmat.xmax);
+                    parseDouble(a5, &DATA.src->fmat.ymin);
+                    parseDouble(a6, &DATA.src->fmat.ymax);
+                    parseDouble(a7, &DATA.src->fmat.zmin);
+                    parseDouble(a8, &DATA.src->fmat.zmax);
+                }
+
+            }
             else 
             {
-                fprintf(stderr, "[ERROR] Source type %d not implemented (line %ld).\n", src_type, lnum);
+                fprintf(stderr, "[ERROR] Source type %d not implemented (line %ld).\n", DATA.src_type, lnum);
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
 
             if (VERBOSITY >= 2)
-                fprintf(stdout, "Parsed type %d source at (%.2f, %.2f, %.2f) with E=%.2f MeV.\n", src_type, x, y, z, E);
+                fprintf(stdout, "Parsed a source definition of type: %d.\n", DATA.src_type);
 
             np++;
         }

@@ -35,6 +35,21 @@ int runExternalSourceSimulation(void)
         }
     }
 
+    /* If doing track plots grab ptrs to arrays */
+    
+
+    double *track_points = NULL;
+    size_t *track_counts = NULL;
+    bool do_tracks = false;
+
+    if (GLOB.trackplotmode && DATA.tracks != NULL && DATA.track_counts != NULL)
+    {
+        track_points = DATA.tracks;
+        track_counts = DATA.track_counts;
+        do_tracks = true;
+    }
+
+
     for (long c = 1; c <= GLOB.n_cycles + GLOB.n_inactive; c++)
     {
         DATA.cur_cycle = (uint64_t)c;
@@ -55,7 +70,7 @@ int runExternalSourceSimulation(void)
             memset(thread_buf_count, 0, (size_t)GLOB.n_threads * sizeof(size_t));
 
             #pragma omp parallel default(none) \
-                    shared(GLOB, DATA, RES, stdout, stderr, thread_bufs, thread_buf_cap, thread_buf_count, base_cap, c) \
+                    shared(GLOB, DATA, RES, stdout, stderr, thread_bufs, thread_buf_cap, thread_buf_count, base_cap, c, track_counts, track_points, do_tracks) \
                     reduction(+:cycle_scores)
             {
                 /* Get pointer to thread-local buffers */
@@ -77,8 +92,17 @@ int runExternalSourceSimulation(void)
                 /* Loop through the neutrons in the bank */
 
                 #pragma omp for schedule(dynamic)
-                for (size_t i = 0; i < DATA.n_bank; ++i)
+                for (size_t i = 0; i < DATA.n_bank; i++)
                 {
+                    double *points = NULL;
+                    size_t *count = NULL;
+
+                    if (do_tracks && i < (size_t)GLOB.n_tracks)
+                    {
+                        points = track_points + (size_t)i * (MAX_COLLISION_BINS + 1u) * 3u;
+                        count  = &track_counts[i];
+                    }
+
                     /* Get neutron from bank */
 
                     Neutron *n = &DATA.bank[i];
@@ -92,15 +116,50 @@ int runExternalSourceSimulation(void)
                     size_t k = 0;
                     while (n->status == NEUTRON_ALIVE)
                     {
-                        /* Sample distance to next collision */
+                        /* Add point to track segment array if plotting tracks */
+
+                        if (do_tracks && *count < (MAX_COLLISION_BINS + 1))
+                        {
+                            double *slot = points + (*count) * 3u;
+                            slot[0] = n->x;
+                            slot[1] = n->y;
+                            slot[2] = n->z;
+                            (*count)++;
+                        }
+
+                        /* Do boundary conditions */
+                        
+                        applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
+                    
+                        /* Sample distance to next collision within current material */
 
                         double d = sampleDistanceToCollision(n);
+
+                        /* Check distance to nearest boundary */
+
+                        double d0 = distanceToNearestBoundary(n->x, n->y, n->z, n->u, n->v, n->w);
+
+                        /* Check if collision is after boundary cross */
+
+                        if (isfinite(d0) && d0 < d)
+                        {
+                            /* Move over  boundary*/
+
+                            n->x += n->u * (d0 + STEP_INTPL);
+                            n->y += n->v * (d0 + STEP_INTPL);
+                            n->z += n->w * (d0 + STEP_INTPL);
+
+                            /* Continue loop */
+
+                            continue;
+                        }
 
                         if (d < 0.0)
                         {
                             n->status = NEUTRON_DEAD_LEAKAGE;
                             continue;
                         }
+                        
 
                         /* Move neutron */
 
@@ -134,6 +193,9 @@ int runExternalSourceSimulation(void)
 
                         int err;
                         n->mat_idx = getMaterialAtPosition(n->x, n->y, n->z, &err);
+
+                        if (n->mat_idx < 0)
+                            continue;
 
                         /* Sample collision nuclide */
 
@@ -250,10 +312,23 @@ int runExternalSourceSimulation(void)
 
                     }
                 }
+
                 /* Update thread-local buffer counts to main array */
 
                 thread_buf_count[tid] = local_count;
                 thread_buf_cap[tid] = local_cap;
+            }
+
+            /* If in trackplotter mode, we can exit now. Secondary neutrons are not tracked. */
+            if (GLOB.trackplotmode)
+            {
+                for (int i = 0; i < GLOB.n_threads; ++i)
+                    free(thread_bufs[i]);
+                free(thread_bufs);
+                free(thread_buf_count);
+                free(thread_buf_cap);
+
+                return EXIT_SUCCESS;
             }
 
             /* Combine buffers into neutron bank */

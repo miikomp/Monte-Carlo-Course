@@ -56,6 +56,7 @@ extern int VERBOSITY;
 #define E_FG_LIMIT 0.0002             /* MeV energy cutoff for free gas model at 200eV */
 #define E_THERMAL 5.0e-7              /* MeV Thermal threshold energy (Cadmium cutoff) */
 #define E_EPITHERMAL 0.1              /* MeV Epithermal threshold energy */
+#define STEP_INTPL 1e-6             /* Interpolation distance to cross boundaries and avoid floating point errors */
 
 #define DEFAULT_NEEDLE_LENGTH 0.85
 #define DEFAULT_LINE_SPACING  1.0
@@ -79,7 +80,9 @@ enum NEUTRON_STATUS{
 };
 
 enum SRC_TYPES {
-    SRC_MONO_POINT = 1
+    SRC_MONO_POINT = 1,
+    SRC_MONO_REGION,
+    SRC_FISS_MAT = 18
 };
 
 enum DET_TYPES{

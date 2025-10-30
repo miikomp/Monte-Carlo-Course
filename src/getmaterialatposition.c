@@ -4,7 +4,7 @@ long getMaterialAtPosition(double x, double y, double z, int* err) {
 
     /* Apply boundary condition */
     
-    applyBoundaryConditions(&x,&y,&z,NULL,NULL,NULL);
+    applyBoundaryConditions(&x, &y, &z, NULL, NULL, NULL);
 
     /* Find current cell */
 

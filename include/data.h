@@ -380,8 +380,18 @@ typedef struct {
     double x, y, z; // position cm
 } MonoNeutronPointSource;
 
+typedef struct {
+    double E;
+    char mat_name[MAX_STR_LEN];
+    long mat_idx;
+    double xmin, xmax;
+    double ymin, ymax;
+    double zmin, zmax;
+} FissileMaterialSource;
+
 typedef union {
     MonoNeutronPointSource mono;
+    FissileMaterialSource fmat;
 } SourceDefinition;
 
 /* ############################################################################################## */
@@ -428,6 +438,10 @@ typedef struct {
     /* Detectors*/
     size_t n_detectors;
     Detector *detectors[MAX_NUM_DETECTORS];
+
+    /* Track plotting */
+    size_t *track_counts;   // array to store number of track points for each track
+    double *tracks;         // flattened array to store x, y, z for track segments
 } runData;
 
 typedef struct {
@@ -453,6 +467,7 @@ typedef struct {
     double      nbuf_factor;
     bool        norun;
     bool        noplot;
+    bool        trackplotmode;
 
     /* Iteration parameters */
     long        n_generations;  // criticality simulation
@@ -461,6 +476,7 @@ typedef struct {
     long        n_inactive;     // number of inactive generations/cycles
     long        n_points;       // number of points for volume checking (type 1)
     long        n_lines;        // number of lines for volume checking (type 2)
+    long        n_tracks;       // number of particle tracks to plot in trackplot mode
 
     /* Cutoff parameters */
     double      energy_cutoff; // MeV

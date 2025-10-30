@@ -105,6 +105,24 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
             }
         }
+        else if (!strcmp(argv[i], "-tracks") || !strcmp(argv[i], ".--tracks"))
+        {
+            if (i + 1 >= argc - 1)
+            {
+                fprintf(stderr, "[ERROR] Number of tracks not provided.\n");
+                return EXIT_FAILURE;
+            }
+
+            long tracks = strtol(argv[++i], NULL, 10);
+            if (tracks < 1)
+            {
+                fprintf(stderr, "[ERROR] Invalid number of tracks: %ld", tracks);
+                return EXIT_FAILURE;
+            }
+
+            GLOB.trackplotmode = true;
+            GLOB.n_tracks = tracks;
+        }
         else 
         {
             fprintf(stderr, "[ERROR] Unknown commandline argument \"%s\".\n", argv[i]);
@@ -136,10 +154,16 @@ int main(int argc, char **argv) {
     fprintf(stdout, "DONE.\n");
 
     /* Set desired number of threads and put actual number provided */
+    /* trackplot mode is single-threaded only */
 
-    omp_set_num_threads(GLOB.n_threads);
+    if (GLOB.trackplotmode)
+        omp_set_num_threads(1);
+    else
+        omp_set_num_threads(GLOB.n_threads);
+    
     int nt = omp_get_max_threads();
     GLOB.n_threads = nt;
+        
 
     /* Disable dynamic teaming to not mess up thread-private things */
 
@@ -157,7 +181,7 @@ int main(int argc, char **argv) {
     TempNucDataLib *lib = NULL;
     size_t nlib = 0;
 
-    if (processXsData(&lib, &nlib) != 0) 
+    if (processXsData(&lib, &nlib) != EXIT_SUCCESS) 
     {
         fprintf(stderr, "[ERROR] Could not process cross section library file at \"%s\".\n", GLOB.xslibpath);
         return EXIT_FAILURE;
@@ -165,7 +189,7 @@ int main(int argc, char **argv) {
 
     /* Resolve all materials using the temporary nuclide library */
 
-    if (resolveMaterials(lib, nlib) != 0) 
+    if (resolveMaterials(lib, nlib) != EXIT_SUCCESS) 
     {
         fprintf(stderr, "[ERROR] Could not resolve materials.\n");
         return EXIT_FAILURE;
@@ -178,7 +202,7 @@ int main(int argc, char **argv) {
 
     /* Compute macroscopic cross sections for all resolved materials and reaction modes */
     
-    if (computeMacroXs() != 0)
+    if (computeMacroXs() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Failed to compute macroscopic cross sections.\n");
         return EXIT_FAILURE;
@@ -190,7 +214,7 @@ int main(int argc, char **argv) {
 
     /* Process geometry universes */
 
-    if (resolveUniverses() != 0)
+    if (resolveUniverses() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Failed to process universes.\n");
         return EXIT_FAILURE;
@@ -198,7 +222,7 @@ int main(int argc, char **argv) {
 
     /* Process lattices */
 
-    if (resolveLattices() != 0)
+    if (resolveLattices() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Failed to process lattices.\n");
         return EXIT_FAILURE;
@@ -206,7 +230,7 @@ int main(int argc, char **argv) {
 
     /* Process geometry cells */
 
-    if (resolveCells() != 0)
+    if (resolveCells() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Failed to process geometry cells.\n");
         return EXIT_FAILURE;
@@ -214,7 +238,7 @@ int main(int argc, char **argv) {
 
     /* Process transformations */
 
-    if (resolveTransformations() != 0)
+    if (resolveTransformations() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Failed to process transformations.\n");
         return EXIT_FAILURE;
@@ -222,7 +246,7 @@ int main(int argc, char **argv) {
 
     /* Calculate and put outer bounds */
 
-    if (resolveOuterBounds() != 0)
+    if (resolveOuterBounds() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Failed to calculate outer bounds.\n");
         return EXIT_FAILURE;
@@ -230,7 +254,7 @@ int main(int argc, char **argv) {
 
     /* Plot geometry */
     
-    if (plotGeometry() != 0) 
+    if (plotGeometry() != EXIT_SUCCESS) 
     {
         fprintf(stderr, "[ERROR] Could not plot geometry.\n");
         return EXIT_FAILURE;
@@ -238,7 +262,7 @@ int main(int argc, char **argv) {
 
     /* Check volumes by sampling random points */
 
-    if (checkVolumes() != 0)
+    if (checkVolumes() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Volume checking failed.\n");
         return EXIT_FAILURE;
@@ -246,7 +270,7 @@ int main(int argc, char **argv) {
 
     /* Check volumes by sampling random lines */
 
-    if (checkVolumes2() != 0)
+    if (checkVolumes2() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Volume checking failed.\n");
         return EXIT_FAILURE;
@@ -281,7 +305,7 @@ int main(int argc, char **argv) {
 
     /* Process detectors */
 
-    if (processDetectors() != 0) 
+    if (processDetectors() != EXIT_SUCCESS) 
     {
         fprintf(stderr, "[ERROR] Could not process detectors.\n");
         return EXIT_FAILURE;
@@ -291,7 +315,7 @@ int main(int argc, char **argv) {
 
     fprintf(stdout, "\nSampling initial neutron source...\n");
 
-    if (sampleInitialSource() < 0) {
+    if (sampleInitialSource() != EXIT_SUCCESS) {
         fprintf(stderr, "[ERROR] Failed to sample initial source.\n");
         return EXIT_FAILURE;
     }
@@ -310,7 +334,7 @@ int main(int argc, char **argv) {
 
     if (GLOB.norun)
     {
-        fprintf(stdout, "\nLaunched in check mode and found no issues. Exiting...\n");
+        fprintf(stdout, "\nPreparation succesful. Exiting before transport simulation...\n");
         return EXIT_SUCCESS;
     }
 
@@ -323,10 +347,26 @@ int main(int argc, char **argv) {
     /* --- Main loop --- */
     
     /* Dispatch case to correct sub-routine */
+    
+    if (GLOB.trackplotmode)
+    {
+        /* Allocate track coordinate array and adjust run parameters */
 
+        GLOB.n_cycles = GLOB.n_generations = 1;
+        GLOB.n_particles = GLOB.n_tracks;
+
+        DATA.track_counts = (size_t*)calloc(GLOB.n_tracks, sizeof(size_t));
+        DATA.tracks = (double*)calloc(GLOB.n_tracks * MAX_COLLISION_BINS * 3, sizeof(double));
+        if (!DATA.tracks || !DATA.track_counts)
+        {
+            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+            return EXIT_FAILURE;
+        }
+    }
     fprintf(stdout, "\n------------------------\n");
     fprintf(stdout, "  Starting simulation\n");
     fprintf(stdout, "------------------------\n\n");
+
 
     switch (GLOB.mode) {
     case RUNMODE_EXTERNAL_SOURCE:
@@ -338,10 +378,12 @@ int main(int argc, char **argv) {
            For super critical systems a cut-off must be in place to avoid infinite loops.
         */
 
-        fprintf(stdout, "Running external source simulation for %ld cycles with %ld neutrons each.\n", 
-            GLOB.n_cycles, GLOB.n_particles);
+        if (!GLOB.trackplotmode)
+            fprintf(stdout, "Running external source simulation for %ld cycles with %ld neutrons each.\n", GLOB.n_cycles, GLOB.n_particles);
+        else
+            fprintf(stdout, "Simulating %ld tracks...\n", GLOB.n_tracks);
 
-        if (runExternalSourceSimulation() != 0) {
+        if (runExternalSourceSimulation() != EXIT_SUCCESS) {
             fprintf(stderr, "[ERROR] Computation failed.\n");
             return EXIT_FAILURE;
         }
@@ -355,11 +397,14 @@ int main(int argc, char **argv) {
            Simulates a set number of generations so that each new generation is spawned from
            the fission sites of the last generation. 
         */
+        if (!GLOB.trackplotmode)
+            fprintf(stdout, "Running criticality source simulation for %ld generations with %ld neutrons each.\n", GLOB.n_generations, GLOB.n_particles);
+        else
+            fprintf(stdout, "Simulating %ld tracks...\n", GLOB.n_tracks);
 
-        fprintf(stdout, "Running criticality source simulation for %ld generations with %ld neutrons each.\n", 
-            GLOB.n_generations, GLOB.n_particles);
-
-        if (runCriticalitySimulation() != 0) {
+        fprintf(stdout, "Not implemented\n");
+        break;
+        if (runCriticalitySimulation() != EXIT_SUCCESS) {
             fprintf(stderr, "[ERROR] Computation failed.\n");
             return EXIT_FAILURE;
         }
@@ -383,9 +428,18 @@ int main(int argc, char **argv) {
 
     fprintf(stdout, "\n------------------------\n");
     fprintf(stdout, "  Runtime: %.4lfs\n", GLOB.t1 - GLOB.t0);
-    fprintf(stdout, "------------------------\n\n");
+    fprintf(stdout, "------------------------\n");
 
     /* ########################################################################################## */
+
+    /* Plot tracks */
+
+    if (GLOB.trackplotmode)
+        if (plotGeometry() != EXIT_SUCCESS)
+        {
+            fprintf(stderr, "[ERROR Track plotting failed.\n");
+            return EXIT_FAILURE;
+        }
 
     /* Process and output transport results */
 

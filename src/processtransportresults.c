@@ -236,7 +236,7 @@ void processTransportResults(void)
     if (VERBOSITY >= 1)
     {
         fprintf(stdout, "\nTransport per-generation statistics:\n");
-        fprintf(stdout, "  Generation  Histories\n");
+        fprintf(stdout, "  %s  Histories\n", (GLOB.mode == RUNMODE_EXTERNAL_SOURCE) ? "Cycle" : "Generation");
         for (size_t g = 0; g < n_iter; ++g)
             fprintf(stdout, "  %-10zu  %-10.0f\n", g + 1, histories[g]);
     }

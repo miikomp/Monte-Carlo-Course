@@ -60,11 +60,13 @@ int processInput() {
        */
 
         if (!(GLOB.time_cutoff < LONG_MAX) && !(GLOB.generation_cutoff < LONG_MAX)) 
-            GLOB.generation_cutoff = 30l;
+            GLOB.generation_cutoff = 200l;
 
-        /* Unless rewritten by user, increase neutron buffer size in external source simulation */
-        if (GLOB.nbuf_factor <= 1.0)
-            GLOB.nbuf_factor = 10.0;
+        if (!DATA.src)
+        {
+            fprintf(stderr, "[ERROR] Neutron source not defined for external source simulation.\n");
+            return EXIT_FAILURE;
+        }
     }
 
     /* Return success */

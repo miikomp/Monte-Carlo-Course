@@ -81,7 +81,7 @@ Specify `s` for surface targets, then provide translations (`dx`, `dy`, `dz`) an
 - `-v [LEVEL]` Where LEVEL specifies the level of babble, 0 is default, 1 is increased, and 2 is debug output.
 - `-norun` Stops the calculation before the transport routines, used to check input for errors.
 - `-checkvolumes [MODE] [N]` Calculate material volumes. MODE 1 uses random points and 2 draws random lines across the geometry. N sets the number of samples.
-- `-tracks N` Draw N oarticle tracks onto geometry visualisation defined with the **plot** input option.
+- `-tracks N` Draw N particle tracks onto geometry visualisation defined with the **plot** input option.
 
 ---
 

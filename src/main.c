@@ -356,7 +356,7 @@ int main(int argc, char **argv) {
         GLOB.n_particles = GLOB.n_tracks;
 
         DATA.track_counts = (size_t*)calloc(GLOB.n_tracks, sizeof(size_t));
-        DATA.tracks = (double*)calloc(GLOB.n_tracks * MAX_COLLISION_BINS * 3, sizeof(double));
+        DATA.tracks = (double*)calloc(GLOB.n_tracks * (MAX_COLLISION_BINS + 1) * 3, sizeof(double));
         if (!DATA.tracks || !DATA.track_counts)
         {
             fprintf(stderr, "[ERROR] Memory allocation failed.\n");
@@ -402,8 +402,6 @@ int main(int argc, char **argv) {
         else
             fprintf(stdout, "Simulating %ld tracks...\n", GLOB.n_tracks);
 
-        fprintf(stdout, "Not implemented\n");
-        break;
         if (runCriticalitySimulation() != EXIT_SUCCESS) {
             fprintf(stderr, "[ERROR] Computation failed.\n");
             return EXIT_FAILURE;

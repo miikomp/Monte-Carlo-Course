@@ -138,8 +138,118 @@ long sampleInitialSource(void) {
     /* Sample from fissile material (criticality simulation) */
     else
     {
-        fprintf(stderr, "[ERROR] Initial source sampling for criticality mode not implemented.\n");
-        return EXIT_FAILURE;
+        long *mat_idxs = (long *)calloc(DATA.n_mats, sizeof(long));
+        long n_mat_idxs = 0;
+
+        /* Find fissile material(s) */
+
+        for (long m = 0; m < (long)DATA.n_mats; m++)
+        {
+            Material *mat = &DATA.mats[m];
+            bool fissile = false;
+
+            for (size_t n = 0; n < mat->n_nucs; n++)
+            {
+                MaterialNuclide *nuc = &mat->nucs[n];
+
+                if (nuc->nuc_data.has_nubar)
+                {
+                    fissile = true;
+                    break;
+                }
+            }
+
+            if (fissile)
+                mat_idxs[n_mat_idxs++] = m;
+            
+        }
+
+        if (n_mat_idxs <= 0)
+        {
+            fprintf(stderr, "Unable to sample fission source. No material with fission data found.\n");
+            return EXIT_FAILURE;
+        }
+
+        for (long i = 0; i < GLOB.n_particles; i++)
+        {
+            /* Add new neutron to bank */
+
+            Neutron *n = &DATA.bank[DATA.n_bank++];
+
+            /* Initialize misc. parameters */
+
+            n->status = NEUTRON_ALIVE;
+            n->id = (DATA.cur_gen - 1) * GLOB.n_particles + i;
+            n->mat_idx = -1;
+            n->fission_yield = 0;
+            n->path_length = 0.0;
+            n->fast_path_length = 0.0;
+            n->time = 0.0;
+            n->slowing_down_time = 0.0;
+            n->genc = 0;
+
+            /* Initialize particle private seeding */
+
+            n->seed = GLOB.seed + n->id;
+            xoshiro256ss_seed(&n->state, n->seed);
+
+            /* Initial direction is isotropic */
+
+            sampleNeutronDirection(n);
+
+
+            /* Get bounds to sample in */
+
+            double xmin = DATA.x_min;
+            double xmax = DATA.x_max;
+            double ymin = DATA.y_min;
+            double ymax = DATA.y_max;
+            double zmin = DATA.z_min;
+            double zmax = DATA.z_max;
+
+            double dx = xmax - xmin;
+            double dy = ymax - ymin;
+            double dz = zmax - zmin;
+
+            /* Sample points until valid found */
+
+            int err;
+            long counter = 0;
+            bool fissile;
+            double x, y, z, f;
+            do 
+            {
+                x = xmin + randd(&n->state) * dx;
+                y = ymin + randd(&n->state) * dy;
+                z = zmin + randd(&n->state) * dz;
+
+                f = surfaceTest(bb_surf->type, bb_surf->params, bb_surf->n_params, x, y, z);
+
+                long mat_idx = getMaterialAtPosition(x, y, z, &err);
+
+                fissile = false;
+
+                for (long m = 0; m < n_mat_idxs; m++)
+                {
+                    if (mat_idx == mat_idxs[m])
+                    {
+                        fissile = true;
+                        break;
+                    }
+                }
+
+                counter++;
+            }
+            while ((counter < 1000) && (f > 0 || !fissile));
+
+            if (counter >= 1e3)
+                return EXIT_FAILURE;
+
+            n->x = x;
+            n->y = y;
+            n->z = z;
+            n->E = sampleMaxwellianEnergy(n, TNUC_FISSION);
+        }
     }
 
     if (VERBOSITY >= 1)

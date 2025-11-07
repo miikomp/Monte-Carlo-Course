@@ -208,8 +208,7 @@ int runCriticalitySimulation(void)
                     memset(history_counts, 0, total_detector_bins * sizeof(double));
 
                 /* Sample collisions until dead */
-
-                size_t k = 0;
+                
                 while (n->status == NEUTRON_ALIVE) 
                 {
                     /* Add point to track segment array if plotting tracks */
@@ -349,17 +348,6 @@ int runCriticalitySimulation(void)
 
                     gen_scores.total_collisions++;
 
-                    /* For the first set number of collision score energy */
-                    
-                    if (k < MAX_COLLISION_BINS) 
-                    {
-                        gen_scores.collision_energy_sum[k] += n->E;
-                        gen_scores.collision_energy_count[k] += 1;
-                        k++;
-                        if (k > gen_scores.max_collision_bin)
-                            gen_scores.max_collision_bin = k;
-                    }
-
                     /* Handle interaction */
 
                     if (MT_IS_ELASTIC_SCATTER(mt))
@@ -384,15 +372,6 @@ int runCriticalitySimulation(void)
                         gen_scores.total_fission_yield += n->fission_yield;
 
                         r_mode = RRDET_MODE_FISSION;
-
-                        /* Score fission time */
-                        size_t time_bin = (size_t)(n->time / TIME_BIN_WIDTH);
-                        if (time_bin < MAX_TIME_BINS && n->fission_yield > 0)
-                        {
-                            gen_scores.fission_time_yield[time_bin] += (double)n->fission_yield;
-                            gen_scores.fission_time_events[time_bin] += 1;
-                        }
-
                     }
                     else if (MT_IS_INELASTIC_SCATTER(mt))
                     {

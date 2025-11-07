@@ -130,12 +130,16 @@ long sampleInitialSource(void) {
                 n->x = x;
                 n->y = y;
                 n->z = z;
+
+                /* Sample fission energy from Maxwellian distribution */
+
                 n->E = sampleMaxwellianEnergy(n, TNUC_FISSION);
             }
         }   
     }
 
     /* Sample from fissile material (criticality simulation) */
+    
     else
     {
         long *mat_idxs = (long *)calloc(DATA.n_mats, sizeof(long));

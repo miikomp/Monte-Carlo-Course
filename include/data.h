@@ -254,11 +254,6 @@ typedef struct {
     uint64_t total_leakages;
     uint64_t total_unknowns;
     uint64_t total_terminated;
-    size_t   max_collision_bin;
-    double   collision_energy_sum[MAX_COLLISION_BINS];
-    uint64_t collision_energy_count[MAX_COLLISION_BINS];
-    double   fission_time_yield[MAX_TIME_BINS];
-    uint64_t fission_time_events[MAX_TIME_BINS];
 } TransportRunScores;
 
 /* Custom OpenMP reduction clause for the TransportRunScores structure */
@@ -283,18 +278,6 @@ static inline void TransportRunScoresReduce(TransportRunScores *restrict out,
     out->total_leakages      += in->total_leakages;
     out->total_unknowns      += in->total_unknowns;
     out->total_terminated      += in->total_terminated;
-    if (in->max_collision_bin > out->max_collision_bin)
-        out->max_collision_bin = in->max_collision_bin;
-    for (size_t b = 0; b < MAX_COLLISION_BINS; ++b)
-    {
-        out->collision_energy_sum[b]   += in->collision_energy_sum[b];
-        out->collision_energy_count[b] += in->collision_energy_count[b];
-    }
-    for (size_t b = 0; b < MAX_TIME_BINS; ++b)
-    {
-        out->fission_time_yield[b]   += in->fission_time_yield[b];
-        out->fission_time_events[b] += in->fission_time_events[b];
-    }
 }
 
 #pragma omp declare reduction(+:TransportRunScores: TransportRunScoresReduce(&omp_out, &omp_in)) \
@@ -399,7 +382,7 @@ typedef union {
 
 // Collection data structure for all of the data needed during a run
 typedef struct {
-    /* System */
+    /* Geometry */
     size_t           n_mats;
     Material        *mats;
     size_t           n_surf;
@@ -479,14 +462,16 @@ typedef struct {
     long        n_tracks;       // number of particle tracks to plot in trackplot mode
 
     /* Cutoff parameters */
-    double      energy_cutoff; // MeV
-    long        collision_cutoff; // per neutron
-    long        generation_cutoff; // in external source mode to limits lengths of fission histories
-    double      time_cutoff; // seconds
+    double      energy_cutoff;      // MeV
+    long        collision_cutoff;   // per neutron
+    long        generation_cutoff;  // in external source mode to limits lengths of fission histories
+    double      time_cutoff;        // seconds
 
     /* Allocated memory footprint (bytes)*/
     size_t      mem_xsdata;
     size_t      mem_nbank;
+    size_t      mem_results;
+    size_t      mem_detectors;
 } runInfo;
 
 extern runData DATA;

@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
             }
         }
-        else if (!strcmp(argv[i], "-tracks") || !strcmp(argv[i], ".--tracks"))
+        else if (!strcmp(argv[i], "-tracks") || !strcmp(argv[i], "--tracks"))
         {
             if (i + 1 >= argc - 1)
             {
@@ -178,6 +178,7 @@ int main(int argc, char **argv) {
     fprintf(stdout, "------------------------\n");
 
     /* Read and process the xsdata from the given path into a temporary librabry */
+
     TempNucDataLib *lib = NULL;
     size_t nlib = 0;
 
@@ -297,8 +298,8 @@ int main(int argc, char **argv) {
 
     /* Calculate memory footprint of results data structure */
 
-    size_t total_bytes = sizeof(ResultsData) + n_res * sizeof(TransportRunScores);
-    fprintf(stdout, "Memory allocated for results: %.2f MB\n", (double)total_bytes / (1024.0 * 1024.0));
+    GLOB.mem_results = sizeof(ResultsData) + n_res * sizeof(TransportRunScores);
+    fprintf(stdout, "Memory allocated for results: %.2f MB\n", (double)GLOB.mem_results / (1024.0 * 1024.0));
 
 
     fprintf(stdout, "DONE.\n");
@@ -379,7 +380,7 @@ int main(int argc, char **argv) {
         */
 
         if (!GLOB.trackplotmode)
-            fprintf(stdout, "Running external source simulation for %ld cycles with %ld neutrons each.\n", GLOB.n_cycles, GLOB.n_particles);
+            fprintf(stdout, "Running external source simulation for %ld cycles with %ld neutrons each.\n\n", GLOB.n_cycles, GLOB.n_particles);
         else
             fprintf(stdout, "Simulating %ld tracks...\n", GLOB.n_tracks);
 
@@ -398,7 +399,7 @@ int main(int argc, char **argv) {
            the fission sites of the last generation. 
         */
         if (!GLOB.trackplotmode)
-            fprintf(stdout, "Running criticality source simulation for %ld generations with %ld neutrons each.\n", GLOB.n_generations, GLOB.n_particles);
+            fprintf(stdout, "Running criticality source simulation for %ld generations with %ld neutrons each.\n\n", GLOB.n_generations, GLOB.n_particles);
         else
             fprintf(stdout, "Simulating %ld tracks...\n", GLOB.n_tracks);
 

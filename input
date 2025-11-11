@@ -1,13 +1,13 @@
 # Example input file for the "moca" Monte Carlo neutron transport code
 
 # Set the seed (if not set, a random seed is used)
-# set seed 12165467978
+set seed 12165467978
 
 # Set total number of neutrons and number of cycles
-set pop 10000 20 10
+set nps 10000 20 10
 
 # Define fission source in fuel
-# src 18 fuel
+src 18 fuel
 
 # Specify geometry plot
 plot xy c 2000 0 -15 15 -15 15

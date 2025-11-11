@@ -453,8 +453,8 @@ typedef struct {
     bool        trackplotmode;
 
     /* Iteration parameters */
-    long        n_generations;  // criticality simulation
-    long        n_cycles;       // external source simulation
+    long        n_generations;  // generations for criticality simulation
+    long        n_cycles;       // independent cycles for external source simulation
     long        n_particles;    // particles per cycle/generation
     long        n_inactive;     // number of inactive generations/cycles
     long        n_points;       // number of points for volume checking (type 1)

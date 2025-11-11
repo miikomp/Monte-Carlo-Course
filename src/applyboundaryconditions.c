@@ -2,12 +2,12 @@
 
 void applyBoundaryConditions(double *x, double *y, double *z, double *u, double *v, double *w)
 {
-    if (!x || !y || !z || DATA.outside_surf_idx < 0 || DATA.outside_surf_idx >= (long)DATA.n_surf)
+    if (!x || !y || !z || DATA.boundary_surf_idx < 0 || DATA.boundary_surf_idx >= (long)DATA.n_surf)
         return;
 
     /* Check if outer boundary breached */
     
-    Surface *S = &DATA.surfs[DATA.outside_surf_idx];
+    Surface *S = &DATA.surfs[DATA.boundary_surf_idx];
 
     if (surfaceTest(S->type, S->params, S->n_params, *x, *y, *z) <= 0.0)
         return;

@@ -24,7 +24,7 @@ long sampleInitialSource(void) {
 
     /* Get geometry bounding surface */
 
-    Surface *bb_surf = &DATA.surfs[DATA.outside_surf_idx];
+    Surface *bb_surf = &DATA.surfs[DATA.boundary_surf_idx];
 
     /* Sample from a user defined neutron source */
 
@@ -61,14 +61,16 @@ long sampleInitialSource(void) {
 
             if (DATA.src_type == SRC_MONO_POINT) 
             {
-                n->E = DATA.src->mono.E;
-                n->x = DATA.src->mono.x;
-                n->y = DATA.src->mono.y;
-                n->z = DATA.src->mono.z;
+                NeutronPointSource *src = &DATA.src->npoint;
+
+                n->E = src->E;
+                n->x = src->x;
+                n->y = src->y;
+                n->z = src->z;
             }
             else if (DATA.src_type == SRC_FISS_MAT)
             {
-                FissileMaterialSource *src = &DATA.src->fmat;
+                NeutronFissionSource *src = &DATA.src->fission;
 
                 if (src->mat_idx < 0)
                 {

@@ -370,8 +370,9 @@ long readInput() {
             /* Read input parameters */
 
             char *a1 = strtok(NULL, DELIMS);
+            char *a2 = strtok(NULL, DELIMS);
 
-            if (!a1) 
+            if (!a1 || !a2) 
             {
                 fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                 fclose(fp);
@@ -379,7 +380,7 @@ long readInput() {
             }
 
             uint32_t src_type;
-            if (!parseUInt(a1, &src_type)) 
+            if (!parseUInt(a2, &src_type)) 
             {
                 fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
                 fclose(fp);
@@ -390,7 +391,7 @@ long readInput() {
 
             if (DATA.src == NULL) 
             {
-                DATA.src = (SourceDefinition*)malloc(sizeof(SourceDefinition));
+                DATA.src = (ParticleSource*)malloc(sizeof(ParticleSource));
                 if (!DATA.src) 
                 { 
                     fprintf(stderr,"[ERROR] Memory allocation failed.\n"); 
@@ -406,6 +407,9 @@ long readInput() {
 
             if (src_type == SRC_MONO_POINT) 
             {
+                /* Put source name */
+                snprintf(DATA.src->npoint.name, sizeof(DATA.src->npoint.name), "%s", a2);
+
                 char *a2 = strtok(NULL, DELIMS);
                 char *a3 = strtok(NULL, DELIMS);
                 char *a4 = strtok(NULL, DELIMS);
@@ -418,18 +422,21 @@ long readInput() {
                     exit(EXIT_FAILURE);
                 }
 
-                parseDouble(a2, &DATA.src->mono.E);
-                parseDouble(a3, &DATA.src->mono.x);
-                parseDouble(a4, &DATA.src->mono.y);
-                parseDouble(a5, &DATA.src->mono.z);
+                parseDouble(a2, &DATA.src->npoint.E);
+                parseDouble(a3, &DATA.src->npoint.x);
+                parseDouble(a4, &DATA.src->npoint.y);
+                parseDouble(a5, &DATA.src->npoint.z);
             }
             /* Fissile material source */
 
             else if (src_type == SRC_FISS_MAT)
             {
-                char *a2 = strtok(NULL, DELIMS);
+                /* Put source name */
+                snprintf(DATA.src->fission.name, sizeof(DATA.src->fission.name), "%s", a2);
 
-                if (!a2)
+                char *a3 = strtok(NULL, DELIMS);
+
+                if (!a3)
                 {
                     fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
                     fclose(fp);
@@ -438,36 +445,37 @@ long readInput() {
 
                 /* Put material name */
 
-                snprintf(DATA.src->fmat.mat_name, sizeof(DATA.src->fmat.mat_name), "%s", a2);
-                DATA.src->fmat.mat_idx = -1;
+                snprintf(DATA.src->fission.mat_name, sizeof(DATA.src->fission.mat_name), "%s", a3);
+                DATA.src->fission.mat_idx = -1;
 
                 /* Try to read boundaries */
-                char *a3 = strtok(NULL, DELIMS);
+
                 char *a4 = strtok(NULL, DELIMS);
                 char *a5 = strtok(NULL, DELIMS);
                 char *a6 = strtok(NULL, DELIMS);
                 char *a7 = strtok(NULL, DELIMS);
                 char *a8 = strtok(NULL, DELIMS);
+                char *a9 = strtok(NULL, DELIMS);
 
-                if (!a3 || !a4 || !a5 || !a6 || !a7 || !a8)
+                if (!a4 || !a5 || !a6 || !a7 || !a8 || !a9)
                 {
                     /* Default to geometry bounds */
 
-                    DATA.src->fmat.xmin = NAN;
-                    DATA.src->fmat.xmax = NAN;
-                    DATA.src->fmat.ymin = NAN;
-                    DATA.src->fmat.ymax = NAN;
-                    DATA.src->fmat.zmin = NAN;
-                    DATA.src->fmat.zmax = NAN;
+                    DATA.src->fission.xmin = NAN;
+                    DATA.src->fission.xmax = NAN;
+                    DATA.src->fission.ymin = NAN;
+                    DATA.src->fission.ymax = NAN;
+                    DATA.src->fission.zmin = NAN;
+                    DATA.src->fission.zmax = NAN;
                 }
                 else
                 {
-                    parseDouble(a3, &DATA.src->fmat.xmin);
-                    parseDouble(a4, &DATA.src->fmat.xmax);
-                    parseDouble(a5, &DATA.src->fmat.ymin);
-                    parseDouble(a6, &DATA.src->fmat.ymax);
-                    parseDouble(a7, &DATA.src->fmat.zmin);
-                    parseDouble(a8, &DATA.src->fmat.zmax);
+                    parseDouble(a4, &DATA.src->fission.xmin);
+                    parseDouble(a5, &DATA.src->fission.xmax);
+                    parseDouble(a6, &DATA.src->fission.ymin);
+                    parseDouble(a7, &DATA.src->fission.ymax);
+                    parseDouble(a8, &DATA.src->fission.zmin);
+                    parseDouble(a9, &DATA.src->fission.zmax);
                 }
 
             }

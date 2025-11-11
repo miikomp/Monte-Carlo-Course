@@ -145,6 +145,7 @@ long plotGeometry() {
         memset(prev_row, -1, sizeof(long) * gpl->pixx);
 
         /* Cell boundary plotting requires tracking lattice boundaries as well */
+
         long *prev_row2 = (long*)calloc(gpl->pixx, sizeof(long));
         memset(prev_row2, -1, sizeof(long) * gpl->pixx);
 

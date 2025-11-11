@@ -36,7 +36,6 @@ int runExternalSourceSimulation(void)
     }
 
     /* If doing track plots grab ptrs to arrays */
-    
 
     double *track_points = NULL;
     size_t *track_counts = NULL;
@@ -58,7 +57,7 @@ int runExternalSourceSimulation(void)
         TransportRunScores cycle_scores;
         memset(&cycle_scores, 0, sizeof(TransportRunScores));
 
-        if (sampleInitialSource() != 0)
+        if (c > 1 && sampleInitialSource() != 0)
         {
             fprintf(stderr, "[ERROR] Failed to sample initial source for cycle %ld.\n", c);
             exit(EXIT_FAILURE);
@@ -118,7 +117,7 @@ int runExternalSourceSimulation(void)
                     {
                         /* Add point to track segment array if plotting tracks */
 
-                        if (do_tracks && *count < (MAX_COLLISION_BINS + 1))
+                        if (do_tracks && count && *count < (MAX_COLLISION_BINS + 1))
                         {
                             double *slot = points + (*count) * 3u;
                             slot[0] = n->x;
@@ -321,15 +320,7 @@ int runExternalSourceSimulation(void)
 
             /* If in trackplotter mode, we can exit now. Secondary neutrons are not tracked. */
             if (GLOB.trackplotmode)
-            {
-                for (int i = 0; i < GLOB.n_threads; ++i)
-                    free(thread_bufs[i]);
-                free(thread_bufs);
-                free(thread_buf_count);
-                free(thread_buf_cap);
-
                 return EXIT_SUCCESS;
-            }
 
             /* Combine buffers into neutron bank */
 

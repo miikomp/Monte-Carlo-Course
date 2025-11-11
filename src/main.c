@@ -283,7 +283,22 @@ int main(int argc, char **argv) {
     fprintf(stdout, "----------------------------\n\n");
 
     /* Initialize results data struct */
+    if (GLOB.trackplotmode)
+    {
+        /* Allocate track coordinate array and adjust run parameters */
 
+        GLOB.n_cycles = GLOB.n_generations = 1;
+        GLOB.n_particles = GLOB.n_tracks;
+
+        DATA.track_counts = (size_t*)calloc(GLOB.n_tracks, sizeof(size_t));
+        DATA.tracks = (double*)calloc(GLOB.n_tracks * (MAX_COLLISION_BINS + 1u) * 3, sizeof(double));
+        if (!DATA.tracks || !DATA.track_counts)
+        {
+            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+            return EXIT_FAILURE;
+        }
+    }
+    
     fprintf(stdout, "Clearing results...\n");
 
     size_t n_res = (size_t)GLOB.n_generations ? GLOB.n_generations > 0 : GLOB.n_cycles;
@@ -347,22 +362,7 @@ int main(int argc, char **argv) {
     /* --- Main loop --- */
     
     /* Dispatch case to correct sub-routine */
-    
-    if (GLOB.trackplotmode)
-    {
-        /* Allocate track coordinate array and adjust run parameters */
 
-        GLOB.n_cycles = GLOB.n_generations = 1;
-        GLOB.n_particles = GLOB.n_tracks;
-
-        DATA.track_counts = (size_t*)calloc(GLOB.n_tracks, sizeof(size_t));
-        DATA.tracks = (double*)calloc(GLOB.n_tracks * MAX_COLLISION_BINS * 3, sizeof(double));
-        if (!DATA.tracks || !DATA.track_counts)
-        {
-            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
-            return EXIT_FAILURE;
-        }
-    }
     fprintf(stdout, "\n------------------------\n");
     fprintf(stdout, "  Starting simulation\n");
     fprintf(stdout, "------------------------\n\n");

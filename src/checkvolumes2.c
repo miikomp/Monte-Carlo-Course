@@ -80,7 +80,7 @@ int checkVolumes2()
             /* Sample a random point in XYZ or XY within the defined geometry*/
 
             double x, y, z, f;
-            Surface *bb_surf = &DATA.surfs[DATA.outside_surf_idx];
+            Surface *bb_surf = &DATA.surfs[DATA.boundary_surf_idx];
             
             do 
             {

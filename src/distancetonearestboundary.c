@@ -71,7 +71,7 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
 
     /* Compute distance to system bounding surface */
 
-    Surface *S = &DATA.surfs[DATA.outside_surf_idx];
+    Surface *S = &DATA.surfs[DATA.boundary_surf_idx];
     double tx = x;
     double ty = y;
     double tz = z;

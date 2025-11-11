@@ -61,7 +61,7 @@ int resolveOuterBounds() {
     /* Get the bounding surface and save its index */
 
     Surface *s0 = &DATA.surfs[j];
-    DATA.outside_surf_idx = j;
+    DATA.boundary_surf_idx = j;
 
     /* Set the outer bounds */
     size_t n_params = s0->n_params;
@@ -70,206 +70,206 @@ int resolveOuterBounds() {
 
     switch (type)
     {
-    case SURF_CYLX:
-    {
-        double r = params[2];
-        DATA.y_min = params[0] - r;
-        DATA.y_max = params[0] + r;
-        DATA.z_min = params[1] - r;
-        DATA.z_max = params[1] + r;
-
-        if (n_params == 5)
+        case SURF_CYLX:
         {
-            DATA.x_min = params[3];
-            DATA.x_max = params[4];
+            double r = params[2];
+            DATA.y_min = params[0] - r;
+            DATA.y_max = params[0] + r;
+            DATA.z_min = params[1] - r;
+            DATA.z_max = params[1] + r;
 
-            DATA.tot_vol = M_PI * r * r * (DATA.x_max - DATA.x_min);
-        }
-        else
+            if (n_params == 5)
+            {
+                DATA.x_min = params[3];
+                DATA.x_max = params[4];
+
+                DATA.tot_vol = M_PI * r * r * (DATA.x_max - DATA.x_min);
+            }
+            else
+            {
+                DATA.x_min = 0.0;
+                DATA.x_max = 0.0;
+
+                DATA.tot_vol = M_PI * r * r;
+            }
+
+            break;
+        }  
+        
+        case SURF_CYLY:
         {
-            DATA.x_min = 0.0;
-            DATA.x_max = 0.0;
+            double r = params[2];
+            DATA.x_min = params[0] - r;
+            DATA.x_max = params[0] + r;
+            DATA.z_min = params[1] - r;
+            DATA.z_max = params[1] + r;
 
-            DATA.tot_vol = M_PI * r * r;
-        }
+            if (n_params == 5)
+            {
+                DATA.y_min = params[3];
+                DATA.y_max = params[4];
 
-        break;
-    }  
-    
-    case SURF_CYLY:
-    {
-        double r = params[2];
-        DATA.x_min = params[0] - r;
-        DATA.x_max = params[0] + r;
-        DATA.z_min = params[1] - r;
-        DATA.z_max = params[1] + r;
+                DATA.tot_vol = M_PI * r * r * (DATA.y_max - DATA.y_min);
+            }
+            else
+            {
+                DATA.y_min = 0.0;
+                DATA.y_max = 0.0;
 
-        if (n_params == 5)
-        {
-            DATA.y_min = params[3];
-            DATA.y_max = params[4];
+                DATA.tot_vol = M_PI * r * r;
+            }
 
-            DATA.tot_vol = M_PI * r * r * (DATA.y_max - DATA.y_min);
-        }
-        else
-        {
-            DATA.y_min = 0.0;
-            DATA.y_max = 0.0;
-
-            DATA.tot_vol = M_PI * r * r;
-        }
-
-        break;
-    }
-
-    case SURF_CYLZ:
-    {
-        double r = params[2];
-        DATA.x_min = params[0] - r;
-        DATA.x_max = params[0] + r;
-        DATA.y_min = params[1] - r;
-        DATA.y_max = params[1] + r;
-
-        if (n_params == 5)
-        {
-            DATA.z_min = params[3];
-            DATA.z_max = params[4];
-
-            DATA.tot_vol = M_PI * r * r * (DATA.z_max - DATA.z_min);
-        }
-        else
-        {
-            DATA.z_min = 0.0;
-            DATA.z_max = 0.0;
-
-            DATA.tot_vol = M_PI * r * r;
+            break;
         }
 
-        break;
-    }
-
-    case SURF_HEXX:
-    {
-        double d = params[2];
-        DATA.x_min = params[0] - d;
-        DATA.x_max = params[0] + d;
-        DATA.y_min = (params[1] - d) / (0.5 * SQRT3);
-        DATA.y_max = (params[1] + d) / (0.5 * SQRT3);
-
-        if (n_params == 5)
+        case SURF_CYLZ:
         {
-            DATA.z_min = params[3];
-            DATA.z_max = params[4];
+            double r = params[2];
+            DATA.x_min = params[0] - r;
+            DATA.x_max = params[0] + r;
+            DATA.y_min = params[1] - r;
+            DATA.y_max = params[1] + r;
 
-            DATA.tot_vol = (2 * SQRT3 * d * d) * (DATA.z_max - DATA.z_min);
-        }
-        else
-        {
-            DATA.z_min = 0.0;
-            DATA.z_max = 0.0;
+            if (n_params == 5)
+            {
+                DATA.z_min = params[3];
+                DATA.z_max = params[4];
 
-            DATA.tot_vol = (2 * SQRT3 * d * d);
-        }
+                DATA.tot_vol = M_PI * r * r * (DATA.z_max - DATA.z_min);
+            }
+            else
+            {
+                DATA.z_min = 0.0;
+                DATA.z_max = 0.0;
 
-        break;
-    }
+                DATA.tot_vol = M_PI * r * r;
+            }
 
-    case SURF_HEXY:
-    {
-        double d  = params[2];
-        DATA.x_min = (params[0] - d) / (0.5 * SQRT3);
-        DATA.x_max = (params[0] + d) / (0.5 * SQRT3);
-        DATA.y_min = params[1] - d;
-        DATA.y_max = params[1] + d;
-
-        if (n_params == 5)
-        {
-            DATA.z_min = params[3];
-            DATA.z_max = params[4];
-
-            DATA.tot_vol = (2 * SQRT3 * d * d) * (DATA.z_max - DATA.z_min);
-        }
-        else
-        {
-            DATA.z_min = 0.0;
-            DATA.z_max = 0.0;
-
-            DATA.tot_vol = (2 * SQRT3 * d * d);
+            break;
         }
 
-        break;
-    }
-
-    case SURF_SQR:
-    {
-        double a = params[2];
-        DATA.x_min = params[0] - a;
-        DATA.x_max = params[0] + a;
-        DATA.y_min = params[1] - a;
-        DATA.y_max = params[1] + a;
-        if (n_params == 5)
+        case SURF_HEXX:
         {
-            DATA.z_min = params[3];
-            DATA.z_max = params[4];
+            double d = params[2];
+            DATA.x_min = params[0] - d;
+            DATA.x_max = params[0] + d;
+            DATA.y_min = (params[1] - d) / (0.5 * SQRT3);
+            DATA.y_max = (params[1] + d) / (0.5 * SQRT3);
+
+            if (n_params == 5)
+            {
+                DATA.z_min = params[3];
+                DATA.z_max = params[4];
+
+                DATA.tot_vol = (2 * SQRT3 * d * d) * (DATA.z_max - DATA.z_min);
+            }
+            else
+            {
+                DATA.z_min = 0.0;
+                DATA.z_max = 0.0;
+
+                DATA.tot_vol = (2 * SQRT3 * d * d);
+            }
+
+            break;
+        }
+
+        case SURF_HEXY:
+        {
+            double d  = params[2];
+            DATA.x_min = (params[0] - d) / (0.5 * SQRT3);
+            DATA.x_max = (params[0] + d) / (0.5 * SQRT3);
+            DATA.y_min = params[1] - d;
+            DATA.y_max = params[1] + d;
+
+            if (n_params == 5)
+            {
+                DATA.z_min = params[3];
+                DATA.z_max = params[4];
+
+                DATA.tot_vol = (2 * SQRT3 * d * d) * (DATA.z_max - DATA.z_min);
+            }
+            else
+            {
+                DATA.z_min = 0.0;
+                DATA.z_max = 0.0;
+
+                DATA.tot_vol = (2 * SQRT3 * d * d);
+            }
+
+            break;
+        }
+
+        case SURF_SQR:
+        {
+            double a = params[2];
+            DATA.x_min = params[0] - a;
+            DATA.x_max = params[0] + a;
+            DATA.y_min = params[1] - a;
+            DATA.y_max = params[1] + a;
+            if (n_params == 5)
+            {
+                DATA.z_min = params[3];
+                DATA.z_max = params[4];
+
+                DATA.tot_vol = (DATA.x_max - DATA.x_min) * (DATA.y_max - DATA.y_min) * (DATA.z_max - DATA.z_min);
+            }
+            else
+            {
+                DATA.z_min = 0.0;
+                DATA.z_max = 0.0;
+
+                DATA.tot_vol = (DATA.x_max - DATA.x_min) * (DATA.y_max - DATA.y_min);
+            }
+
+            break;
+        }
+        case SURF_SPH:
+        {
+            double r = params[3];
+            DATA.x_min = -r;
+            DATA.x_max =  r;
+            DATA.y_min = -r;
+            DATA.y_max =  r;
+            DATA.z_min = -r;
+            DATA.z_max =  r;
+
+            DATA.tot_vol = 4 * M_PI * r * r * r / 3;
+
+            break;
+        }
+        case SURF_CUBE:
+        {
+            double a = params[3];
+            DATA.x_min = -a;
+            DATA.x_max =  a;
+            DATA.y_min = -a;
+            DATA.y_max =  a;
+            DATA.z_min = -a;
+            DATA.z_max =  a;
 
             DATA.tot_vol = (DATA.x_max - DATA.x_min) * (DATA.y_max - DATA.y_min) * (DATA.z_max - DATA.z_min);
+
+            break;
         }
-        else
+        case SURF_CUBOID:
         {
-            DATA.z_min = 0.0;
-            DATA.z_max = 0.0;
+            DATA.x_min = params[0];
+            DATA.x_max = params[1];
+            DATA.y_min = params[2];
+            DATA.y_max = params[3];
+            DATA.z_min = params[4];
+            DATA.z_max = params[5];
 
-            DATA.tot_vol = (DATA.x_max - DATA.x_min) * (DATA.y_max - DATA.y_min);
+            DATA.tot_vol = (DATA.x_max - DATA.x_min) * (DATA.y_max - DATA.y_min) * (DATA.z_max - DATA.z_min);
+
+            break;
         }
-
-        break;
-    }
-    case SURF_SPH:
-    {
-        double r = params[3];
-        DATA.x_min = -r;
-        DATA.x_max =  r;
-        DATA.y_min = -r;
-        DATA.y_max =  r;
-        DATA.z_min = -r;
-        DATA.z_max =  r;
-
-        DATA.tot_vol = 4 * M_PI * r * r * r / 3;
-
-        break;
-    }
-    case SURF_CUBE:
-    {
-        double a = params[3];
-        DATA.x_min = -a;
-        DATA.x_max =  a;
-        DATA.y_min = -a;
-        DATA.y_max =  a;
-        DATA.z_min = -a;
-        DATA.z_max =  a;
-
-        DATA.tot_vol = (DATA.x_max - DATA.x_min) * (DATA.y_max - DATA.y_min) * (DATA.z_max - DATA.z_min);
-
-        break;
-    }
-    case SURF_CUBOID:
-    {
-        DATA.x_min = params[0];
-        DATA.x_max = params[1];
-        DATA.y_min = params[2];
-        DATA.y_max = params[3];
-        DATA.z_min = params[4];
-        DATA.z_max = params[5];
-
-        DATA.tot_vol = (DATA.x_max - DATA.x_min) * (DATA.y_max - DATA.y_min) * (DATA.z_max - DATA.z_min);
-
-        break;
-    }
-    default:
-    {
-        fprintf(stderr, "[ERROR] Surface type %d not implemented for outer boundaries.\n", type);
-        return EXIT_FAILURE;
-    }
+        default:
+        {
+            fprintf(stderr, "[ERROR] Surface type %d not implemented for outer boundaries.\n", type);
+            return EXIT_FAILURE;
+        }
     }
 
     /* Check for legal geometry */
@@ -281,7 +281,8 @@ int resolveOuterBounds() {
         return EXIT_FAILURE;
     }
 
-    fprintf(stdout, "  X: [%8.4lf, %8.4lf] cm\n  Y: [%8.4lf, %8.4lf] cm\n  Z: [%8.4lf, %8.4lf] cm\nVol: %.4lf\n", DATA.x_min, DATA.x_max, DATA.y_min, DATA.y_max, DATA.z_min, DATA.z_max, DATA.tot_vol);
+    fprintf(stdout, "  X: [%8.4lf, %8.4lf] cm\n  Y: [%8.4lf, %8.4lf] cm\n  Z: [%8.4lf, %8.4lf] cm\n%s: %.4lf\n",
+            DATA.x_min, DATA.x_max, DATA.y_min, DATA.y_max, DATA.z_min, DATA.z_max, ((DATA.z_max - DATA.z_min) > 0.0 ? "Volume" : "Area"), DATA.tot_vol);
 
     fprintf(stdout, "DONE.\n");
 

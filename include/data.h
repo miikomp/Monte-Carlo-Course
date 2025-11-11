@@ -376,23 +376,25 @@ typedef struct {
 /* --- Particle source data structures --- */
 
 typedef struct {
+    char name[MAX_STR_LEN];
     double E;       // MeV
     double x, y, z; // position cm
-} MonoNeutronPointSource;
+} NeutronPointSource;
 
 typedef struct {
+    char name[MAX_STR_LEN];
     double E;
     char mat_name[MAX_STR_LEN];
     long mat_idx;
     double xmin, xmax;
     double ymin, ymax;
     double zmin, zmax;
-} FissileMaterialSource;
+} NeutronFissionSource;
 
 typedef union {
-    MonoNeutronPointSource mono;
-    FissileMaterialSource fmat;
-} SourceDefinition;
+    NeutronPointSource npoint;
+    NeutronFissionSource fission;
+} ParticleSource;
 
 /* ############################################################################################## */
 /* --- Global data structures --- */
@@ -418,7 +420,7 @@ typedef struct {
 
     /* Bounds */
     BoundaryCoefficents boundary_coef;
-    long      outside_surf_idx;
+    long      boundary_surf_idx;
     double    tot_vol;
     double    x_min, x_max;
     double    y_min, y_max;
@@ -432,7 +434,7 @@ typedef struct {
     Neutron  *bank;
 
     /* Sources */
-    SourceDefinition *src;
+    ParticleSource *src;
     uint32_t src_type;
 
     /* Detectors*/

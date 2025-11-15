@@ -1,6 +1,5 @@
 #include "header.h"
-
-inline size_t energyGridBinIndex(const EnergyGrid *grid, double energy);
+#include "detectorbuffer.h"
 
 int runCriticalitySimulation(void) 
 {
@@ -28,78 +27,6 @@ int runCriticalitySimulation(void)
 
     /* ########################################################################################## */
 
-    /* Get pointer to detector array */
-
-    const size_t n_detectors = DATA.n_detectors;
-    Detector **detectors = DATA.detectors;
-
-    /* Initialize detector scoring related variables */
-
-    size_t *detector_offsets = NULL;
-    size_t *detector_bin_counts = NULL;
-    size_t total_detector_bins = 0;
-    int max_threads = omp_get_max_threads();
-    double *detector_thread_sums = NULL;
-    double *detector_thread_sums_sq = NULL;
-    double *detector_history_counts = NULL;
-
-    /* Create thread local storage for detector scores */
-
-    if (n_detectors > 0)
-    {
-        detector_offsets = (size_t*)malloc(n_detectors * sizeof(size_t));
-        detector_bin_counts = (size_t*)calloc(n_detectors, sizeof(size_t));
-        if (!detector_offsets || !detector_bin_counts)
-        {
-            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
-            free(detector_offsets);
-            free(detector_bin_counts);
-            free(detector_thread_sums);
-            free(detector_thread_sums_sq);
-            free(detector_history_counts);
-            return EXIT_FAILURE;
-        }
-
-        for (size_t d = 0; d < n_detectors; ++d)
-        {
-            detector_offsets[d] = total_detector_bins;
-            Detector *det = detectors[d];
-            size_t bins = 0;
-            if (det)
-            {
-                if (det->type == DETECTOR_TYPE_REACTION_RATE)
-                {
-                    size_t energy_bins = det->data.reaction_rate.n_energy_bins;
-                    if (energy_bins == 0)
-                        energy_bins = 1;
-                    bins = det->data.reaction_rate.n_nuclides * energy_bins * RRDET_MODE_COUNT;
-                }
-                else if (det->type == DETECTOR_TYPE_ENERGY_SPECTRUM && det->data.energy_spectrum.grid.enabled)
-                    bins = det->data.energy_spectrum.grid.n_bins;
-            }
-            detector_bin_counts[d] = bins;
-            total_detector_bins += bins;
-        }
-
-        if (total_detector_bins > 0)
-        {
-            size_t per_thread_bytes = (size_t)max_threads * total_detector_bins;
-            detector_thread_sums = (double*)calloc(per_thread_bytes, sizeof(double));
-            detector_thread_sums_sq = (double*)calloc(per_thread_bytes, sizeof(double));
-            detector_history_counts = (double*)calloc(per_thread_bytes, sizeof(double));
-            if (!detector_thread_sums || !detector_thread_sums_sq || !detector_history_counts)
-            {
-                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
-                free(detector_offsets);
-                free(detector_bin_counts);
-                free(detector_thread_sums);
-                free(detector_thread_sums_sq);
-                free(detector_history_counts);
-                return EXIT_FAILURE;
-            }
-        }
-    }
-
     /* If doing track plots grab ptrs to arrays */
 
     double *track_points = NULL;
@@ -124,16 +51,6 @@ int runCriticalitySimulation(void)
         TransportRunScores gen_scores;
         memset(&gen_scores, 0, sizeof(TransportRunScores));
 
-        /* Clear thread-local detector scoring arrays */
-
-        const int do_detectors = (total_detector_bins > 0) && (g > GLOB.n_inactive);
-        if (do_detectors)
-        {
-            size_t total_bins_bytes = (size_t)max_threads * total_detector_bins * sizeof(double);
-            memset(detector_thread_sums, 0, total_bins_bytes);
-            memset(detector_thread_sums_sq, 0, total_bins_bytes);
-        }
-
         /* On all but the first run, build a fission neutron bank from fission sites of last generation */
         
         if (g > 1) 
@@ -141,11 +58,6 @@ int runCriticalitySimulation(void)
             if (buildFissionBank() != 0) 
             {
                 fprintf(stderr, "[ERROR] Failed to build fission bank for generation %zu.\n", g);
-                free(detector_offsets);
-                free(detector_bin_counts);
-                free(detector_thread_sums);
-                free(detector_thread_sums_sq);
-                free(detector_history_counts);
                 return EXIT_FAILURE;
             }
         }
@@ -165,24 +77,11 @@ int runCriticalitySimulation(void)
 
         #pragma omp parallel default(none)\
                 shared(GLOB, DATA, RES, stdout, stderr, \
-                       detectors, n_detectors, detector_offsets, detector_bin_counts, \
-                       detector_thread_sums, detector_thread_sums_sq, \
-                       detector_history_counts, total_detector_bins, do_detectors, \
                        do_tracks, track_points, track_counts) \
                 reduction(+:gen_scores)
         {
-            ReactionRateMode r_mode = RRDET_MODE_COUNT;
-            const int tid = omp_get_thread_num();
-            double *history_counts = NULL;
-            double *local_sum = NULL;
-            double *local_sq = NULL;
-
-            if (do_detectors)
-            {
-                history_counts = detector_history_counts + (size_t)tid * total_detector_bins;
-                local_sum = detector_thread_sums + (size_t)tid * total_detector_bins;
-                local_sq  = detector_thread_sums_sq + (size_t)tid * total_detector_bins;
-            }
+            const size_t n_detectors = DATA.n_detectors;
+            DetectorHistoryBuffer *det_buffers = createDetectorHistoryBuffers(n_detectors);
 
             #pragma omp for schedule(dynamic)
             for (size_t i = 0; i < DATA.n_bank; i++)
@@ -204,9 +103,6 @@ int runCriticalitySimulation(void)
 
                 gen_scores.n_histories++;
 
-                if (do_detectors)
-                    memset(history_counts, 0, total_detector_bins * sizeof(double));
-
                 /* Sample collisions until dead */
                 
                 while (n->status == NEUTRON_ALIVE) 
@@ -222,11 +118,12 @@ int runCriticalitySimulation(void)
                         (*count)++;
                     }
 
+                    n->last_mt = 0;
+                    n->last_nuc = 0;
+
                     /* Do boundary conditions */
 
                     applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
-
-                    double segment_energy = n->E;
 
                     /* Sample distance to next collision */
 
@@ -256,6 +153,7 @@ int runCriticalitySimulation(void)
                         /* Neutron is outside the geometry */
 
                         n->status = NEUTRON_DEAD_LEAKAGE;
+
                         continue;
                     }
 
@@ -296,36 +194,6 @@ int runCriticalitySimulation(void)
                     int err;
                     n->mat_idx = getMaterialAtPosition(n->x, n->y, n->z, &err);
 
-                    if (do_detectors && d > 0.0)
-                    {
-                        if (n->mat_idx >= 0)
-                        {
-                            for (size_t det_idx = 0; det_idx < n_detectors; ++det_idx)
-                            {
-                                Detector *detector = detectors[det_idx];
-                                if (!detector || detector->type != DETECTOR_TYPE_ENERGY_SPECTRUM)
-                                    continue;
-
-                                size_t bin_count = detector_bin_counts[det_idx];
-                                if (bin_count == 0)
-                                    continue;
-
-                                EnergySpectrumDetector *es = &detector->data.energy_spectrum;
-                                if (!es->grid.enabled)
-                                    continue;
-                                if (es->has_material_filter && es->material_index != n->mat_idx)
-                                    continue;
-
-                                size_t energy_bin = energyGridBinIndex(&es->grid, segment_energy);
-                                if (energy_bin >= es->grid.n_bins)
-                                    continue;
-
-                                size_t offset = detector_offsets[det_idx];
-                                history_counts[offset + energy_bin] += d;
-                            }
-                        }
-                    }
-
                     /* Sample collision nuclide in active material */
 
                     int nuc_idx = sampleCollisionNuclide(n);
@@ -335,6 +203,8 @@ int runCriticalitySimulation(void)
                         continue;
                     }
 
+                    n->last_nuc = nuc_idx;
+
                     /* Sample interaction type */
 
                     int mt = sampleInteractionType(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
@@ -343,6 +213,8 @@ int runCriticalitySimulation(void)
                         n->status = NEUTRON_DEAD_LEAKAGE;
                         continue;
                     }
+
+                    n->last_mt = mt;
 
                     /* Score collision */
 
@@ -355,8 +227,6 @@ int runCriticalitySimulation(void)
                         gen_scores.total_elastic_scatters++;
                         
                         handleElasticScatter(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
-
-                        r_mode = RRDET_MODE_ELASTIC;
                     }
                     else if (MT_IS_FISSION(mt))
                     {
@@ -370,54 +240,32 @@ int runCriticalitySimulation(void)
                         handleFission(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
 
                         gen_scores.total_fission_yield += n->fission_yield;
-
-                        r_mode = RRDET_MODE_FISSION;
                     }
                     else if (MT_IS_INELASTIC_SCATTER(mt))
                     {
                         gen_scores.total_inelastic_scatters++;
 
                         handleInelasticScatter(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data, mt);
-
-                        r_mode = RRDET_MODE_INELASTIC;
                     }
                     else if (MT_IS_CAPTURE(mt))
                     {
                         gen_scores.total_captures++;
                         n->status = NEUTRON_DEAD_CAPTURE;
-
-                        r_mode = RRDET_MODE_CAPTURE;
                     }
                     else
                     {
                         gen_scores.total_unknowns++;
                     }
 
-                    /* Score detectors if applicable */
+                    /* Score detectors using per-history buffers */
 
-                    if (do_detectors && r_mode != RRDET_MODE_COUNT)
+                    if (det_buffers)
                     {
                         for (size_t d = 0; d < n_detectors; ++d)
                         {
-                            Detector *det = detectors[d];
-                            if (!det || det->type != DETECTOR_TYPE_REACTION_RATE)
-                                continue;
-
-                            ReactionRateDetector *rr = &det->data.reaction_rate;
-                            if (rr->material_index == n->mat_idx && (size_t)nuc_idx < rr->n_nuclides)
-                            {
-                                size_t energy_bins = (rr->n_energy_bins > 0) ? rr->n_energy_bins : 1;
-                                size_t energy_bin = 0;
-                                if (rr->energy_grid.enabled && rr->n_energy_bins > 0)
-                                {
-                                    energy_bin = energyGridBinIndex(&rr->energy_grid, segment_energy);
-                                    if (energy_bin >= energy_bins)
-                                        continue;
-                                }
-                                size_t flatten_stride = energy_bins * RRDET_MODE_COUNT;
-                                size_t bin = detector_offsets[d] + (size_t)nuc_idx * flatten_stride + energy_bin * RRDET_MODE_COUNT + (size_t)r_mode;
-                                history_counts[bin] += 1.0;
-                            }
+                            long bin = computeDetectorBin(n, d);
+                            if (bin >= 0)
+                                detectorHistoryBufferAccumulate(&det_buffers[d], (size_t)bin, 1.0);
                         }
                     }
 
@@ -429,27 +277,18 @@ int runCriticalitySimulation(void)
 
                 }
 
-                if (do_detectors)
-                {
-                    for (size_t b = 0; b < total_detector_bins; ++b)
-                    {
-                        double val = history_counts[b];
-                        local_sum[b] += val;
-                        local_sq[b]  += val * val;
-                    }
-                }
+                if (det_buffers)
+                    flushDetectorHistoryBuffers(det_buffers, n_detectors);
             }
+
+            if (det_buffers)
+                destroyDetectorHistoryBuffers(det_buffers, n_detectors);
         }
 
         /* If in trackplotter mode, we can exit now. Secondary neutrons are not tracked. */
+
         if (GLOB.trackplotmode)
         {
-            free(detector_offsets);
-            free(detector_bin_counts);
-            free(detector_thread_sums);
-            free(detector_thread_sums_sq);
-            free(detector_history_counts);
-
             return EXIT_SUCCESS;
         }
             
@@ -460,76 +299,10 @@ int runCriticalitySimulation(void)
         {
             if (g - 1 - GLOB.n_inactive < RES.n_iterations && RES.avg_scores)
                 RES.avg_scores[g - 1 - GLOB.n_inactive] = gen_scores;
-        }
-        
-        /* Score detectors from thread private buffers if in active cycle */
 
-        if (g > GLOB.n_inactive && n_detectors > 0)
-        {
             uint64_t histories_this_gen = gen_scores.n_histories;
-            for (size_t d = 0; d < n_detectors; ++d)
-                detectors[d]->n_histories += histories_this_gen;
-        }
-
-        if (g > GLOB.n_inactive && total_detector_bins > 0)
-        {
-            for (size_t d = 0; d < n_detectors; ++d)
-            {
-                Detector *det = detectors[d];
-                size_t bins = detector_bin_counts ? detector_bin_counts[d] : 0;
-                if (!det || bins == 0)
-                    continue;
-
-                size_t offset = detector_offsets[d];
-                if (det->type == DETECTOR_TYPE_REACTION_RATE)
-                {
-                    ReactionRateDetector *rr = &det->data.reaction_rate;
-                    size_t energy_bins = (rr->n_energy_bins > 0) ? rr->n_energy_bins : 1;
-                    size_t flatten_stride = energy_bins * RRDET_MODE_COUNT;
-                    for (size_t nuc = 0; nuc < rr->n_nuclides; ++nuc)
-                    {
-                        for (size_t ebin = 0; ebin < energy_bins; ++ebin)
-                        {
-                            for (size_t mode = 0; mode < RRDET_MODE_COUNT; ++mode)
-                            {
-                                size_t bin_index = offset + nuc * flatten_stride + ebin * RRDET_MODE_COUNT + mode;
-                                double sum_val = 0.0;
-                                double sum_sq_val = 0.0;
-                                for (int tid = 0; tid < max_threads; ++tid)
-                                {
-                                    size_t base = (size_t)tid * total_detector_bins + bin_index;
-                                    sum_val    += detector_thread_sums[base];
-                                    sum_sq_val += detector_thread_sums_sq[base];
-                                }
-
-                                size_t tally_index = ebin * RRDET_MODE_COUNT + mode;
-                                ReactionRateTally *tally = &rr->nuclides[nuc].tallies[tally_index];
-                                tally->sum    += sum_val;
-                                tally->sum_sq += sum_sq_val;
-                            }
-                        }
-                    }
-                }
-                else if (det->type == DETECTOR_TYPE_ENERGY_SPECTRUM)
-                {
-                    EnergySpectrumDetector *es = &det->data.energy_spectrum;
-                    for (size_t bin = 0; bin < es->grid.n_bins; ++bin)
-                    {
-                        size_t bin_index = offset + bin;
-                        double sum_val = 0.0;
-                        double sum_sq_val = 0.0;
-                        for (int tid = 0; tid < max_threads; ++tid)
-                        {
-                            size_t base = (size_t)tid * total_detector_bins + bin_index;
-                            sum_val    += detector_thread_sums[base];
-                            sum_sq_val += detector_thread_sums_sq[base];
-                        }
-
-                        es->track_length_sum[bin]    += sum_val;
-                        es->track_length_sum_sq[bin] += sum_sq_val;
-                    }
-                }
-            }
+            for (size_t d = 0; d < DATA.n_detectors; ++d)
+                DATA.detectors[d].n_histories += histories_this_gen;
         }
 
         /* Print generation summary */
@@ -541,56 +314,7 @@ int runCriticalitySimulation(void)
             fprintf(stdout, " keff: %.6lf\n", k_eff);
     }
 
-
     /* Return succesfully */
 
-    free(detector_offsets);
-    free(detector_bin_counts);
-    free(detector_thread_sums);
-    free(detector_thread_sums_sq);
-    free(detector_history_counts);
-
     return EXIT_SUCCESS;
-}
-
-inline size_t energyGridBinIndex(const EnergyGrid *grid, double energy)
-{
-    if (!grid)
-        return 0;
-
-    if (!grid->enabled || !grid->edges || grid->n_bins == 0)
-        return grid->n_bins;
-
-    if (energy < grid->E_min)
-        return grid->n_bins;
-
-    if (energy > grid->E_max)
-        return grid->n_bins;
-
-    if (energy == grid->E_max)
-        return (grid->n_bins > 0) ? grid->n_bins - 1 : grid->n_bins;
-
-    const double *edges = grid->edges;
-    size_t left = 0;
-    size_t right = grid->n_bins;
-    while (left < right)
-    {
-        size_t mid = (left + right) >> 1;
-        double low = edges[mid];
-        double high = edges[mid + 1];
-        if (energy < low)
-        {
-            right = mid;
-        }
-        else if (energy >= high)
-        {
-            left = mid + 1;
-        }
-        else
-        {
-            return mid;
-        }
-    }
-
-    return grid->n_bins;
 }

@@ -3,9 +3,12 @@
 #include "header.h"
 
 typedef struct {
-    const char *label;
-    const char *matlab_name;
+    const char *perhist_label;
+    const char *perhist_name;
+    const char *rate_label;
+    const char *rate_name;
     double (*extract)(const TransportRunScores *gs);
+    bool    apply_norm;  // true if metric should be scaled by normalization factor
 } MetricSpec;
 
 static double safe_norm(uint64_t count, double value) 
@@ -97,6 +100,11 @@ static double metric_unknowns(const TransportRunScores *gs)
     return safe_norm(gs->n_histories, (double)gs->total_unknowns);
 }
 
+static double metric_keff(const TransportRunScores *gs)
+{
+    double den = (double)active_histories(gs);
+    return (den > 0.0) ? (double)gs->total_fission_yield / den : 0.0;
+}
 static double metric_terminated(const TransportRunScores *gs) 
 {
     return safe_norm(gs->n_histories, (double)gs->total_terminated);
@@ -134,21 +142,22 @@ void processTransportResults(void)
     const size_t n_iter = (size_t)RES.n_iterations;
 
     const MetricSpec metrics[] = {
-        {"Path length",        "PATH_LENGTH",          metric_path_length},
-        {"Fast path length",   "FAST_PATH_LENGTH",     metric_fast_path_length},
-        {"Flight time",        "FLIGHT_TIME",          metric_time},
-        {"Fast flight time",   "FAST_FLIGHT_TIME",     metric_time_fast},
-        {"Fission yield",      "FISSION_YIELD",        metric_fission_yield},
-        {"Collisions",         "COLLISIONS",           metric_collisions},
-        {"Captures",           "CAPTURES",             metric_captures},
-        {"Elastic scatters",   "ELASTIC_SCATTERS",     metric_elastic},
-        {"Inelastic scatters", "INELASTIC_SCATTERS",   metric_inelastic},
-        {"Fissions",           "FISSIONS",             metric_fissions},
-        {"Thermal Fissions",   "THERMAL_FISSIONS",     metric_thermal_fissions},
-        {"Fast Fissions",      "FAST_FISSIONS",        metric_fast_fissions},
-        {"Leakages",           "LEAKAGES",             metric_leakages},
-        {"Terminated",         "TERMINATED",           metric_terminated},
-        {"Unknown outcomes",   "UNKNOWN_OUTCOMES",     metric_unknowns}
+        {"Path length / history",        "PATH_LENGTH",        NULL,                 NULL,                 metric_path_length,       false},
+        {"Fast path length / history",   "FAST_PATH_LENGTH",   NULL,                 NULL,                 metric_fast_path_length,  false},
+        {"Flight time / history",        "FLIGHT_TIME",        NULL,                 NULL,                 metric_time,              false},
+        {"Fast flight time / history",   "FAST_FLIGHT_TIME",   NULL,                 NULL,                 metric_time_fast,         false},
+        {"Fission yield / history",      "FISSION_YIELD",      "Fission rate [1/s]",      "FISSION_RATE",      metric_fission_yield,     true},
+        {"Collisions / history",         "COLLISIONS",         "Collision rate [1/s]",    "COLLISION_RATE",    metric_collisions,        true},
+        {"Captures / history",           "CAPTURES",           "Capture rate [1/s]",      "CAPTURE_RATE",      metric_captures,          true},
+        {"Elastic scatters / history",   "ELASTIC_SCATTERS",   "Elastic rate [1/s]",      "ELASTIC_RATE",      metric_elastic,           true},
+        {"Inelastic scatters / history", "INELASTIC_SCATTERS", "Inelastic rate [1/s]",    "INELASTIC_RATE",    metric_inelastic,         true},
+        {"Fissions / history",           "FISSIONS",           "Fission rate [1/s]",      "TOTAL_FISSION_RATE",metric_fissions,          true},
+        {"Thermal fissions / history",   "THERMAL_FISSIONS",   "Thermal fission rate [1/s]", "THERMAL_FISSION_RATE", metric_thermal_fissions,  true},
+        {"Fast fissions / history",      "FAST_FISSIONS",      "Fast fission rate [1/s]", "FAST_FISSION_RATE", metric_fast_fissions,     true},
+        {"Leakages / history",           "LEAKAGES",           "Leakage rate [1/s]",      "LEAKAGE_RATE",      metric_leakages,          true},
+        {"Terminated / history",         "TERMINATED",         "Termination rate [1/s]",  "TERMINATION_RATE",  metric_terminated,        true},
+        {"Unknown outcomes / history",   "UNKNOWN_OUTCOMES",   "Unknown rate [1/s]",      "UNKNOWN_RATE",      metric_unknowns,          true},
+        {"k-eff",                          "KEFF",              NULL,                       NULL,                metric_keff,              false}
     };
 
     const size_t nmetrics = sizeof(metrics) / sizeof(metrics[0]);
@@ -161,9 +170,14 @@ void processTransportResults(void)
     }
 
     double **metric_values = (double**)calloc(nmetrics, sizeof(double*));
-    if (!metric_values) 
+    double *summary_mean = (double*)calloc(nmetrics, sizeof(double));
+    double *summary_ci = (double*)calloc(nmetrics, sizeof(double));
+    if (!metric_values || !summary_mean || !summary_ci) 
     {
         free(histories);
+        if (metric_values) free(metric_values);
+        if (summary_mean) free(summary_mean);
+        if (summary_ci) free(summary_ci);
         fprintf(stderr, "[ERROR] Memory allocation failed.\n");
         return;
     }
@@ -173,8 +187,12 @@ void processTransportResults(void)
         if (!metric_values[m]) 
         {
             for (size_t j = 0; j < m; ++j) free(metric_values[j]);
+            for (size_t j = 0; j < m; ++j)
+                free(metric_values[j]);
             free(metric_values);
             free(histories);
+            free(summary_mean);
+            free(summary_ci);
             fprintf(stderr, "[ERROR] Memory allocation failed.\n");
             return;
         }
@@ -202,8 +220,28 @@ void processTransportResults(void)
     {
         double mean, std, ci;
         compute_stats(metric_values[m], n_iter, &mean, &std, &ci);
-        fprintf(stdout, "  %-20s  mean = %12.6e +/- %9.3e (%.6lf%%)\n",
-                metrics[m].label, mean, ci, (ci / mean) * 100.0);
+        summary_mean[m] = mean;
+        summary_ci[m] = ci;
+        double rel = (mean != 0.0) ? fabs(ci / mean) * 100.0 : 0.0;
+        fprintf(stdout, "  %-28s  mean = %12.6e +/- %9.3e (%.6lf%%)\n",
+                metrics[m].perhist_label, mean, ci, rel);
+    }
+
+    const double norm_factor = getNormalizationFactor();
+    const char *norm_desc = getNormalizationModeDescription();
+
+    fprintf(stdout, "\nTotal reaction rates (normalized to %.3e %s):\n",
+            norm_factor, norm_desc);
+    for (size_t m = 0; m < nmetrics; ++m)
+    {
+        if (!metrics[m].apply_norm)
+            continue;
+
+        double scaled_mean = summary_mean[m] * norm_factor;
+        double scaled_ci = summary_ci[m] * norm_factor;
+        fprintf(stdout, "  %-28s  %12.6e +/- %9.3e\n",
+                metrics[m].rate_label ? metrics[m].rate_label : metrics[m].perhist_label,
+                scaled_mean, scaled_ci);
     }
 
     /* ########################################################################################## */
@@ -220,21 +258,31 @@ void processTransportResults(void)
     else 
     {
         fprintf(mfile, "%%%% Transport results auto-generated\n");
-        fprintf(mfile, "%% Input file: %s\n\n", GLOB.inputf);
+        fprintf(mfile, "%% Input file: %s\n", GLOB.inputf);
+        fprintf(mfile, "%% Normalisation: %.8E (%s)\n\n", norm_factor, norm_desc);
         fprintf(mfile, "N_GENERATIONS = %zu;\n\n", n_iter);
 
-        fprintf(mfile, "HISTORIES = [\n");
-        for (size_t g = 0; g < n_iter; ++g)
-            fprintf(mfile, "  %.0f", histories[g]);
-        fprintf(mfile, "];\n\n");
-
+        fprintf(mfile, "%% Per-history averages\n");
         for (size_t m = 0; m < nmetrics; ++m) 
         {
-            fprintf(mfile, "%s = [\n", metrics[m].matlab_name);
-            for (size_t g = 0; g < n_iter; ++g)
-                fprintf(mfile, "  %.12e", metric_values[m][g]);
-            fprintf(mfile, "];\n\n");
+            fprintf(mfile, "%-30s = [ %.8E %.8E ];\n",
+                    metrics[m].perhist_name,
+                    summary_mean[m], summary_ci[m]);
         }
+        fprintf(mfile, "\n%% Reaction rates (normalized)\n");
+        for (size_t m = 0; m < nmetrics; ++m)
+        {
+            if (!metrics[m].apply_norm)
+                continue;
+
+            const char *rate_name = metrics[m].rate_name ? metrics[m].rate_name
+                                                         : metrics[m].perhist_name;
+            fprintf(mfile, "%-30s = [ %.8E %.8E ];\n",
+                    rate_name,
+                    summary_mean[m] * norm_factor,
+                    summary_ci[m] * norm_factor);
+        }
+        fprintf(mfile, "\n");
 
         fclose(mfile);
         fprintf(stdout, "\nWrote transport results to '%s'.\n", mpath);
@@ -244,4 +292,6 @@ void processTransportResults(void)
         free(metric_values[m]);
     free(metric_values);
     free(histories);
+    free(summary_mean);
+    free(summary_ci);
 }

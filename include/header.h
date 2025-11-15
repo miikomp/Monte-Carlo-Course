@@ -28,6 +28,21 @@
 /* Verbosity level: 0 = standard output, 1 = increased output, 2 = all the output */
 extern int VERBOSITY;
 
+static inline double getNormalizationFactor(void)
+{
+    return (GLOB.norm_factor > 0.0) ? GLOB.norm_factor : 1.0;
+}
+
+static inline const char *getNormalizationModeDescription(void)
+{
+    switch (GLOB.norm_mode)
+    {
+        case NORM_POWER:   return "power";
+        case NORM_SRCRATE: return "source rate";
+        default:           return "unity";
+    }
+}
+
 /* --- Constants --- */
 
 #define EXIT_SUCCESS 0
@@ -241,7 +256,17 @@ int computeMacroXs(void);
  * 
  * @return int 0 on success, 1 on failure
  */
-int processDetectors(void);
+int resolveDetectors(void);
+
+
+/**
+ * @brief Compute detector bin idx for a neutron context
+ * 
+ * @param n ptr to neutron
+ * @param det_idx detector idx in DATA.detectors
+ * @return long bin idx, or -1 if no valid bin for neutron
+ */
+long computeDetectorBin(Neutron *n, size_t det_idx);
 
 /**
  * @brief Process scored detector results and output relevant data into file and stdout.

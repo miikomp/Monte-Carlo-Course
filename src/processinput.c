@@ -69,6 +69,27 @@ int processInput() {
         }
     }
 
+    /* Check normalisation */
+
+    if ((GLOB.srcrate >= 0.0) && (GLOB.power >= 0.0))
+    {
+        fprintf(stderr, "[ERROR] Multiple normalisation defined.\n");
+        return EXIT_FAILURE;
+    }
+    else if (GLOB.power >= 0.0)
+    {
+        GLOB.norm_mode = NORM_POWER;
+        GLOB.norm_factor = 1.0; /* Placeholder: updated once power normalisation is implemented */
+    }
+    else
+    {
+        if (GLOB.srcrate < 0.0)
+            GLOB.srcrate = 1.0;
+
+        GLOB.norm_mode = NORM_SRCRATE;
+        GLOB.norm_factor = GLOB.srcrate;
+    }
+
     /* Return success */
     return EXIT_SUCCESS;
 }

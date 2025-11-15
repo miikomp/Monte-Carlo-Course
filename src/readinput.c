@@ -496,233 +496,397 @@ long readInput() {
         /* --- det --- (Detector definition for scoring reaction channels)*/
         else if (!strcmp(tok, "det"))
         {
-            if (DATA.n_detectors >= (size_t)MAX_NUM_DETECTORS) 
-            {
-                fprintf(stderr, "[ERROR] Only %d detectors supported (line %ld).\n", MAX_NUM_DETECTORS, lnum);
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-
-            Detector *det = (Detector*)malloc(sizeof(Detector));
-            if (!det)
-            {
-                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
-                fclose(fp);
-                exit(EXIT_FAILURE);
-            }
-            memset(det, 0, sizeof(Detector));
-
-            /* Read detector name */
+            Detector det;
+            memset(&det, 0, sizeof(det));
 
             char *name_tok = strtok(NULL, DELIMS);
-            snprintf(det->name, sizeof(det->name), "%s", name_tok);
+            if (!name_tok)
+            {
+                fprintf(stderr, "[ERROR] Missing detector name on line %ld.\n", lnum);
+                fclose(fp);
+                exit(EXIT_FAILURE);
+            }
+            snprintf(det.name, sizeof(det.name), "%s", name_tok);
 
-            /* Read options */
+            DetectorResponseBin *resp_bins = NULL;
+            size_t resp_count = 0u;
+            size_t resp_cap = 0u;
 
-            bool has_dr = false;
-            bool dr_all = false;
-            bool has_dm = false;
-            char mat_name_buf[128] = {0};
-            bool has_de = false;
-            double e_min = 0.0, e_max = 0.0;
-            uint64_t n_bins = 0;
-            EnergyBinSpacing energy_spacing = ENERGY_BIN_SPACING_LINEAR;
+            bool seen_dx = false;
+            bool seen_dy = false;
+            bool seen_dz = false;
+            bool seen_de = false;
+            bool seen_dt = false;
+            bool seen_dm = false;
+            char mat_filter_name[MAX_STR_LEN] = {0};
 
             char *opt = NULL;
             while ((opt = strtok(NULL, DELIMS)) != NULL)
             {
                 if (!strcmp(opt, "dr"))
                 {
-                    char *resp_tok = strtok(NULL, DELIMS);
-                    if (!resp_tok)
+                    char *mt_tok = strtok(NULL, DELIMS);
+                    char *target_tok = strtok(NULL, DELIMS);
+                    if (!mt_tok || !target_tok)
                     {
-                        fprintf(stderr, "[ERROR] Missing detector response after 'dr' (line %ld).\n", lnum);
-                        free(det);
+                        fprintf(stderr, "[ERROR] Incomplete 'dr' specification on line %ld.\n", lnum);
+                        free(resp_bins);
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
-                    has_dr = true;
-                    if (!strcmp(resp_tok, "all"))
+
+                    long mt_val = 0;
+                    if (!parseLong(mt_tok, &mt_val))
                     {
-                        dr_all = true;
+                        fprintf(stderr, "[ERROR] Invalid MT value \"%s\" on line %ld.\n", mt_tok, lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (resp_count == resp_cap)
+                    {
+                        size_t new_cap = resp_cap ? resp_cap * 2u : 4u;
+                        DetectorResponseBin *tmp = (DetectorResponseBin*)realloc(resp_bins, new_cap * sizeof(DetectorResponseBin));
+                        if (!tmp)
+                        {
+                            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                            free(resp_bins);
+                            fclose(fp);
+                            exit(EXIT_FAILURE);
+                        }
+                        resp_bins = tmp;
+                        resp_cap = new_cap;
+                    }
+
+                    DetectorResponseBin *bin = &resp_bins[resp_count++];
+                    memset(bin, 0, sizeof(*bin));
+                    bin->response_id = mt_val;
+                    bin->rmat_id = -1;
+                    bin->multiplier = 1.0;
+                    snprintf(bin->rmat_name, sizeof(bin->rmat_name), "%s", target_tok);
+                }
+                else if (!strcmp(opt, "dx") || !strcmp(opt, "dy") || !strcmp(opt, "dz"))
+                {
+                    bool *seen_flag = NULL;
+                    DetectorCartesianAxis *axis = NULL;
+                    const char *label = opt;
+
+                    if (!strcmp(opt, "dx"))
+                    {
+                        seen_flag = &seen_dx;
+                        axis = &det.mesh_x;
+                    }
+                    else if (!strcmp(opt, "dy"))
+                    {
+                        seen_flag = &seen_dy;
+                        axis = &det.mesh_y;
                     }
                     else
                     {
-                        fprintf(stderr, "[ERROR] Unsupported detector response '%s' (line %ld).\n", resp_tok, lnum);
-                        free(det);
-                        fclose(fp);
-                        exit(EXIT_FAILURE);
+                        seen_flag = &seen_dz;
+                        axis = &det.mesh_z;
                     }
-                }
-                else if (!strcmp(opt, "dm"))
-                {
-                    char *mat_tok = strtok(NULL, DELIMS);
-                    if (!mat_tok)
+
+                    if (*seen_flag)
                     {
-                        fprintf(stderr, "[ERROR] Missing material name after 'dm' (line %ld).\n", lnum);
-                        free(det);
+                        fprintf(stderr, "[ERROR] Duplicate '%s' specification on line %ld.\n", label, lnum);
+                        free(resp_bins);
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
-                    snprintf(mat_name_buf, sizeof(mat_name_buf), "%s", mat_tok);
-                    has_dm = true;
+
+                    char *min_tok = strtok(NULL, DELIMS);
+                    char *max_tok = strtok(NULL, DELIMS);
+                    char *bins_tok = strtok(NULL, DELIMS);
+                    if (!min_tok || !max_tok || !bins_tok)
+                    {
+                        fprintf(stderr, "[ERROR] Incomplete '%s' specification on line %ld.\n", label, lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    double min_val = 0.0;
+                    double max_val = 0.0;
+                    if (!parseDouble(min_tok, &min_val) || !parseDouble(max_tok, &max_val))
+                    {
+                        fprintf(stderr, "[ERROR] Invalid '%s' bounds on line %ld.\n", label, lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (max_val <= min_val)
+                    {
+                        fprintf(stderr, "[ERROR] '%s' max must exceed min on line %ld.\n", label, lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    uint64_t bins_tmp = 0;
+                    if (!parseULong(bins_tok, &bins_tmp) || bins_tmp == 0)
+                    {
+                        fprintf(stderr, "[ERROR] Invalid '%s' bin count on line %ld.\n", label, lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (bins_tmp > (uint64_t)SIZE_MAX)
+                    {
+                        fprintf(stderr, "[ERROR] '%s' bin count too large on line %ld.\n", label, lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    axis->active = true;
+                    axis->type = DETECTOR_MESH_AXIS_UNIFORM;
+                    axis->n_bins = (size_t)bins_tmp;
+                    axis->origin = min_val;
+                    axis->min = min_val;
+                    axis->max = max_val;
+                    axis->spacing = (max_val - min_val) / (double)axis->n_bins;
+                    axis->edges = NULL;
+                    *seen_flag = true;
                 }
                 else if (!strcmp(opt, "de"))
                 {
+                    if (seen_de)
+                    {
+                        fprintf(stderr, "[ERROR] Duplicate 'de' specification on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    char *type_tok = strtok(NULL, DELIMS);
                     char *emin_tok = strtok(NULL, DELIMS);
                     char *emax_tok = strtok(NULL, DELIMS);
-                    char *nbins_tok = strtok(NULL, DELIMS);
-                    char *spacing_tok = strtok(NULL, DELIMS);
-                    if (!emin_tok || !emax_tok || !nbins_tok)
+                    char *bins_tok = strtok(NULL, DELIMS);
+                    if (!type_tok || !emin_tok || !emax_tok || !bins_tok)
                     {
-                        fprintf(stderr, "[ERROR] Incomplete energy grid specification on line %ld.\n", lnum);
-                        free(det);
+                        fprintf(stderr, "[ERROR] Incomplete energy bin specification on line %ld.\n", lnum);
+                        free(resp_bins);
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
 
-                    if (!spacing_tok)
-                        spacing_tok = "1";
+                    long type_val = 0;
+                    if (!parseLong(type_tok, &type_val) ||
+                        (type_val != ENERGY_GRID_LIN && type_val != ENERGY_GRID_LOG))
+                    {
+                        fprintf(stderr, "[ERROR] Energy grid type must be 1 (lin) or 2 (log) on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
 
-                    if (!parseDouble(emin_tok, &e_min) || !parseDouble(emax_tok, &e_max))
+                    double emin = 0.0;
+                    double emax = 0.0;
+                    if (!parseDouble(emin_tok, &emin) || !parseDouble(emax_tok, &emax))
                     {
                         fprintf(stderr, "[ERROR] Invalid energy bounds on line %ld.\n", lnum);
-                        free(det);
+                        free(resp_bins);
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
 
-                    if (!parseULong(nbins_tok, &n_bins) || n_bins == 0)
+                    if (emax <= emin)
                     {
-                        fprintf(stderr, "[ERROR] Invalid bin count in detector energy grid (line %ld).\n", lnum);
-                        free(det);
+                        fprintf(stderr, "[ERROR] Energy max must exceed min on line %ld.\n", lnum);
+                        free(resp_bins);
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
 
-                    long spacing_val = 0;
-                    if (!parseLong(spacing_tok, &spacing_val))
+                    if (type_val == ENERGY_GRID_LOG && emin <= 0.0)
                     {
-                        fprintf(stderr, "[ERROR] Invalid grid spacing flag in detector energy grid (line %ld).\n", lnum);
-                        free(det);
+                        fprintf(stderr, "[ERROR] Logarithmic energy bins require Emin > 0 on line %ld.\n", lnum);
+                        free(resp_bins);
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
 
-                    if (spacing_val == 0)
-                        energy_spacing = ENERGY_BIN_SPACING_LOG;
-                    else if (spacing_val == 1)
-                        energy_spacing = ENERGY_BIN_SPACING_LINEAR;
-                    else
+                    uint64_t bins_tmp = 0;
+                    if (!parseULong(bins_tok, &bins_tmp) || bins_tmp == 0)
                     {
-                        fprintf(stderr, "[ERROR] Grid spacing flag must be 0 (log) or 1 (lin) on line %ld.\n", lnum);
-                        free(det);
+                        fprintf(stderr, "[ERROR] Invalid number of energy bins on line %ld.\n", lnum);
+                        free(resp_bins);
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
 
-                    if (e_max <= e_min)
+                    if (bins_tmp > (uint64_t)SIZE_MAX)
                     {
-                        fprintf(stderr, "[ERROR] Detector energy max must exceed min (line %ld).\n", lnum);
-                        free(det);
-                        fclose(fp);
-                        exit(EXIT_FAILURE);
-                    }
-                    if (energy_spacing == ENERGY_BIN_SPACING_LOG && e_min <= 0.0)
-                    {
-                        fprintf(stderr, "[ERROR] Logarithmic energy bins require Emin > 0 (line %ld).\n", lnum);
-                        free(det);
+                        fprintf(stderr, "[ERROR] Energy bin count too large on line %ld.\n", lnum);
+                        free(resp_bins);
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
 
-                    has_de = true;
+                    det.energy.active = true;
+                    det.energy.n_bins = (size_t)bins_tmp;
+                    det.energy.type = (EnergyGridType)type_val;
+                    det.energy.spacing = (type_val == ENERGY_GRID_LIN) ?
+                                          DETECTOR_GRID_SPACING_LINEAR : DETECTOR_GRID_SPACING_LOG;
+                    det.energy.min = emin;
+                    det.energy.max = emax;
+                    det.energy.edges = NULL;
+                    seen_de = true;
+                }
+                else if (!strcmp(opt, "dt"))
+                {
+                    if (seen_dt)
+                    {
+                        fprintf(stderr, "[ERROR] Duplicate 'dt' specification on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    char *tmin_tok = strtok(NULL, DELIMS);
+                    char *tmax_tok = strtok(NULL, DELIMS);
+                    char *bins_tok = strtok(NULL, DELIMS);
+                    if (!tmin_tok || !tmax_tok || !bins_tok)
+                    {
+                        fprintf(stderr, "[ERROR] Incomplete time bin specification on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    double tmin = 0.0;
+                    double tmax = 0.0;
+                    if (!parseDouble(tmin_tok, &tmin) || !parseDouble(tmax_tok, &tmax))
+                    {
+                        fprintf(stderr, "[ERROR] Invalid time bounds on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (tmax <= tmin)
+                    {
+                        fprintf(stderr, "[ERROR] Time max must exceed min on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    uint64_t bins_tmp = 0;
+                    if (!parseULong(bins_tok, &bins_tmp) || bins_tmp == 0)
+                    {
+                        fprintf(stderr, "[ERROR] Invalid number of time bins on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (bins_tmp > (uint64_t)SIZE_MAX)
+                    {
+                        fprintf(stderr, "[ERROR] Time bin count too large on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    det.time.active = true;
+                    det.time.n_bins = (size_t)bins_tmp;
+                    det.time.spacing = DETECTOR_GRID_SPACING_LINEAR;
+                    det.time.min = tmin;
+                    det.time.max = tmax;
+                    det.time.edges = NULL;
+                    seen_dt = true;
+                }
+                else if (!strcmp(opt, "dm"))
+                {
+                    if (seen_dm)
+                    {
+                        fprintf(stderr, "[ERROR] Duplicate 'dm' specification on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    char *mat_tok = strtok(NULL, DELIMS);
+                    if (!mat_tok)
+                    {
+                        fprintf(stderr, "[ERROR] Missing material after 'dm' on line %ld.\n", lnum);
+                        free(resp_bins);
+                        fclose(fp);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    snprintf(mat_filter_name, sizeof(mat_filter_name), "%s", mat_tok);
+                    seen_dm = true;
                 }
                 else
                 {
-                    fprintf(stderr, "[ERROR] Unknown detector option '%s' (line %ld).\n", opt, lnum);
-                    free(det);
+                    fprintf(stderr, "[ERROR] Unknown detector option '%s' on line %ld.\n", opt, lnum);
+                    free(resp_bins);
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
             }
 
-            /* If detector response defined create a reaction rate detector */
-
-            if (has_dr)
+            if (resp_count == 0)
             {
-                if (!dr_all)
+                resp_bins = (DetectorResponseBin*)calloc(1, sizeof(DetectorResponseBin));
+                if (!resp_bins)
                 {
-                    fprintf(stderr, "[ERROR] Only 'dr all' is supported currently (line %ld).\n", lnum);
-                    free(det);
+                    fprintf(stderr, "[ERROR] Memory allocation failed.\n");
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
-                if (!has_dm)
-                {
-                    fprintf(stderr, "[ERROR] Reaction rate detectors require a material (use 'dm <name>') (line %ld).\n", lnum);
-                    free(det);
-                    fclose(fp);
-                    exit(EXIT_FAILURE);
-                }
-
-                det->type = DETECTOR_TYPE_REACTION_RATE;
-                ReactionRateDetector *rr = &det->data.reaction_rate;
-                memset(rr, 0, sizeof(*rr));
-                snprintf(rr->material_name, sizeof(rr->material_name), "%s", mat_name_buf);
-                rr->material_index = -1;
-                rr->energy_grid.enabled = has_de;
-                if (has_de)
-                {
-                    rr->energy_grid.enabled = true;
-                    rr->energy_grid.n_bins = (size_t)n_bins;
-                    rr->energy_grid.E_min = e_min;
-                    rr->energy_grid.E_max = e_max;
-                    rr->energy_grid.spacing = energy_spacing;
-                }
-                else
-                    rr->energy_grid.enabled = false;
-
-                if (VERBOSITY >= 2)
-                {
-                    fprintf(stdout, "Parsed reaction-rate detector '%s' (material: %s)%s.\n",
-                            det->name, rr->material_name, has_de ? " with energy grid" : "");
-                }
+                resp_bins[0].response_id = 0;
+                resp_bins[0].rmat_id = -1;
+                resp_bins[0].multiplier = 1.0;
+                resp_bins[0].rmat_name[0] = '\0';
+                resp_count = 1;
             }
-            /* Otherwise create an energy spectrum detector */
 
+            det.responses.active = true;
+            det.responses.n_bins = resp_count;
+            det.responses.bins = resp_bins;
+
+            if (seen_dm)
+            {
+                det.has_material_filter = true;
+                det.material_filter_index = -1;
+                snprintf(det.material_filter_name, sizeof(det.material_filter_name), "%s", mat_filter_name);
+            }
+
+            if (VERBOSITY >= 2)
+            {
+                size_t n_resp = det.responses.n_bins;
+                size_t n_time = det.time.active ? det.time.n_bins : 1u;
+                size_t n_energy = det.energy.active ? det.energy.n_bins : 1u;
+                size_t nx = det.mesh_x.active ? det.mesh_x.n_bins : 1u;
+                size_t ny = det.mesh_y.active ? det.mesh_y.n_bins : 1u;
+                size_t nz = det.mesh_z.active ? det.mesh_z.n_bins : 1u;
+                fprintf(stdout,
+                        "Parsed detector '%s' with %zu response bin(s), time=%zu, energy=%zu, mesh=(%zu,%zu,%zu).\n",
+                        det.name, n_resp, n_time, n_energy, nx, ny, nz);
+            }
+
+            Detector *new_arr = NULL;
+            if (DATA.n_detectors == 0)
+                new_arr = (Detector*)calloc(1u, sizeof(Detector));
             else
+                new_arr = (Detector*)realloc(DATA.detectors, (DATA.n_detectors + 1u) * sizeof(Detector));
+
+            if (!new_arr)
             {
-                det->type = DETECTOR_TYPE_ENERGY_SPECTRUM;
-                EnergySpectrumDetector *es = &det->data.energy_spectrum;
-                memset(es, 0, sizeof(*es));
-                es->material_index = -1;
-                es->has_material_filter = has_dm;
-                if (has_dm)
-                    snprintf(es->material_name, sizeof(es->material_name), "%s", mat_name_buf);
-
-                if (!has_de)
-                {
-                    fprintf(stderr, "[ERROR] Energy spectrum detectors require an energy grid ('de').\n");
-                    free(det);
-                    fclose(fp);
-                    exit(EXIT_FAILURE);
-                }
-
-                es->grid.enabled = true;
-                es->grid.n_bins = (size_t)n_bins;
-                es->grid.E_min = e_min;
-                es->grid.E_max = e_max;
-                es->grid.spacing = energy_spacing;
-
-                if (VERBOSITY >= 2)
-                {
-                    const char *mat_desc = es->has_material_filter ? es->material_name : "all materials";
-                    fprintf(stdout, "Parsed energy-spectrum detector '%s' (%s) with %zu bins between %E - %E\n",
-                            det->name, mat_desc, es->grid.n_bins, es->grid.E_min, es->grid.E_max);
-                }
+                fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+                free(resp_bins);
+                fclose(fp);
+                exit(EXIT_FAILURE);
             }
 
+            DATA.detectors = new_arr;
             DATA.detectors[DATA.n_detectors] = det;
             DATA.n_detectors++;
             np++;
@@ -732,8 +896,6 @@ long readInput() {
 
         else if (!strcmp(tok, "surf"))
         {
-            /* "surf" [NAME] [TYPE] [ARGS] (all in one line) */
-
             char *name = strtok(NULL, DELIMS);
             char *type = strtok(NULL, DELIMS);
 
@@ -1709,6 +1871,52 @@ long readInput() {
                 }
 
                 GLOB.nbuf_factor = nbuf_factor;
+                np++;
+            }
+            /* --- Normalisation source rate */
+            else if (!strcmp(subkey, "srcrate")) 
+            {
+                char *a1 = strtok(NULL, DELIMS);
+                if (!a1) 
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                double srcrate;
+                if (!parseDouble(a1, &srcrate) || srcrate < 0.0) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                GLOB.srcrate = srcrate;
+                GLOB.norm_mode = NORM_SRCRATE;
+                np++;
+            }
+            /* --- Normalisation power */
+            else if (!strcmp(subkey, "power")) 
+            {
+                char *a1 = strtok(NULL, DELIMS);
+                if (!a1) 
+                {
+                    fprintf(stderr, "[ERROR] Incomplete input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                double power;
+                if (!parseDouble(a1, &power) || power < 0.0) 
+                {
+                    fprintf(stderr, "[ERROR] Invalid input on line %ld.\n", lnum);
+                    fclose(fp);
+                    exit(EXIT_FAILURE);
+                }
+
+                GLOB.power = power;
+                GLOB.norm_mode = NORM_POWER;
                 np++;
             }
             else 

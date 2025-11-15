@@ -10,7 +10,6 @@
 #define MAX_PATH 4096
 #define MAX_COLLISION_BINS 250
 #define MAX_TIME_BINS 1000
-#define MAX_NUM_DETECTORS 16
 
 /* --- Enums for types --- */
 typedef enum {
@@ -69,6 +68,11 @@ typedef enum {
     BC_REFLECTIVE,
     BC_PERIODIC
 } BoundaryCoefficents;
+
+typedef enum {
+    NORM_SRCRATE = 1,
+    NORM_POWER
+} NormalisationModes;
 
 typedef struct {
     uint64_t s[4];
@@ -232,6 +236,8 @@ typedef struct {
     double slowing_down_time;   // time in fast region seconds
     long genc;      // generation counter
     int fission_yield;   // fission neutrons produced
+    long last_mt; // Latest mt experience by Neutron, or zero
+    long last_nuc; // Latest nuclide interacted with, or zero
 } Neutron;
 
 /* --- Scoring data structures --- */
@@ -286,74 +292,102 @@ static inline void TransportRunScoresReduce(TransportRunScores *restrict out,
 
 /* --- Detector structures --- */
 
-/* Reaction rate detector structures */
 typedef enum {
-    RRDET_MODE_ELASTIC = 0,
-    RRDET_MODE_FISSION,
-    RRDET_MODE_INELASTIC,
-    RRDET_MODE_CAPTURE,
-    RRDET_MODE_COUNT
-} ReactionRateMode;
-
-typedef struct {
-    double sum;     // accumulated score
-    double sum_sq;  // accumulated score squared
-} ReactionRateTally;
-
-typedef struct {
-    char  nuclide_name[16];
-    int   nuclide_index;   // index inside the Material.nucs array
-    size_t n_energy_bins;  // number of energy bins (>=1)
-    ReactionRateTally *tallies; // flattened array [n_energy_bins][RRDET_MODE_COUNT]
-} ReactionRateNuclide;
+    DETECTOR_AXIS_TIME = 0,
+    DETECTOR_AXIS_ENERGY,
+    DETECTOR_AXIS_MESH_X,
+    DETECTOR_AXIS_MESH_Y,
+    DETECTOR_AXIS_MESH_Z,
+    DETECTOR_AXIS_RESPONSE,
+    DETECTOR_AXIS_COUNT
+} DetectorAxisKind;
 
 typedef enum {
-    ENERGY_BIN_SPACING_LOG = 0,
-    ENERGY_BIN_SPACING_LINEAR = 1
-} EnergyBinSpacing;
+    ENERGY_GRID_LIN = 1,
+    ENERGY_GRID_LOG
+} EnergyGridType;
 
 typedef struct {
-    bool   enabled;
+    bool   active;
     size_t n_bins;
-    double E_min;
-    double E_max;
-    EnergyBinSpacing spacing;
-    double *edges;            // energy bin edges, length n_bins + 1
-} EnergyGrid;
+    size_t stride;   // element stride in flattened tally array
+} DetectorAxisLayout;
 
 typedef struct {
-    char   material_name[128];  // tracked material name from input
-    int    material_index;      // resolved material index, -1 if unresolved
-    size_t n_nuclides;          // length of the nuclides array
-    ReactionRateNuclide *nuclides;
-    EnergyGrid energy_grid;
-    size_t n_energy_bins;       // number of bins used for tallying (1 if grid disabled)
-} ReactionRateDetector;
+    DetectorAxisLayout axes[DETECTOR_AXIS_COUNT];
+    size_t             total_bins;
+} DetectorBinLayout;
 
-typedef struct {
-    bool   has_material_filter;   // true if material filter requested
-    char   material_name[128];    // tracked material name from input (empty if global)
-    int    material_index;        // resolved material index, -1 if unresolved or unused
-    EnergyGrid grid;        // energy bin specification
-    double *track_length_sum;     // accumulated track-length tallies per bin
-    double *track_length_sum_sq;  // accumulated squared tallies
-} EnergySpectrumDetector;
-
-/* General detector structures */
 typedef enum {
-    DETECTOR_TYPE_REACTION_RATE = 0,
-    DETECTOR_TYPE_ENERGY_SPECTRUM,
-    DETECTOR_TYPE_COUNT
-} DetectorType;
+    DETECTOR_GRID_SPACING_NONE = 0,
+    DETECTOR_GRID_SPACING_LINEAR,
+    DETECTOR_GRID_SPACING_LOG,
+    DETECTOR_GRID_SPACING_CUSTOM
+} DetectorGridSpacing;
 
 typedef struct {
-    DetectorType type;
-    char   name[MAX_STR_LEN];           // detector name from input
-    uint64_t n_histories;       // number of tallied source histories
-    union {
-        ReactionRateDetector reaction_rate;
-        EnergySpectrumDetector energy_spectrum;
-    } data;
+    bool                active;
+    size_t              n_bins;
+    DetectorGridSpacing spacing;
+    EnergyGridType      type;
+    double              min;
+    double              max;
+    double             *edges;  // explicit edges array (n_bins + 1) when spacing == CUSTOM
+} DetectorEnergyAxis;
+
+typedef struct {
+    bool                active;
+    size_t              n_bins;
+    DetectorGridSpacing spacing;
+    double              min;
+    double              max;
+    double             *edges;
+} DetectorTimeAxis;
+
+typedef enum {
+    DETECTOR_MESH_AXIS_UNIFORM = 0,
+    DETECTOR_MESH_AXIS_EXPLICIT
+} DetectorMeshAxisType;
+
+typedef struct {
+    bool                 active;
+    DetectorMeshAxisType type;
+    size_t               n_bins;
+    double               origin;  // used for uniform axes
+    double               spacing; // used for uniform axes
+    double               min;
+    double               max;
+    double              *edges;   // optional explicit edges (n_bins + 1) when type == EXPLICIT
+} DetectorCartesianAxis;
+
+typedef struct {
+    long                 response_id;    // MT number
+    char                 rmat_name[MAX_STR_LEN]; // material or nuclide name as parsed from input
+    long                 rmat_id;   // Material to score in, macroscopic -> material id, microscopic -> nuclide za
+    double               multiplier;
+} DetectorResponseBin;
+
+typedef struct {
+    bool                 active;
+    size_t               n_bins;
+    DetectorResponseBin *bins;
+} DetectorResponseAxis;
+
+typedef struct {
+    char                  name[MAX_STR_LEN];
+    uint64_t              n_histories;
+    bool                  has_material_filter;
+    long                  material_filter_index;
+    char                  material_filter_name[MAX_STR_LEN];
+    DetectorTimeAxis      time;
+    DetectorEnergyAxis    energy;
+    DetectorCartesianAxis mesh_x;
+    DetectorCartesianAxis mesh_y;
+    DetectorCartesianAxis mesh_z;
+    DetectorResponseAxis  responses;
+    DetectorBinLayout     layout;
+    double               *scores;    // flattened
+    double               *scores_sq; // flattened
 } Detector;
 
 /* --- Particle source data structures --- */
@@ -421,8 +455,8 @@ typedef struct {
     uint32_t src_type;
 
     /* Detectors*/
-    size_t n_detectors;
-    Detector *detectors[MAX_NUM_DETECTORS];
+    size_t    n_detectors;
+    Detector *detectors;
 
     /* Track plotting */
     size_t *track_counts;   // array to store number of track points for each track
@@ -453,6 +487,12 @@ typedef struct {
     bool        norun;
     bool        noplot;
     bool        trackplotmode;
+
+    /* Normalisation */
+    NormalisationModes norm_mode;
+    double      norm_factor;
+    double      srcrate;
+    double      power;
 
     /* Iteration parameters */
     long        n_generations;  // generations for criticality simulation

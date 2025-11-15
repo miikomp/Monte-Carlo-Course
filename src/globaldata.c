@@ -21,6 +21,11 @@ runInfo GLOB = {
     .noplot         = false,
     .trackplotmode  = false,
 
+    .norm_mode      = 0,
+    .norm_factor    = 1.0,
+    .srcrate        = -1.0,
+    .power          = -1.0,
+
     .n_generations  = 0l,
     .n_particles    = 0l,
     .n_cycles       = 0l,
@@ -44,6 +49,7 @@ runData DATA = {
     .src = NULL,
     .src_type = 0,
     .n_detectors = 0,
+    .detectors = NULL,
     .n_cells = 0ul,
     .cells = NULL,
     .n_surf = 0ul,

@@ -7,6 +7,8 @@ void initFissionNeutron(Neutron *parent, Neutron *new_neutron, long idx)
     new_neutron->status = NEUTRON_ALIVE;
     new_neutron->id = (DATA.cur_gen - 1) * GLOB.n_particles + idx;
     new_neutron->mat_idx = -1;
+    new_neutron->last_mt = 0;
+    new_neutron->last_nuc = 0;
     new_neutron->fission_yield = 0;
 
     new_neutron->path_length = 0.0;

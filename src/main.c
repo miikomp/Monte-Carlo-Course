@@ -319,11 +319,11 @@ int main(int argc, char **argv) {
 
     fprintf(stdout, "DONE.\n");
 
-    /* Process detectors */
+    /* Resolve detectors */
 
-    if (processDetectors() != EXIT_SUCCESS) 
+    if (resolveDetectors() != EXIT_SUCCESS) 
     {
-        fprintf(stderr, "[ERROR] Could not process detectors.\n");
+        fprintf(stderr, "[ERROR] Could not resolve detectors.\n");
         return EXIT_FAILURE;
     }
 

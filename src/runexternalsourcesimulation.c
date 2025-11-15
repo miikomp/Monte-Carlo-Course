@@ -1,4 +1,5 @@
 #include "header.h"
+#include "detectorbuffer.h"
 
 int runExternalSourceSimulation(void)
 {
@@ -75,6 +76,8 @@ int runExternalSourceSimulation(void)
                 /* Get pointer to thread-local buffers */
 
                 const int tid = omp_get_thread_num();
+                const size_t n_detectors = DATA.n_detectors;
+                DetectorHistoryBuffer *det_buffers = createDetectorHistoryBuffers(n_detectors);
 
                 Neutron *local_buf = thread_bufs[tid];
                 size_t local_cap = thread_buf_cap[tid];
@@ -125,6 +128,9 @@ int runExternalSourceSimulation(void)
                             (*count)++;
                         }
 
+                        n->last_mt = 0;
+                        n->last_nuc = 0;
+
                         /* Do boundary conditions */
                         
                         applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
@@ -155,6 +161,7 @@ int runExternalSourceSimulation(void)
                         if (d < 0.0)
                         {
                             n->status = NEUTRON_DEAD_LEAKAGE;
+                            cycle_scores.total_leakages++;
                             continue;
                         }
                         
@@ -204,6 +211,8 @@ int runExternalSourceSimulation(void)
                             continue;
                         }
 
+                        n->last_nuc = nuc_idx;
+
                         /* Sample interaction type */
 
                         int mt = sampleInteractionType(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
@@ -212,6 +221,8 @@ int runExternalSourceSimulation(void)
                             n->status = NEUTRON_DEAD_LEAKAGE;
                             continue;
                         }
+
+                        n->last_mt = mt;
 
                         cycle_scores.total_collisions++;
 
@@ -282,6 +293,18 @@ int runExternalSourceSimulation(void)
                             cycle_scores.total_unknowns++;
                         }
 
+                        /* Score detectors */
+
+                        if (det_buffers)
+                        {
+                            for (size_t d = 0; d < n_detectors; d++)
+                            {
+                                long bin = computeDetectorBin(n, d);
+                                if (bin >= 0)
+                                    detectorHistoryBufferAccumulate(&det_buffers[d], (size_t)bin, 1.0);
+                            }
+                        }
+
                         /* If neutron is alive, check for cut-off */
 
                         if (n->status == NEUTRON_ALIVE)
@@ -291,12 +314,18 @@ int runExternalSourceSimulation(void)
                         }
 
                     }
+
+                    if (det_buffers)
+                        flushDetectorHistoryBuffers(det_buffers, n_detectors);
                 }
 
                 /* Update thread-local buffer counts to main array */
 
                 thread_buf_count[tid] = local_count;
                 thread_buf_cap[tid] = local_cap;
+
+                if (det_buffers)
+                    destroyDetectorHistoryBuffers(det_buffers, n_detectors);
             }
 
             /* If in trackplotter mode, we can exit now. Secondary neutrons are not tracked. */
@@ -357,6 +386,10 @@ int runExternalSourceSimulation(void)
             long idx = c - 1 - GLOB.n_inactive;
             if (idx >= 0 && idx < RES.n_iterations && RES.avg_scores)
                 RES.avg_scores[idx] = cycle_scores;
+
+            uint64_t histories_this_cycle = cycle_scores.n_histories;
+            for (size_t d = 0; d < DATA.n_detectors; ++d)
+                DATA.detectors[d].n_histories += histories_this_cycle;
         }
 
         /* Print cycle summary*/

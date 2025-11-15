@@ -100,6 +100,19 @@ int runCriticalitySimulation(void)
         }
     }
 
+    /* If doing track plots grab ptrs to arrays */
+
+    double *track_points = NULL;
+    size_t *track_counts = NULL;
+    bool do_tracks = false;
+
+    if (GLOB.trackplotmode && DATA.tracks != NULL && DATA.track_counts != NULL)
+    {
+        track_points = DATA.tracks;
+        track_counts = DATA.track_counts;
+        do_tracks = true;
+    }
+
     /* Loop over generations (single-threaded) */
 
     for (long g = 1; g <= GLOB.n_generations + GLOB.n_inactive; g++) 
@@ -136,24 +149,26 @@ int runCriticalitySimulation(void)
                 return EXIT_FAILURE;
             }
         }
-
-        if (g > GLOB.n_inactive)
+        if (!GLOB.trackplotmode)
         {
-            fprintf(stdout, "\n--- Generation %ld ---\n"
-                            "Simulating %zu neutrons.\n", g - GLOB.n_inactive, DATA.n_bank);
+            if (g > GLOB.n_inactive)
+            {
+                fprintf(stdout, "\n--- Generation %ld ---\n"
+                                "Simulating %zu neutrons.\n", g - GLOB.n_inactive, DATA.n_bank);
+            }
+            else
+            {
+                fprintf(stdout, "Inactive cycle %2ld/%2ld -", g, GLOB.n_inactive);
+            }
         }
-        else
-        {
-            fprintf(stdout, "Inactive cycle %2ld/%2ld -", g, GLOB.n_inactive);
-        }
-
         /* Loop over all neutrons in bank (parallel) */
 
         #pragma omp parallel default(none)\
                 shared(GLOB, DATA, RES, stdout, stderr, \
                        detectors, n_detectors, detector_offsets, detector_bin_counts, \
                        detector_thread_sums, detector_thread_sums_sq, \
-                       detector_history_counts, total_detector_bins, do_detectors) \
+                       detector_history_counts, total_detector_bins, do_detectors, \
+                       do_tracks, track_points, track_counts) \
                 reduction(+:gen_scores)
         {
             ReactionRateMode r_mode = RRDET_MODE_COUNT;
@@ -172,6 +187,15 @@ int runCriticalitySimulation(void)
             #pragma omp for schedule(dynamic)
             for (size_t i = 0; i < DATA.n_bank; i++)
             {
+                double *points = NULL;
+                size_t *count = NULL;
+
+                if (do_tracks && i < (size_t)GLOB.n_tracks)
+                {
+                    points = track_points + (size_t)i * (MAX_COLLISION_BINS + 1u) * 3u;
+                    count  = &track_counts[i];
+                }
+
                 /* Get neutron from bank */
 
                 Neutron *n = &DATA.bank[i];
@@ -184,14 +208,48 @@ int runCriticalitySimulation(void)
                     memset(history_counts, 0, total_detector_bins * sizeof(double));
 
                 /* Sample collisions until dead */
-
-                size_t k = 0;
+                
                 while (n->status == NEUTRON_ALIVE) 
                 {
+                    /* Add point to track segment array if plotting tracks */
+
+                    if (do_tracks && count && *count < (MAX_COLLISION_BINS + 1))
+                    {
+                        double *slot = points + (*count) * 3u;
+                        slot[0] = n->x;
+                        slot[1] = n->y;
+                        slot[2] = n->z;
+                        (*count)++;
+                    }
+
+                    /* Do boundary conditions */
+
+                    applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
+
                     double segment_energy = n->E;
+
                     /* Sample distance to next collision */
 
                     double d = sampleDistanceToCollision(n);
+
+                    /* Get distance to nearest boundary */
+
+                    double d0 = distanceToNearestBoundary(n->x, n->y, n->z, n->u, n->v, n->w);
+
+                    /* Check if collision is beyond the boundary crossing */
+
+                    if (isfinite(d0) && d0 < d)
+                    {
+                        /* Move over boundary */
+
+                        n->x += n->u * (d0 + STEP_INTPL);
+                        n->y += n->v * (d0 + STEP_INTPL);
+                        n->z += n->w * (d0 + STEP_INTPL);
+
+                        /* Continue loop */
+
+                        continue;
+                    }
 
                     if (d < 0.0)
                     {
@@ -290,17 +348,6 @@ int runCriticalitySimulation(void)
 
                     gen_scores.total_collisions++;
 
-                    /* For the first set number of collision score energy */
-                    
-                    if (k < MAX_COLLISION_BINS) 
-                    {
-                        gen_scores.collision_energy_sum[k] += n->E;
-                        gen_scores.collision_energy_count[k] += 1;
-                        k++;
-                        if (k > gen_scores.max_collision_bin)
-                            gen_scores.max_collision_bin = k;
-                    }
-
                     /* Handle interaction */
 
                     if (MT_IS_ELASTIC_SCATTER(mt))
@@ -325,15 +372,6 @@ int runCriticalitySimulation(void)
                         gen_scores.total_fission_yield += n->fission_yield;
 
                         r_mode = RRDET_MODE_FISSION;
-
-                        /* Score fission time */
-                        size_t time_bin = (size_t)(n->time / TIME_BIN_WIDTH);
-                        if (time_bin < MAX_TIME_BINS && n->fission_yield > 0)
-                        {
-                            gen_scores.fission_time_yield[time_bin] += (double)n->fission_yield;
-                            gen_scores.fission_time_events[time_bin] += 1;
-                        }
-
                     }
                     else if (MT_IS_INELASTIC_SCATTER(mt))
                     {
@@ -402,6 +440,19 @@ int runCriticalitySimulation(void)
                 }
             }
         }
+
+        /* If in trackplotter mode, we can exit now. Secondary neutrons are not tracked. */
+        if (GLOB.trackplotmode)
+        {
+            free(detector_offsets);
+            free(detector_bin_counts);
+            free(detector_thread_sums);
+            free(detector_thread_sums_sq);
+            free(detector_history_counts);
+
+            return EXIT_SUCCESS;
+        }
+            
         /* ###################################################################################### */
         /* Store generation scores if in active cycle */
 
@@ -498,6 +549,7 @@ int runCriticalitySimulation(void)
     free(detector_thread_sums);
     free(detector_thread_sums_sq);
     free(detector_history_counts);
+
     return EXIT_SUCCESS;
 }
 

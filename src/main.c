@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
             }
         }
-        else if (!strcmp(argv[i], "-tracks") || !strcmp(argv[i], ".--tracks"))
+        else if (!strcmp(argv[i], "-tracks") || !strcmp(argv[i], "--tracks"))
         {
             if (i + 1 >= argc - 1)
             {
@@ -178,6 +178,7 @@ int main(int argc, char **argv) {
     fprintf(stdout, "------------------------\n");
 
     /* Read and process the xsdata from the given path into a temporary librabry */
+
     TempNucDataLib *lib = NULL;
     size_t nlib = 0;
 
@@ -312,8 +313,8 @@ int main(int argc, char **argv) {
 
     /* Calculate memory footprint of results data structure */
 
-    size_t total_bytes = sizeof(ResultsData) + n_res * sizeof(TransportRunScores);
-    fprintf(stdout, "Memory allocated for results: %.2f MB\n", (double)total_bytes / (1024.0 * 1024.0));
+    GLOB.mem_results = sizeof(ResultsData) + n_res * sizeof(TransportRunScores);
+    fprintf(stdout, "Memory allocated for results: %.2f MB\n", (double)GLOB.mem_results / (1024.0 * 1024.0));
 
 
     fprintf(stdout, "DONE.\n");
@@ -362,7 +363,22 @@ int main(int argc, char **argv) {
     /* --- Main loop --- */
     
     /* Dispatch case to correct sub-routine */
+    
+    if (GLOB.trackplotmode)
+    {
+        /* Allocate track coordinate array and adjust run parameters */
 
+        GLOB.n_cycles = GLOB.n_generations = 1;
+        GLOB.n_particles = GLOB.n_tracks;
+
+        DATA.track_counts = (size_t*)calloc(GLOB.n_tracks, sizeof(size_t));
+        DATA.tracks = (double*)calloc(GLOB.n_tracks * (MAX_COLLISION_BINS + 1) * 3, sizeof(double));
+        if (!DATA.tracks || !DATA.track_counts)
+        {
+            fprintf(stderr, "[ERROR] Memory allocation failed.\n");
+            return EXIT_FAILURE;
+        }
+    }
     fprintf(stdout, "\n------------------------\n");
     fprintf(stdout, "  Starting simulation\n");
     fprintf(stdout, "------------------------\n\n");
@@ -379,7 +395,7 @@ int main(int argc, char **argv) {
         */
 
         if (!GLOB.trackplotmode)
-            fprintf(stdout, "Running external source simulation for %ld cycles with %ld neutrons each.\n", GLOB.n_cycles, GLOB.n_particles);
+            fprintf(stdout, "Running external source simulation for %ld cycles with %ld neutrons each.\n\n", GLOB.n_cycles, GLOB.n_particles);
         else
             fprintf(stdout, "Simulating %ld tracks...\n", GLOB.n_tracks);
 
@@ -398,12 +414,10 @@ int main(int argc, char **argv) {
            the fission sites of the last generation. 
         */
         if (!GLOB.trackplotmode)
-            fprintf(stdout, "Running criticality source simulation for %ld generations with %ld neutrons each.\n", GLOB.n_generations, GLOB.n_particles);
+            fprintf(stdout, "Running criticality source simulation for %ld generations with %ld neutrons each.\n\n", GLOB.n_generations, GLOB.n_particles);
         else
             fprintf(stdout, "Simulating %ld tracks...\n", GLOB.n_tracks);
 
-        fprintf(stdout, "Not implemented\n");
-        break;
         if (runCriticalitySimulation() != EXIT_SUCCESS) {
             fprintf(stderr, "[ERROR] Computation failed.\n");
             return EXIT_FAILURE;

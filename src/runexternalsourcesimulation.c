@@ -112,7 +112,6 @@ int runExternalSourceSimulation(void)
 
                     /* Transport neutron until death */
 
-                    size_t k = 0;
                     while (n->status == NEUTRON_ALIVE)
                     {
                         /* Add point to track segment array if plotting tracks */
@@ -216,17 +215,6 @@ int runExternalSourceSimulation(void)
 
                         cycle_scores.total_collisions++;
 
-                        /* For the first set number of collision score energy */
-
-                        if (k < MAX_COLLISION_BINS)
-                        {
-                            cycle_scores.collision_energy_sum[k] += n->E;
-                            cycle_scores.collision_energy_count[k] += 1;
-                            ++k;
-                            if (k > cycle_scores.max_collision_bin)
-                                cycle_scores.max_collision_bin = k;
-                        }
-
                         /* Handle interaction */
 
                         if (MT_IS_ELASTIC_SCATTER(mt))
@@ -244,13 +232,6 @@ int runExternalSourceSimulation(void)
                                 cycle_scores.total_thermal_fissions++;
 
                             handleFission(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
-
-                            size_t time_bin = (size_t)(n->time / TIME_BIN_WIDTH);
-                            if (time_bin < MAX_TIME_BINS && n->fission_yield > 0)
-                            {
-                                cycle_scores.fission_time_yield[time_bin] += (double)n->fission_yield;
-                                cycle_scores.fission_time_events[time_bin] += 1;
-                            }
 
                             if (n->fission_yield > 0)
                             {
@@ -319,6 +300,7 @@ int runExternalSourceSimulation(void)
             }
 
             /* If in trackplotter mode, we can exit now. Secondary neutrons are not tracked. */
+
             if (GLOB.trackplotmode)
                 return EXIT_SUCCESS;
 

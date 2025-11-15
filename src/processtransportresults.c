@@ -180,25 +180,6 @@ void processTransportResults(void)
         }
     }
 
-    size_t max_bin = 0;
-
-    size_t max_time_bin = 0;
-    double *time_yield = (double*)calloc(MAX_TIME_BINS, sizeof(double));
-    uint64_t *time_events = (uint64_t*)calloc(MAX_TIME_BINS, sizeof(uint64_t));
-    if (!time_yield || !time_events)
-    {
-        fprintf(stderr, "[ERROR] Memory allocation failed.\n");
-        free(time_yield);
-        free(time_events);
-        for (size_t m = 0; m < nmetrics; ++m)
-            free(metric_values[m]);
-        free(metric_values);
-        free(histories);
-        return;
-    }
-
-    const TransportRunScores *ref_gen = NULL;
-
     for (size_t g = 0; g < n_iter; ++g)
     {
         const TransportRunScores *gs = &RES.avg_scores[g];
@@ -206,32 +187,7 @@ void processTransportResults(void)
 
         for (size_t m = 0; m < nmetrics; ++m)
             metric_values[m][g] = metrics[m].extract(gs);
-
-        for (size_t b = 0; b < MAX_COLLISION_BINS; ++b)
-        {
-            if (gs->collision_energy_count[b] == 0)
-                continue;
-            if (b + 1 > max_bin)
-                max_bin = b + 1;
-        }
-
-        for (size_t b = 0; b < MAX_TIME_BINS; ++b)
-        {
-            double yield = gs->fission_time_yield[b];
-            uint64_t events = gs->fission_time_events[b];
-            if (yield <= 0.0 && events == 0)
-                continue;
-            time_yield[b] += yield;
-            time_events[b] += events;
-            if (b + 1 > max_time_bin)
-                max_time_bin = b + 1;
-        }
-
-        if (!ref_gen && gs->collision_energy_count[0] > 0)
-            ref_gen = gs;
     }
-    if (ref_gen)
-        max_bin = ref_gen->max_collision_bin;
 
     if (VERBOSITY >= 1)
     {
@@ -248,27 +204,6 @@ void processTransportResults(void)
         compute_stats(metric_values[m], n_iter, &mean, &std, &ci);
         fprintf(stdout, "  %-20s  mean = %12.6e +/- %9.3e (%.6lf%%)\n",
                 metrics[m].label, mean, ci, (ci / mean) * 100.0);
-    }
-    
-
-    if (VERBOSITY >= 2)
-    {
-        if (ref_gen && max_bin > 0) 
-        {
-            fprintf(stdout, "\nAverage neutron energy by collision index:\n");
-            for (size_t b = 0; b < max_bin; ++b) 
-            {
-                uint64_t cnt = ref_gen->collision_energy_count[b];
-                double avgE = (cnt > 0)
-                    ? ref_gen->collision_energy_sum[b] / (double)cnt
-                    : 0.0;
-                fprintf(stdout, "  Collision %-3zu  <E> = %12.6e MeV  samples = %lu\n",
-                        b + 1, avgE, cnt);
-            }
-        } 
-        else {
-            fprintf(stdout, "\nNo collision energy tallies were recorded.\n");
-        }
     }
 
     /* ########################################################################################## */
@@ -301,48 +236,6 @@ void processTransportResults(void)
             fprintf(mfile, "];\n\n");
         }
 
-        if (ref_gen && max_bin > 0) {
-            fprintf(mfile, "MEAN_ENERGY_PER_COLLISION = [\n");
-            for (size_t b = 0; b < max_bin; ++b) 
-            {
-                uint64_t cnt = ref_gen->collision_energy_count[b];
-                double avgE = (cnt > 0)
-                    ? ref_gen->collision_energy_sum[b] / (double)cnt
-                    : 0.0;
-                fprintf(mfile, "  %.12e", avgE);
-            }
-            fprintf(mfile, "];\n\n");
-
-            fprintf(mfile, "ENERGY_SAMPLES_PER_COLLISION = [\n");
-            for (size_t b = 0; b < max_bin; ++b)
-                fprintf(mfile, "  %lu", ref_gen->collision_energy_count[b]);
-            fprintf(mfile, "];\n\n");
-        }
-
-        if (max_time_bin > 0)
-        {
-            fprintf(mfile, "FISSION_TIME_BIN_WIDTH = %.12e;\n", (double)TIME_BIN_WIDTH);
-            fprintf(mfile, "FISSION_TIME_BIN_COUNT = %zu;\n\n", max_time_bin);
-
-            fprintf(mfile, "FISSION_TIME_BIN_CENTERS = [\n");
-            for (size_t b = 0; b < max_time_bin; ++b)
-            {
-                double center = (b + 0.5) * (double)TIME_BIN_WIDTH;
-                fprintf(mfile, "  %.12e\n", center);
-            }
-            fprintf(mfile, "];\n\n");
-
-            fprintf(mfile, "FISSION_NEUTRONS_PER_BIN = [\n");
-            for (size_t b = 0; b < max_time_bin; ++b)
-                fprintf(mfile, "  %.12e\n", time_yield[b]);
-            fprintf(mfile, "];\n\n");
-
-            fprintf(mfile, "FISSION_EVENTS_PER_BIN = [\n");
-            for (size_t b = 0; b < max_time_bin; ++b)
-                fprintf(mfile, "  %" PRIu64 "\n", time_events[b]);
-            fprintf(mfile, "];\n\n");
-        }
-
         fclose(mfile);
         fprintf(stdout, "\nWrote transport results to '%s'.\n", mpath);
     }
@@ -351,6 +244,4 @@ void processTransportResults(void)
         free(metric_values[m]);
     free(metric_values);
     free(histories);
-    free(time_yield);
-    free(time_events);
 }

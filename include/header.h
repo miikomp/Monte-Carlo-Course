@@ -153,6 +153,13 @@ int processXsData(TempNucDataLib **outlib, size_t *noutlib);
 int resolveMaterials(TempNucDataLib *lib, size_t nlib);
 
 /**
+ * @brief Computes majorant cross section based on loaded materials
+ * 
+ * @return int 0 on success 1 on failure
+ */
+int computeMajorantXS();
+
+/**
  * @brief Resolve all cell data, populating the surf_idxs arrays and material indices.
  * Checks for valid surface and material names.
  * 
@@ -367,6 +374,14 @@ void handleFission(Neutron *n, Nuclide *nuc);
  * @return double total macroscopic cross section in 1/cm, or -1.0 on failure
  */
 double getTotalMacroscopicXS(const double E, Material* mat);
+
+/**
+ * @brief Get the majorant cross section at a given neutron energy
+ * 
+ * @param E Energy in MeV
+ * @return double majorant cross section in 1/cm, or -1.0 on failure
+ */
+double getMajorantXS(const double E);
 
 /**
  * @brief Get the Total Microscopic xs for a given nuclide and neutron energy

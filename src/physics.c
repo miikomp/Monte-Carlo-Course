@@ -289,6 +289,42 @@ void handleFission(Neutron *n, Nuclide *nuc)
     n->status = NEUTRON_DEAD_FISSION;
 }
 
+double getMajorantXS(const double E)
+{
+    const MajorantXsTable *maj = &DATA.majorant_xs;
+
+    if (maj->n == 0 || !maj->E || !maj->xs)
+        return -1.0;
+
+    double sigma_M;
+
+    if (E <= maj->E[0])
+    {
+        sigma_M = maj->xs[0];
+    }
+    else if (E >= maj->E[maj->n - 1])
+    {
+        sigma_M = maj->xs[maj->n - 1];
+    }
+    else
+    {
+        size_t lo = 0, hi = maj->n - 1;
+        while (hi - lo > 1)
+        {
+            size_t mid = (lo + hi) >> 1;
+            if (maj->E[mid] <= E)
+                lo = mid;
+            else
+                hi = mid;
+        }
+
+        sigma_M = linlin(maj->E[lo], maj->xs[lo],
+                         maj->E[lo + 1], maj->xs[lo + 1], E);
+    }
+
+    return sigma_M;
+}
+
 double getTotalMacroscopicXS(const double E, Material* mat)
 {
     /* Get material total macroscopic cross section table */

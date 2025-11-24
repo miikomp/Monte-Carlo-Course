@@ -60,6 +60,7 @@ runData DATA = {
     .lats = NULL,
     .n_gpls = 0ul,
     .gpls = NULL,
+    .majorant_xs = {0, NULL, NULL},
     .boundary_surf_idx = -1,
     .tot_vol = -1,
     .boundary_coef = BC_BLACK,

@@ -21,7 +21,7 @@ OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
 
 # Make all compiles everything in ./src and dependencies from ./include
-all: $(BIN)
+all: clean $(BIN)
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
@@ -56,3 +56,5 @@ $(TEST_BIN): $(TEST_OBJ)
 
 build/%.o: test/%.c
 	$(CC) $(CFLAGS) -Iinclude -c $< -o $@
+
+.PHONY: all clean run test

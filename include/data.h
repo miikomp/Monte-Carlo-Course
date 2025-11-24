@@ -97,6 +97,13 @@ typedef struct {
     double *xs;   // 1/cm
 } MacroXsTable;
 
+// Majorant cross section table
+typedef struct {
+    size_t  n;
+    double *E;      // MeV
+    double *xs;     // 1/cm
+} MajorantXsTable;
+
 // Energy wise nubar data for a single fissile nuclide
 typedef struct {
     size_t  n;
@@ -434,6 +441,7 @@ typedef struct {
     size_t           n_gpls;
     GeometryPlotter *gpls;
 
+    MajorantXsTable  majorant_xs;
 
     /* Bounds */
     BoundaryCoefficents boundary_coef;

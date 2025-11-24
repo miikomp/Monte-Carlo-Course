@@ -209,6 +209,14 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    /* Compute majorant cross section for use by delta-tracking */
+
+    if (computeMajorantXS() != EXIT_SUCCESS)
+    {
+        fprintf(stderr, "[ERROR] Failed to compute majorant cross section.\n");
+        return EXIT_FAILURE;
+    }
+
     fprintf(stdout, "\n------------------------\n");
     fprintf(stdout, "  Processing geometry\n");
     fprintf(stdout, "------------------------\n");

@@ -96,10 +96,10 @@ static inline void flushDetectorHistoryBuffers(DetectorHistoryBuffer *bufs, size
         {
             size_t bin = buf->bins[i];
             double value = buf->values[i];
-            _Pragma("omp atomic")
-            scores[bin] += value;
-            _Pragma("omp atomic")
-            scores_sq[bin] += value * value;
+            #pragma omp atomic
+                scores[bin] += value;
+            #pragma omp atomic
+                scores_sq[bin] += value * value;
         }
 
         buf->count = 0;

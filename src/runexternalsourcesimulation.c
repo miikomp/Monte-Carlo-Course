@@ -202,6 +202,7 @@ int runExternalSourceSimulation(void)
                         if (n->mat_idx < 0)
                             continue;
 
+
                         /* Sample collision nuclide */
 
                         int nuc_idx = sampleCollisionNuclide(n);
@@ -301,7 +302,9 @@ int runExternalSourceSimulation(void)
                             {
                                 long bin = computeDetectorBin(n, d);
                                 if (bin >= 0)
+                                {
                                     detectorHistoryBufferAccumulate(&det_buffers[d], (size_t)bin, 1.0);
+                                }
                             }
                         }
 

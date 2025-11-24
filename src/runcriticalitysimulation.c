@@ -265,7 +265,9 @@ int runCriticalitySimulation(void)
                         {
                             long bin = computeDetectorBin(n, d);
                             if (bin >= 0)
+                            {
                                 detectorHistoryBufferAccumulate(&det_buffers[d], (size_t)bin, 1.0);
+                            }
                         }
                     }
 

@@ -264,7 +264,7 @@ void processTransportResults(void)
             effective_norm = 0.0;
     }
     char norm_desc[MAX_STR_LEN];
-    getNormalizationModeDescription(norm_desc, effective_norm);
+    getNormalizationModeDescription(norm_desc);
 
     fprintf(stdout, "\nTotal reaction rates (normalized to %s):\n", norm_desc);
     for (size_t m = 0; m < nmetrics; ++m)

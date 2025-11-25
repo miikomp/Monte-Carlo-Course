@@ -262,17 +262,15 @@ int runExternalSourceSimulation(void)
                             cycle_scores.total_unknowns++;
                         }
 
-                        /* Score detectors */
+                        /* Score detectors (active cycles only) */
 
-                        if (det_buffers)
+                        if (det_buffers && c > GLOB.n_inactive)
                         {
                             for (size_t d = 0; d < n_detectors; d++)
                             {
                                 long bin = computeDetectorBin(n, d);
                                 if (bin >= 0)
-                                {
                                     detectorHistoryBufferAccumulate(&det_buffers[d], (size_t)bin, 1.0);
-                                }
                             }
                         }
 

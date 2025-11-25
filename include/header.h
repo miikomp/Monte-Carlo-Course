@@ -486,12 +486,12 @@ long plotGeometry();
 
 /* --- Inline functions --- */
 
-static inline void getNormalizationModeDescription(char *str, double norm_factor)
+static inline void getNormalizationModeDescription(char *str)
 {
     switch (GLOB.norm_mode)
     {
         case NORM_POWER:   
-            snprintf(str, MAX_STR_LEN, "%.2E W power (%.3E fission rate)", GLOB.power, norm_factor);
+            snprintf(str, MAX_STR_LEN, "%.2E W power", GLOB.power);
             return;
 
         case NORM_SRCRATE: 

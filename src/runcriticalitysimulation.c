@@ -76,7 +76,7 @@ int runCriticalitySimulation(void)
         /* Loop over all neutrons in bank (parallel) */
 
         #pragma omp parallel default(none)\
-                shared(GLOB, DATA, RES, stdout, stderr, \
+                shared(GLOB, DATA, RES, stdout, stderr, g, \
                        do_tracks, track_points, track_counts) \
                 reduction(+:gen_scores)
         {
@@ -222,17 +222,15 @@ int runCriticalitySimulation(void)
                         gen_scores.total_unknowns++;
                     }
 
-                    /* Score detectors using per-history buffers */
+                    /* Score detectors using per-history buffers (active cycles only) */
 
-                    if (det_buffers)
+                    if (det_buffers && g > GLOB.n_inactive)
                     {
                         for (size_t d = 0; d < n_detectors; ++d)
                         {
                             long bin = computeDetectorBin(n, d);
                             if (bin >= 0)
-                            {
                                 detectorHistoryBufferAccumulate(&det_buffers[d], (size_t)bin, 1.0);
-                            }
                         }
                     }
 

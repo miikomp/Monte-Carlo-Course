@@ -43,10 +43,42 @@ void processDetectorResults(void)
         return;
     }
 
+    /* Determine effective normalization factor */
+
     const double norm_factor = (GLOB.norm_factor > 0.0) ? GLOB.norm_factor : 1.0;
+    double effective_norm = norm_factor;
+
+    if (GLOB.norm_mode == NORM_POWER && RES.avg_scores && RES.n_iterations > 0)
+    {
+        double total_fissions = 0.0;
+        double total_active_hist = 0.0;
+
+        for (long i = 0; i < RES.n_iterations; ++i)
+        {
+            const TransportRunScores *gs = &RES.avg_scores[i];
+            uint64_t active = (gs->n_histories > gs->total_terminated)
+                              ? (gs->n_histories - gs->total_terminated)
+                              : 0u;
+            total_fissions += (double)gs->total_fissions;
+            total_active_hist += (double)active;
+        }
+
+        if (total_active_hist > 0.0)
+        {
+            double fissions_per_history = total_fissions / total_active_hist;
+            if (fissions_per_history > 0.0)
+                effective_norm = norm_factor / fissions_per_history;
+            else
+                effective_norm = 0.0;
+        }
+        else
+        {
+            effective_norm = 0.0;
+        }
+    }
 
     char norm_desc[MAX_STR_LEN];
-    getNormalizationModeDescription(norm_desc, norm_factor);
+    getNormalizationModeDescription(norm_desc);
 
     fprintf(stdout, "\nProcessing detector results (normalized to %s):\n", norm_desc);
 
@@ -62,7 +94,7 @@ void processDetectorResults(void)
     {
         fprintf(mfile, "%%%% Detector results auto-generated\n");
         fprintf(mfile, "%% Input file: %s\n", GLOB.inputfname);
-        fprintf(mfile, "%% Normalisation: %.12E (%s)\n\n", norm_factor, norm_desc);
+        fprintf(mfile, "%% Normalisation: %s\n\n", norm_desc);
     }
 
     for (size_t d = 0; d < n_detectors; ++d)
@@ -134,7 +166,7 @@ void processDetectorResults(void)
                                 if (fabs(mean) > 0.0)
                                     rel_err = err / fabs(mean);
 
-                                double scaled_mean = mean * norm_factor;
+                                double scaled_mean = mean * effective_norm;
 
                                 fprintf(mfile, "  %3lu %3lu %3lu %3lu %3lu %3lu % .8E % .5lf\n",
                                         t_col, e_col, (unsigned long)(r + 1u),

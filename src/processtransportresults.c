@@ -106,10 +106,15 @@ static double metric_unknowns(const TransportRunScores *gs)
     return safe_norm(gs->n_histories, (double)gs->total_unknowns);
 }
 
-static double metric_keff(const TransportRunScores *gs)
+static double metric_ana_keff(const TransportRunScores *gs)
 {
     double den = (double)active_histories(gs);
     return (den > 0.0) ? (double)gs->total_fission_yield / den : 0.0;
+}
+static double metric_imp_keff(const TransportRunScores *gs)
+{
+    double den = gs->total_collisions - (gs->total_elastic_scatters + gs->total_inelastic_scatters) + gs->total_leakages;
+    return (den > 0.0) ? gs->total_fission_yield / den : 0.0;
 }
 static double metric_terminated(const TransportRunScores *gs) 
 {
@@ -164,7 +169,8 @@ void processTransportResults(void)
         {"Leakages / history",           "LEAKAGES",           "Leakage rate",        "LEAKAGE_RATE",      metric_leakages,          true},
         {"Terminated / history",         "TERMINATED",         "Termination rate",    "TERMINATION_RATE",  metric_terminated,        true},
         {"Unknown outcomes / history",   "UNKNOWN_OUTCOMES",   "Unknown rate",        "UNKNOWN_RATE",      metric_unknowns,          true},
-        {"k-eff",                          "KEFF",              NULL,                       NULL,                metric_keff,              false}
+        {"k-eff analog",                 "ANA_KEFF",           "k-eff analog",        "ANA_KEFF",               metric_ana_keff,          false},
+        {"k-eff implicit",               "IMP_KEFF",           "k-eff implicit",      "IMP_KEFF",           metric_imp_keff,            false}
     };
 
     const size_t nmetrics = sizeof(metrics) / sizeof(metrics[0]);

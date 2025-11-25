@@ -43,11 +43,12 @@ void processDetectorResults(void)
         return;
     }
 
-    const double norm_factor = getNormalizationFactor();
-    const char *norm_desc = getNormalizationModeDescription();
+    const double norm_factor = (GLOB.norm_factor > 0.0) ? GLOB.norm_factor : 1.0;
 
-    fprintf(stdout, "\nProcessing detector results (normalised to %.3e %s)...\n",
-            norm_factor, norm_desc);
+    char norm_desc[MAX_STR_LEN];
+    getNormalizationModeDescription(norm_desc, norm_factor);
+
+    fprintf(stdout, "\nProcessing detector results (normalized to %s):\n", norm_desc);
 
     char mpath[MAX_PATH];
     snprintf(mpath, sizeof(mpath), "%s_det.m", GLOB.inputfname);

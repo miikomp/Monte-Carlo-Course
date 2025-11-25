@@ -28,21 +28,6 @@
 /* Verbosity level: 0 = standard output, 1 = increased output, 2 = all the output */
 extern int VERBOSITY;
 
-static inline double getNormalizationFactor(void)
-{
-    return (GLOB.norm_factor > 0.0) ? GLOB.norm_factor : 1.0;
-}
-
-static inline const char *getNormalizationModeDescription(void)
-{
-    switch (GLOB.norm_mode)
-    {
-        case NORM_POWER:   return "power";
-        case NORM_SRCRATE: return "source rate";
-        default:           return "unity";
-    }
-}
-
 /* --- Constants --- */
 
 #define EXIT_SUCCESS 0
@@ -500,6 +485,24 @@ double surfaceDistance(SurfaceTypes type, double* params, size_t n_params, doubl
 long plotGeometry();
 
 /* --- Inline functions --- */
+
+static inline void getNormalizationModeDescription(char *str, double norm_factor)
+{
+    switch (GLOB.norm_mode)
+    {
+        case NORM_POWER:   
+            snprintf(str, MAX_STR_LEN, "%.2E W power (%.3E fission rate)", GLOB.power, norm_factor);
+            return;
+
+        case NORM_SRCRATE: 
+            snprintf(str, MAX_STR_LEN, "%.3E source rate", GLOB.srcrate);
+            return;
+
+        default:
+            snprintf(str, MAX_STR_LEN, "unity");           
+            return;
+    }
+}
 
 /* Compare two doubles, used for quicksort */
 static inline int cmpDouble(const void *a, const void *b) {

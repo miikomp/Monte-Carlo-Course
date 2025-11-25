@@ -69,25 +69,28 @@ int processInput() {
         }
     }
 
-    /* Check normalisation */
+    /* Check and set normalisation */
 
-    if ((GLOB.srcrate >= 0.0) && (GLOB.power >= 0.0))
+    if (GLOB.norm_mode == NORM_SRCRATE)
     {
-        fprintf(stderr, "[ERROR] Multiple normalisation defined.\n");
-        return EXIT_FAILURE;
+        if (GLOB.srcrate < 0.0)
+        {
+            fprintf(stderr, "[ERROR] Invalid sourcerate \"%lf\" for normalisation.\n", GLOB.srcrate);
+            return EXIT_FAILURE;
+        }
+
+        GLOB.norm_factor = GLOB.srcrate;
     }
-    else if (GLOB.power >= 0.0)
+    else if (GLOB.norm_mode == NORM_POWER)
     {
-        GLOB.norm_mode = NORM_POWER;
-        GLOB.norm_factor = 1.0; /* Placeholder: updated once power normalisation is implemented */
+        /* Based on fission energy release we will determine fission rate to normalise to */
+
+        GLOB.norm_factor = GLOB.power / (FISS_ENERGY * MEV_TO_JOULES);
     }
     else
     {
-        if (GLOB.srcrate < 0.0)
-            GLOB.srcrate = 1.0;
-
-        GLOB.norm_mode = NORM_SRCRATE;
-        GLOB.norm_factor = GLOB.srcrate;
+        GLOB.norm_mode = NORM_UNITY;
+        GLOB.norm_factor = 1.0;
     }
 
     /* Return success */

@@ -40,6 +40,12 @@ static double metric_fast_path_length(const TransportRunScores *gs)
     return safe_norm(gs->n_histories, gs->total_fast_path_length);
 }
 
+static double metric_flux(const TransportRunScores *gs)
+{
+    /* Track-length estimator of total flux (path length per history) */
+    return metric_path_length(gs);
+}
+
 static double metric_time(const TransportRunScores *gs)
 {
     return safe_norm(gs->n_histories, gs->total_time);
@@ -142,21 +148,22 @@ void processTransportResults(void)
     const size_t n_iter = (size_t)RES.n_iterations;
 
     const MetricSpec metrics[] = {
-        {"Path length / history",        "PATH_LENGTH",        NULL,                 NULL,                 metric_path_length,       false},
-        {"Fast path length / history",   "FAST_PATH_LENGTH",   NULL,                 NULL,                 metric_fast_path_length,  false},
-        {"Flight time / history",        "FLIGHT_TIME",        NULL,                 NULL,                 metric_time,              false},
-        {"Fast flight time / history",   "FAST_FLIGHT_TIME",   NULL,                 NULL,                 metric_time_fast,         false},
-        {"Fission yield / history",      "FISSION_YIELD",      "Fission rate [1/s]",      "FISSION_RATE",      metric_fission_yield,     true},
-        {"Collisions / history",         "COLLISIONS",         "Collision rate [1/s]",    "COLLISION_RATE",    metric_collisions,        true},
-        {"Captures / history",           "CAPTURES",           "Capture rate [1/s]",      "CAPTURE_RATE",      metric_captures,          true},
-        {"Elastic scatters / history",   "ELASTIC_SCATTERS",   "Elastic rate [1/s]",      "ELASTIC_RATE",      metric_elastic,           true},
-        {"Inelastic scatters / history", "INELASTIC_SCATTERS", "Inelastic rate [1/s]",    "INELASTIC_RATE",    metric_inelastic,         true},
-        {"Fissions / history",           "FISSIONS",           "Fission rate [1/s]",      "TOTAL_FISSION_RATE",metric_fissions,          true},
-        {"Thermal fissions / history",   "THERMAL_FISSIONS",   "Thermal fission rate [1/s]", "THERMAL_FISSION_RATE", metric_thermal_fissions,  true},
-        {"Fast fissions / history",      "FAST_FISSIONS",      "Fast fission rate [1/s]", "FAST_FISSION_RATE", metric_fast_fissions,     true},
-        {"Leakages / history",           "LEAKAGES",           "Leakage rate [1/s]",      "LEAKAGE_RATE",      metric_leakages,          true},
-        {"Terminated / history",         "TERMINATED",         "Termination rate [1/s]",  "TERMINATION_RATE",  metric_terminated,        true},
-        {"Unknown outcomes / history",   "UNKNOWN_OUTCOMES",   "Unknown rate [1/s]",      "UNKNOWN_RATE",      metric_unknowns,          true},
+        {"Path length / history",        "PATH_LENGTH",        NULL,                 NULL,                       metric_path_length,       false},
+        {"Fast path length / history",   "FAST_PATH_LENGTH",   NULL,                 NULL,                       metric_fast_path_length,  false},
+        {"Flight time / history",        "FLIGHT_TIME",        NULL,                 NULL,                       metric_time,              false},
+        {"Fast flight time / history",   "FAST_FLIGHT_TIME",   NULL,                 NULL,                       metric_time_fast,         false},
+        {"Collisions / history",         "COLLISIONS",         "Total reaction rate", "COLLISION_RATE",    metric_collisions,        true},
+        {"Fission prod. / history",      "FISSION_PROD",       "Production rate",     "PRODUCTION_RATE",      metric_fission_yield,     true},
+        {"Captures / history",           "CAPTURES",           "Capture rate",        "CAPTURE_RATE",      metric_captures,          true},
+        {"Elastic scatters / history",   "ELASTIC_SCATTERS",   "Elastic scat. rate",        "ELASTIC_RATE",      metric_elastic,           true},
+        {"Inelastic scatters / history", "INELASTIC_SCATTERS", "Inelastic scat. rate",      "INELASTIC_RATE",    metric_inelastic,         true},
+        {"Fissions / history",           "FISSIONS",           "Fission rate",        "TOTAL_FISSION_RATE",metric_fissions,          true},
+        {"Thermal fissions / history",   "THERMAL_FISSIONS",   "Thermal fission rate","THERMAL_FISSION_RATE", metric_thermal_fissions,  true},
+        {"Fast fissions / history",      "FAST_FISSIONS",      "Fast fission rate",   "FAST_FISSION_RATE", metric_fast_fissions,     true},
+        {"Flux / history",               "FLUX",               "Total flux",                "TOTAL_FLUX",        metric_flux,              true},
+        {"Leakages / history",           "LEAKAGES",           "Leakage rate",        "LEAKAGE_RATE",      metric_leakages,          true},
+        {"Terminated / history",         "TERMINATED",         "Termination rate",    "TERMINATION_RATE",  metric_terminated,        true},
+        {"Unknown outcomes / history",   "UNKNOWN_OUTCOMES",   "Unknown rate",        "UNKNOWN_RATE",      metric_unknowns,          true},
         {"k-eff",                          "KEFF",              NULL,                       NULL,                metric_keff,              false}
     };
 
@@ -223,25 +230,48 @@ void processTransportResults(void)
         summary_mean[m] = mean;
         summary_ci[m] = ci;
         double rel = (mean != 0.0) ? fabs(ci / mean) * 100.0 : 0.0;
-        fprintf(stdout, "  %-28s  mean = %12.6e +/- %9.3e (%.6lf%%)\n",
+        fprintf(stdout, "  %-28s  %12.6E +/- %9.3E (%.6lf%%)\n",
                 metrics[m].perhist_label, mean, ci, rel);
     }
 
-    const double norm_factor = getNormalizationFactor();
-    const char *norm_desc = getNormalizationModeDescription();
+    const double norm_factor = (GLOB.norm_factor > 0.0) ? GLOB.norm_factor : 1.0;
+    double effective_norm = norm_factor;
 
-    fprintf(stdout, "\nTotal reaction rates (normalized to %.3e %s):\n",
-            norm_factor, norm_desc);
+    /* For power normalization, convert target fission rate to source strength (histories/s)
+       using the simulated fissions per history. */
+    if (GLOB.norm_mode == NORM_POWER)
+    {
+        size_t fission_idx = SIZE_MAX;
+        for (size_t m = 0; m < nmetrics; ++m)
+        {
+            if (metrics[m].perhist_name && strcmp(metrics[m].perhist_name, "FISSIONS") == 0)
+            {
+                fission_idx = m;
+                break;
+            }
+        }
+
+        double fissions_per_history = (fission_idx < nmetrics) ? summary_mean[fission_idx] : 0.0;
+        if (fissions_per_history > 0.0)
+            effective_norm = norm_factor / fissions_per_history;
+        else
+            effective_norm = 0.0;
+    }
+    char norm_desc[MAX_STR_LEN];
+    getNormalizationModeDescription(norm_desc, effective_norm);
+
+    fprintf(stdout, "\nTotal reaction rates (normalized to %s):\n", norm_desc);
     for (size_t m = 0; m < nmetrics; ++m)
     {
         if (!metrics[m].apply_norm)
             continue;
 
-        double scaled_mean = summary_mean[m] * norm_factor;
-        double scaled_ci = summary_ci[m] * norm_factor;
-        fprintf(stdout, "  %-28s  %12.6e +/- %9.3e\n",
+        double scaled_mean = summary_mean[m] * effective_norm;
+        double scaled_ci = summary_ci[m] * effective_norm;
+        double rel = (scaled_mean != 0.0) ? fabs(scaled_ci / scaled_mean) * 100.0 : 0.0;
+        fprintf(stdout, "  %-28s  %12.6E +/- %9.3E (%.6lf%%)\n",
                 metrics[m].rate_label ? metrics[m].rate_label : metrics[m].perhist_label,
-                scaled_mean, scaled_ci);
+                scaled_mean, scaled_ci, rel);
     }
 
     /* ########################################################################################## */
@@ -259,7 +289,7 @@ void processTransportResults(void)
     {
         fprintf(mfile, "%%%% Transport results auto-generated\n");
         fprintf(mfile, "%% Input file: %s\n", GLOB.inputf);
-        fprintf(mfile, "%% Normalisation: %.8E (%s)\n\n", norm_factor, norm_desc);
+        fprintf(mfile, "%% Normalisation: %.8E (%s)\n\n", effective_norm, norm_desc);
         fprintf(mfile, "N_GENERATIONS = %zu;\n\n", n_iter);
 
         fprintf(mfile, "%% Per-history averages\n");
@@ -279,8 +309,8 @@ void processTransportResults(void)
                                                          : metrics[m].perhist_name;
             fprintf(mfile, "%-30s = [ %.8E %.8E ];\n",
                     rate_name,
-                    summary_mean[m] * norm_factor,
-                    summary_ci[m] * norm_factor);
+                    summary_mean[m] * effective_norm,
+                    summary_ci[m] * effective_norm);
         }
         fprintf(mfile, "\n");
 

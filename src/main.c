@@ -310,7 +310,8 @@ int main(int argc, char **argv) {
     
     fprintf(stdout, "Clearing results...\n");
 
-    size_t n_res = (size_t)GLOB.n_generations ? GLOB.n_generations > 0 : GLOB.n_cycles;
+    size_t n_res = (GLOB.n_generations > 0) ? (size_t)GLOB.n_generations
+                                            : (size_t)GLOB.n_cycles;
     RES.n_iterations = n_res;
     RES.avg_scores = (TransportRunScores*)calloc(n_res, sizeof(TransportRunScores));
     if (!RES.avg_scores)

@@ -67,11 +67,14 @@ static inline const char *getNormalizationModeDescription(void)
 #define C_LIGHT 2.99792458e10          /* cm/s */
 
 #define BARN_TO_CM2 1.0e-24
+#define MEV_TO_JOULES 1.60213e-13
 #define TNUC_FISSION 1.2895           /* MeV Nuclear temperature of U235 fission */
 #define E_FG_LIMIT 0.0002             /* MeV energy cutoff for free gas model at 200eV */
 #define E_THERMAL 5.0e-7              /* MeV Thermal threshold energy (Cadmium cutoff) */
 #define E_EPITHERMAL 0.1              /* MeV Epithermal threshold energy */
-#define STEP_INTPL 1e-6             /* Interpolation distance to cross boundaries and avoid floating point errors */
+#define STEP_INTPL 1e-6               /* Interpolation distance to cross boundaries and avoid floating point errors */
+#define FISS_ENERGY 200.0             /* Fission energy release MeV */
+#define AVG_NUBAR 2.45261             /* Average fission nubar, used for normalisation calculation */
 
 #define DEFAULT_NEEDLE_LENGTH 0.85
 #define DEFAULT_LINE_SPACING  1.0
@@ -323,6 +326,14 @@ void processTransportResults(void);
  * @return double 
  */
 double distanceToNearestBoundary(double x, double y, double z, double u, double v, double w);
+
+/**
+ * @brief Track given neutron to the next collision. Uses both surface and delta tracking algorithms.
+ * 
+ * @param n 
+ * @return double 
+ */
+double trackingRoutine(Neutron *n);
 
 /**
  * @brief Process detector tallies gathered during transport and write outputs.

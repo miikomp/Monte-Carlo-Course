@@ -71,7 +71,8 @@ typedef enum {
 
 typedef enum {
     NORM_SRCRATE = 1,
-    NORM_POWER
+    NORM_POWER,
+    NORM_UNITY
 } NormalisationModes;
 
 typedef struct {

@@ -131,46 +131,14 @@ int runExternalSourceSimulation(void)
                         n->last_mt = 0;
                         n->last_nuc = 0;
 
-                        /* Do boundary conditions */
-                        
-                        applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
-                    
-                        /* Sample distance to next collision within current material */
+                        /* Do tracking to next collision */
 
-                        double d = sampleDistanceToCollision(n);
-
-                        /* Check distance to nearest boundary */
-
-                        double d0 = distanceToNearestBoundary(n->x, n->y, n->z, n->u, n->v, n->w);
-
-                        /* Check if collision is after boundary cross */
-
-                        if (isfinite(d0) && d0 < d)
-                        {
-                            /* Move over  boundary*/
-
-                            n->x += n->u * (d0 + STEP_INTPL);
-                            n->y += n->v * (d0 + STEP_INTPL);
-                            n->z += n->w * (d0 + STEP_INTPL);
-
-                            /* Continue loop */
-
-                            continue;
-                        }
+                        double d = trackingRoutine(n);
 
                         if (d < 0.0)
-                        {
-                            n->status = NEUTRON_DEAD_LEAKAGE;
-                            cycle_scores.total_leakages++;
-                            continue;
-                        }
-                        
+                            break;
 
-                        /* Move neutron */
-
-                        n->x += d * n->u;
-                        n->y += d * n->v;
-                        n->z += d * n->w;
+                        /* Score path length */
 
                         n->path_length += d;
                         cycle_scores.total_path_length += d;

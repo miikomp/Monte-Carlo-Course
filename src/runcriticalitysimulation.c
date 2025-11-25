@@ -121,49 +121,14 @@ int runCriticalitySimulation(void)
                     n->last_mt = 0;
                     n->last_nuc = 0;
 
-                    /* Do boundary conditions */
+                    /* Do tracking to next collision */
 
-                    applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
-
-                    /* Sample distance to next collision */
-
-                    double d = sampleDistanceToCollision(n);
-
-                    /* Get distance to nearest boundary */
-
-                    double d0 = distanceToNearestBoundary(n->x, n->y, n->z, n->u, n->v, n->w);
-
-                    /* Check if collision is beyond the boundary crossing */
-
-                    if (isfinite(d0) && d0 < d)
-                    {
-                        /* Move over boundary */
-
-                        n->x += n->u * (d0 + STEP_INTPL);
-                        n->y += n->v * (d0 + STEP_INTPL);
-                        n->z += n->w * (d0 + STEP_INTPL);
-
-                        /* Continue loop */
-
-                        continue;
-                    }
+                    double d = trackingRoutine(n);
 
                     if (d < 0.0)
-                    {
-                        /* Neutron is outside the geometry */
+                        break;
 
-                        n->status = NEUTRON_DEAD_LEAKAGE;
-
-                        continue;
-                    }
-
-                    /* Move neutron to collision site */
-
-                    n->x += d * n->u;
-                    n->y += d * n->v;
-                    n->z += d * n->w;
-
-                    /* Update path length */
+                    /* Score path length */
 
                     n->path_length += d;
                     gen_scores.total_path_length += d;

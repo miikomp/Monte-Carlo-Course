@@ -73,8 +73,8 @@ double sampleDistanceToCollision(Neutron *n)
     /* Sample distance to collision */
 
     double xi = randd(&n->state);
-    if (xi <= 0.0)
-        xi = 1.0 - 1e-12;
+    const double eps = 1.0e-12;
+    xi = fmin(fmax(xi, eps), 1.0 - eps);
     double d = -log(1.0 - xi) / sigma_t;
     return d;
 }

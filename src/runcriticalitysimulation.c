@@ -123,7 +123,12 @@ int runCriticalitySimulation(void)
 
                     /* Do tracking to next collision */
 
-                    double d = trackingRoutine(n);
+                    uint64_t dt_count, dt_virtual_count, total_count;
+                    double d = trackingRoutine(n, &dt_count, &dt_virtual_count, &total_count);
+
+                    gen_scores.dt_count += dt_count;
+                    gen_scores.dt_virtual_count += dt_virtual_count;
+                    gen_scores.total_count += total_count;
 
                     if (d < 0.0)
                         break;

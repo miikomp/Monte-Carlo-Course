@@ -268,6 +268,12 @@ typedef struct {
     uint64_t total_leakages;
     uint64_t total_unknowns;
     uint64_t total_terminated;
+
+    /* Delta-tracking performance counters */
+
+    uint64_t dt_count;
+    uint64_t dt_virtual_count;
+    uint64_t total_count;
 } TransportRunScores;
 
 /* Custom OpenMP reduction clause for the TransportRunScores structure */
@@ -291,7 +297,11 @@ static inline void TransportRunScoresReduce(TransportRunScores *restrict out,
     out->total_fast_fissions += in->total_fast_fissions;
     out->total_leakages      += in->total_leakages;
     out->total_unknowns      += in->total_unknowns;
-    out->total_terminated      += in->total_terminated;
+    out->total_terminated    += in->total_terminated;
+
+    out->dt_count            += in->dt_count;
+    out->dt_virtual_count    += in->dt_virtual_count;
+    out->total_count         += in->total_count;
 }
 
 #pragma omp declare reduction(+:TransportRunScores: TransportRunScoresReduce(&omp_out, &omp_in)) \

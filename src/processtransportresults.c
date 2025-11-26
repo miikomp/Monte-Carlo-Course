@@ -121,6 +121,31 @@ static double metric_terminated(const TransportRunScores *gs)
     return safe_norm(gs->n_histories, (double)gs->total_terminated);
 }
 
+static double metric_dt_usefrac(const TransportRunScores *gs)
+{
+    if (!gs || gs->total_count == 0)
+        return 0.0;
+    return (double)gs->dt_count / (double)gs->total_count;
+}
+
+static double metric_surf_usefrac(const TransportRunScores *gs)
+{
+    double dt_frac = metric_dt_usefrac(gs);
+    double surf_frac = 1.0 - dt_frac;
+    return (surf_frac < 0.0) ? 0.0 : surf_frac;
+}
+
+static double metric_dt_eff(const TransportRunScores *gs)
+{
+    if (!gs || gs->dt_count == 0)
+        return 0.0;
+    double virt = (double)gs->dt_virtual_count;
+    double attempts = (double)gs->dt_count;
+    if (virt > attempts)
+        return 0.0;
+    return 1.0 - virt / attempts;
+}
+
 static void compute_stats(const double *values, size_t n, double *mean, double *std, double *ci) 
 {
     double sum = 0.0;
@@ -151,6 +176,7 @@ void processTransportResults(void)
     }
 
     const size_t n_iter = (size_t)RES.n_iterations;
+    size_t n_hist = 0;
 
     const MetricSpec metrics[] = {
         {"Path length / history",        "PATH_LENGTH",        NULL,                 NULL,                       metric_path_length,       false},
@@ -170,7 +196,10 @@ void processTransportResults(void)
         {"Terminated / history",         "TERMINATED",         "Termination rate",    "TERMINATION_RATE",  metric_terminated,        true},
         {"Unknown outcomes / history",   "UNKNOWN_OUTCOMES",   "Unknown rate",        "UNKNOWN_RATE",      metric_unknowns,          true},
         {"k-eff analog",                 "ANA_KEFF",           "k-eff analog",        "ANA_KEFF",               metric_ana_keff,          false},
-        {"k-eff implicit",               "IMP_KEFF",           "k-eff implicit",      "IMP_KEFF",           metric_imp_keff,            false}
+        {"k-eff implicit",               "IMP_KEFF",           "k-eff implicit",      "IMP_KEFF",           metric_imp_keff,            false},
+        {"Delta tracking use frac",      "DT_USEFRAC",         NULL,                  NULL,                 metric_dt_usefrac,         false},
+        {"Surface tracking use frac",    "SURF_USEFRAC",       NULL,                  NULL,                 metric_surf_usefrac,       false},
+        {"Delta tracking efficiency",    "DT_EFF",             NULL,                  NULL,                 metric_dt_eff,             false}
     };
 
     const size_t nmetrics = sizeof(metrics) / sizeof(metrics[0]);
@@ -215,7 +244,7 @@ void processTransportResults(void)
     {
         const TransportRunScores *gs = &RES.avg_scores[g];
         histories[g] = (double)gs->n_histories;
-
+        n_hist += gs->n_histories;
         for (size_t m = 0; m < nmetrics; ++m)
             metric_values[m][g] = metrics[m].extract(gs);
     }
@@ -228,7 +257,7 @@ void processTransportResults(void)
             fprintf(stdout, "  %-10zu  %-10.0f\n", g + 1, histories[g]);
     }
 
-    fprintf(stdout, "\nTransport per-history statistics (95%% Confidence-interval):\n");
+    fprintf(stdout, "\nNon-normalised transport statistics (95%% Confidence-interval):\n");
     for (size_t m = 0; m < nmetrics; ++m) 
     {
         double mean, std, ci;
@@ -266,7 +295,7 @@ void processTransportResults(void)
     char norm_desc[MAX_STR_LEN];
     getNormalizationModeDescription(norm_desc);
 
-    fprintf(stdout, "\nTotal reaction rates (normalized to %s):\n", norm_desc);
+    fprintf(stdout, "\nReaction rates (normalized to %s):\n", norm_desc);
     for (size_t m = 0; m < nmetrics; ++m)
     {
         if (!metrics[m].apply_norm)
@@ -296,9 +325,10 @@ void processTransportResults(void)
         fprintf(mfile, "%%%% Transport results auto-generated\n");
         fprintf(mfile, "%% Input file: %s\n", GLOB.inputf);
         fprintf(mfile, "%% Normalisation: %.8E (%s)\n\n", effective_norm, norm_desc);
-        fprintf(mfile, "N_GENERATIONS = %zu;\n\n", n_iter);
+        fprintf(mfile, "N_GENERATIONS = %zu;\n", n_iter);
+        fprintf(mfile, "N_HISTORIES = %zu;\n\n", n_hist);
 
-        fprintf(mfile, "%% Per-history averages\n");
+        fprintf(mfile, "%% Non-normalised statistics\n");
         for (size_t m = 0; m < nmetrics; ++m) 
         {
             fprintf(mfile, "%-30s = [ %.8E %.8E ];\n",

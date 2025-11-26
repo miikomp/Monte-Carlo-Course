@@ -59,7 +59,7 @@ extern int VERBOSITY;
 #define E_EPITHERMAL 0.1              /* MeV Epithermal threshold energy */
 #define STEP_INTPL 1e-6               /* Interpolation distance to cross boundaries and avoid floating point errors */
 #define FISS_ENERGY 200.0             /* Fission energy release MeV */
-#define AVG_NUBAR 2.45261             /* Average fission nubar, used for normalisation calculation */
+#define DT_THRESHOLD 0.90             /* Maximum rejection probability where delta tracking is still used */
 
 #define DEFAULT_NEEDLE_LENGTH 0.85
 #define DEFAULT_LINE_SPACING  1.0
@@ -316,9 +316,12 @@ double distanceToNearestBoundary(double x, double y, double z, double u, double 
  * @brief Track given neutron to the next collision. Uses both surface and delta tracking algorithms.
  * 
  * @param n 
+ * @param dt_count number of steps taken using delta-tracking
+ * @param dt_vcount number of virtual collision experienced
+ * @param count total number of steps taken
  * @return double 
  */
-double trackingRoutine(Neutron *n);
+double trackingRoutine(Neutron *n, uint64_t *dt_count, uint64_t *dt_vcount, uint64_t *count);
 
 /**
  * @brief Process detector tallies gathered during transport and write outputs.

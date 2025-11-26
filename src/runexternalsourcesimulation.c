@@ -133,7 +133,12 @@ int runExternalSourceSimulation(void)
 
                         /* Do tracking to next collision */
 
-                        double d = trackingRoutine(n);
+                        uint64_t dt_count, dt_virtual_count, total_count;
+                        double d = trackingRoutine(n, &dt_count, &dt_virtual_count, &total_count);
+                        
+                        cycle_scores.dt_count += dt_count;
+                        cycle_scores.dt_virtual_count += dt_virtual_count;
+                        cycle_scores.total_count += total_count;
 
                         if (d < 0.0)
                             break;

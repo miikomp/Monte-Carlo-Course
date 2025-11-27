@@ -222,6 +222,19 @@ int computeMacroXs(void)
                 macro_values[j] = sum;
             }
 
+            /* Drop leading zero-valued points to avoid degenerate tables */
+            
+            size_t start = 0;
+            while (start + 1 < unique_count && macro_values[start] == 0.0)
+                start++;
+            if (start > 0)
+            {
+                size_t new_n = unique_count - start;
+                memmove(E_union, E_union + start, new_n * sizeof(double));
+                memmove(macro_values, macro_values + start, new_n * sizeof(double));
+                unique_count = new_n;
+            }
+
             MacroXsTable *dest = &macro[produced++];
             dest->mt = mt;
             dest->n = unique_count;

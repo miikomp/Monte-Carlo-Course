@@ -174,6 +174,19 @@ int computeMajorantXS(void)
         sigma_M[j] = sigma_max;
     }
 
+    /* Drop leading zero-valued points to avoid zero majorant */
+    
+    size_t start = 0;
+    while (start + 1 < unique_count && sigma_M[start] == 0.0)
+        start++;
+    if (start > 0)
+    {
+        size_t new_n = unique_count - start;
+        memmove(E_union, E_union + start, new_n * sizeof(double));
+        memmove(sigma_M, sigma_M + start, new_n * sizeof(double));
+        unique_count = new_n;
+    }
+
     DATA.majorant_xs.n  = unique_count;
     DATA.majorant_xs.E  = E_union;
     DATA.majorant_xs.xs = sigma_M;

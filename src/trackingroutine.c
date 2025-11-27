@@ -45,7 +45,7 @@ double trackingRoutine(Neutron *n, uint64_t *dt_count, uint64_t *dt_vcount, uint
         /* Get total macroscopic cross section at current material */
 
         double sigma_t = getTotalMacroscopicXS(n->E, &DATA.mats[n->mat_idx]);
-        if (sigma_t <= 0.0)
+        if (sigma_t < 0.0)
         {
             n->status = NEUTRON_DEAD_LEAKAGE;
             return -1.0;
@@ -66,6 +66,8 @@ double trackingRoutine(Neutron *n, uint64_t *dt_count, uint64_t *dt_vcount, uint
 
         if (P >= 1.0 - DT_THRESHOLD)
         {
+            /* Delta-tracking */
+
             if (dt_count)
                 (*dt_count)++;
 
@@ -141,6 +143,8 @@ double trackingRoutine(Neutron *n, uint64_t *dt_count, uint64_t *dt_vcount, uint
         }
         else
         {
+            /* Surface tracking */
+
             /* Do boundary conditions */
 
             applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
@@ -152,7 +156,7 @@ double trackingRoutine(Neutron *n, uint64_t *dt_count, uint64_t *dt_vcount, uint
             if (d < 0.0)
             {
                 /* Neutron is outside the geometry */
-
+                
                 n->status = NEUTRON_DEAD_LEAKAGE;
 
                 return -1.0;

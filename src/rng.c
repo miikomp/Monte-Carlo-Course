@@ -122,7 +122,7 @@ int sampleInteractionType(Neutron *n, Nuclide *nuc)
     /* Get total microscopic cross section */
 
     double sigma_t = getTotalMicroscopicXS(n->E, nuc);
-    if (sigma_t <= 0.0)
+    if (sigma_t < 0.0)
         return -1;
 
     /* Sample interaction type based on microscopic cross sections */

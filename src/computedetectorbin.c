@@ -21,6 +21,7 @@ static bool macroscopicMtMatches(long response_id, long last_mt)
         return false;
 
     /* Extend this table to add new grouped macroscopic responses. */
+    
     static const MacroResponseGroup groups[] = {
         { DETECTOR_RESPONSE_MACRO_CAPTURE,   matchCapture },
         { DETECTOR_RESPONSE_MACRO_ELASTIC,   matchElastic },

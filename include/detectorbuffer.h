@@ -106,4 +106,4 @@ static inline void flushDetectorHistoryBuffers(DetectorHistoryBuffer *bufs, size
     }
 }
 
-#endif /* DETECTORBUFFER_H */
+#endif

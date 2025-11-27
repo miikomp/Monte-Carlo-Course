@@ -130,8 +130,18 @@ int runCriticalitySimulation(void)
                     gen_scores.dt_virtual_count += dt_virtual_count;
                     gen_scores.total_count += total_count;
 
-                    if (d < 0.0)
-                        break;
+                    if (d < 0.0 || n->status != NEUTRON_ALIVE)
+                    {
+                        if (n->status == NEUTRON_DEAD_LEAKAGE)
+                            gen_scores.total_leakages++;
+                        else
+                        {
+                            n->status = NEUTRON_DEAD_TERMINATED;
+                            gen_scores.total_terminated++;
+                        }
+                        continue;
+                    }
+                        
 
                     /* Score path length */
 
@@ -169,6 +179,7 @@ int runCriticalitySimulation(void)
                     int nuc_idx = sampleCollisionNuclide(n);
                     if (nuc_idx < 0)
                     {
+                        gen_scores.total_leakages++;
                         n->status = NEUTRON_DEAD_LEAKAGE;
                         continue;
                     }
@@ -180,6 +191,7 @@ int runCriticalitySimulation(void)
                     int mt = sampleInteractionType(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
                     if (mt < 0)
                     {
+                        gen_scores.total_leakages++;
                         n->status = NEUTRON_DEAD_LEAKAGE;
                         continue;
                     }
@@ -239,11 +251,13 @@ int runCriticalitySimulation(void)
                         }
                     }
 
-                    /* Check if cut-off has been reached */
-                    if (n->E < GLOB.energy_cutoff)
-                    {
-                        n->status = NEUTRON_DEAD_TERMINATED;
-                    }
+                    /* If neutron is alive, check for cut-off */
+
+                        if (n->status == NEUTRON_ALIVE)
+                        {
+                            if (checkNeutronCutoff(n) != 0)
+                                gen_scores.total_terminated++;
+                        }
 
                 }
 

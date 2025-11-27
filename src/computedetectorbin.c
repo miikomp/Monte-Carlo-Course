@@ -1,5 +1,84 @@
 #include "header.h"
 
+typedef bool (*MtGroupMatcher)(long mt);
+
+typedef struct {
+    long           response_id;
+    MtGroupMatcher matches;
+} MacroResponseGroup;
+
+static bool matchCapture(long mt)     { return MT_IS_CAPTURE((int)mt); }
+static bool matchElastic(long mt)     { return MT_IS_ELASTIC_SCATTER((int)mt); }
+static bool matchInelastic(long mt)   { return MT_IS_INELASTIC_SCATTER((int)mt); }
+static bool matchFission(long mt)     { return MT_IS_FISSION((int)mt); }
+
+static bool macroscopicMtMatches(long response_id, long last_mt)
+{
+    if (response_id == DETECTOR_RESPONSE_MACRO_TOTAL)
+        return true;
+
+    if (last_mt <= 0)
+        return false;
+
+    /* Extend this table to add new grouped macroscopic responses. */
+    static const MacroResponseGroup groups[] = {
+        { DETECTOR_RESPONSE_MACRO_CAPTURE,   matchCapture },
+        { DETECTOR_RESPONSE_MACRO_ELASTIC,   matchElastic },
+        { DETECTOR_RESPONSE_MACRO_INELASTIC, matchInelastic },
+        { DETECTOR_RESPONSE_MACRO_FISSION,   matchFission }
+    };
+
+    for (size_t i = 0; i < sizeof(groups) / sizeof(groups[0]); ++i)
+    {
+        if (response_id == groups[i].response_id)
+            return groups[i].matches(last_mt);
+    }
+
+    long req_mt = labs(response_id);
+    if (req_mt > 0 && req_mt != 1)
+        return last_mt == req_mt;
+
+    return true;
+}
+
+static bool macroscopicResponseMatches(const DetectorResponseBin *bin, const Neutron *n)
+{
+    if (!macroscopicMtMatches(bin->response_id, n->last_mt))
+        return false;
+
+    if (bin->rmat_id < 0 || n->mat_idx < 0)
+        return false;
+
+    return n->mat_idx == bin->rmat_id;
+}
+
+static bool microscopicResponseMatches(const DetectorResponseBin *bin, const Neutron *n, const Material *mat)
+{
+    long req_mt = bin->response_id;
+    if (req_mt != 1 && n->last_mt != req_mt)
+        return false;
+
+    if (bin->rmat_id <= 0 || !mat)
+        return false;
+
+    if (n->last_nuc < 0 || (size_t)n->last_nuc >= mat->n_nucs)
+        return false;
+
+    long last_za = mat->nucs[n->last_nuc].nuc_data.ZA;
+    return last_za == bin->rmat_id;
+}
+
+static bool responseMatchesBin(const DetectorResponseBin *bin, const Neutron *n, const Material *mat)
+{
+    if (bin->response_id < 0)
+        return macroscopicResponseMatches(bin, n);
+
+    if (bin->response_id > 0)
+        return microscopicResponseMatches(bin, n, mat);
+
+    return true;
+}
+
 static long detectorLocateBin(const double *edges, size_t n_bins, double value)
 {
     if (!edges || n_bins == 0)
@@ -105,27 +184,8 @@ long computeDetectorBin(Neutron *n, size_t det_idx)
     for (size_t r = 0; r < det->responses.n_bins; r++)
     {
         DetectorResponseBin *bin = &det->responses.bins[r];
-        long req_mt = labs(bin->response_id);
-        if (req_mt > 0 && req_mt != 1 && n->last_mt != req_mt)
+        if (!responseMatchesBin(bin, n, mat))
             continue;
-
-        if (bin->response_id < 0)
-        {
-            if (bin->rmat_id < 0 || n->mat_idx < 0)
-                continue;
-            if (n->mat_idx != bin->rmat_id)
-                continue;
-        }
-        else if (bin->response_id > 0)
-        {
-            if (bin->rmat_id <= 0 || !mat)
-                continue;
-            if (n->last_nuc < 0 || (size_t)n->last_nuc >= mat->n_nucs)
-                continue;
-            long last_za = mat->nucs[n->last_nuc].nuc_data.ZA;
-            if (last_za != bin->rmat_id)
-                continue;
-        }
 
         return (long)(bin_index + response_stride * r);
     }

@@ -20,13 +20,17 @@ double trackingRoutine(Neutron *n, uint64_t *dt_count, uint64_t *dt_vcount, uint
 
     while(1)
     {
+        /* Apply boundary conditions */
+        
+        applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
+
         /* Get current material */
 
         int err;
         if (((n->mat_idx = getMaterialAtPosition(n->x, n->y, n->z, &err)) < 0) || err != CELL_ERR_OK)
         {
             n->status = NEUTRON_DEAD_LEAKAGE;
-            return (dt > 0.0) ? -dt : -1.0;
+            return -1.0;
         }
 
         /* Get majorant cross-section for the incident neutron energy */
@@ -35,7 +39,7 @@ double trackingRoutine(Neutron *n, uint64_t *dt_count, uint64_t *dt_vcount, uint
         if (sigma_m <= 0.0)
         {
             n->status = NEUTRON_DEAD_LEAKAGE;
-            return (dt > 0.0) ? -dt : -1.0;
+            return -1.0;
         }
 
         /* Get total macroscopic cross section at current material */
@@ -55,146 +59,141 @@ double trackingRoutine(Neutron *n, uint64_t *dt_count, uint64_t *dt_vcount, uint
         else if (P < 0.0)
             P = 0.0;
 
-        /* --- Use either delta- or surface-tracking --- */
-
-        long method = (P >= 1.0 - DT_THRESHOLD) ? DELTA_TRACKING : SURFACE_TRACKING;
-
         if (count)
             (*count)++;
 
-        switch (method)
+        /* --- Use either delta- or surface-tracking --- */
+
+        if (P >= 1.0 - DT_THRESHOLD)
         {
-            case DELTA_TRACKING:
+            if (dt_count)
+                (*dt_count)++;
+
+            /* Sample distance to collision using majorant cross section */
+
+            double xi = randd(&n->state);
+            const double eps = 1.0e-12;
+            xi = fmin(fmax(xi, eps), 1.0 - eps);
+            double d = -log(1.0 - xi) / sigma_m;   
+
+            /* Move neutron to collision site */
+
+            n->x += d * n->u;
+            n->y += d * n->v;
+            n->z += d * n->w;  
+
+            /* Add to total distance */
+
+            dt += d;
+
+            /* Do boundary conditions */
+
+            applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
+
+            /* Get current material */
+
+            int err;
+            long new_mat;
+            if (((new_mat = getMaterialAtPosition(n->x, n->y, n->z, &err)) < 0) || err != CELL_ERR_OK)
             {
-                if (dt_count)
-                    (*dt_count)++;
+                n->status = NEUTRON_DEAD_LEAKAGE;
+                return -1.0;
+            }
 
-                /* Sample distance to collision using majorant cross section */
+            /* Check if material boundary crossed */
 
-                double xi = randd(&n->state);
-                const double eps = 1.0e-12;
-                xi = fmin(fmax(xi, eps), 1.0 - eps);
-                double d = -log(1.0 - xi) / sigma_m;   
+            if (new_mat != n->mat_idx)
+            {
+                n->mat_idx = new_mat;
 
-                /* Move neutron to collision site */
+                /* Get new total macroscopic cross section at current material */
 
-                n->x += d * n->u;
-                n->y += d * n->v;
-                n->z += d * n->w;  
+                sigma_t = getTotalMacroscopicXS(n->E, &DATA.mats[n->mat_idx]);
+                if (sigma_t <= 0.0)
+                {
+                    n->status = NEUTRON_DEAD_LEAKAGE;
+                    return -1.0;
+                }
+                
+                /* Compute new rejection probability */
+
+                P = sigma_t / sigma_m;
+                if (P > 1.0)
+                    P = 1.0;
+                else if (P < 0.0)
+                    P = 0.0;
+            } 
+
+            /* Check if collision is accepted */
+
+            xi = randd(&n->state);
+            xi = fmin(fmax(xi, eps), 1.0 - eps);
+
+            /* Break loop if accepted, else experience a virtual collision and continue */
+
+            if (xi < P)
+                return dt;
+
+            if (dt_vcount)
+                (*dt_vcount)++;
+
+            continue;
+        }
+        else
+        {
+            /* Do boundary conditions */
+
+            applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
+
+            /* Sample distance to next collision */
+
+            double d = sampleDistanceToCollision(n);
+
+            if (d < 0.0)
+            {
+                /* Neutron is outside the geometry */
+
+                n->status = NEUTRON_DEAD_LEAKAGE;
+
+                return -1.0;
+            }
+
+            /* Get distance to nearest boundary */
+
+            double d0 = distanceToNearestBoundary(n->x, n->y, n->z, n->u, n->v, n->w);
+
+            /* Check if collision is beyond the boundary crossing */
+
+            if (isfinite(d0) && d0 < d)
+            {
+                /* Move over boundary */
+
+                double step = d0 + STEP_INTPL;
+
+                n->x += n->u * step;
+                n->y += n->v * step;
+                n->z += n->w * step;
 
                 /* Add to total distance */
 
-                dt += d;
+                dt += step;
 
-                /* Do boundary conditions */
-
-                applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
-
-                /* Get current material */
-
-                int err;
-                long new_mat;
-                if (((new_mat = getMaterialAtPosition(n->x, n->y, n->z, &err)) < 0) || err != CELL_ERR_OK)
-                {
-                    n->status = NEUTRON_DEAD_LEAKAGE;
-                    return (dt > 0.0) ? -dt : -1.0;
-                }
-
-                /* Check if material boundary crossed */
-
-                if (new_mat != n->mat_idx)
-                {
-                    n->mat_idx = new_mat;
-
-                    /* Get new total macroscopic cross section at current material */
-
-                    sigma_t = getTotalMacroscopicXS(n->E, &DATA.mats[n->mat_idx]);
-                    if (sigma_t <= 0.0)
-                    {
-                        n->status = NEUTRON_DEAD_LEAKAGE;
-                        return -1.0;
-                    }
-                    
-                    /* Compute new rejection probability */
-
-                    P = sigma_t / sigma_m;
-                    if (P > 1.0)
-                        P = 1.0;
-                    else if (P < 0.0)
-                        P = 0.0;
-                } 
-
-                /* Check if collision is accepted */
-
-                xi = randd(&n->state);
-                xi = fmin(fmax(xi, eps), 1.0 - eps);
-
-                /* Break loop if accepted, else experience a virtual collision and continue */
-
-                if (xi < P)
-                    return dt;
-
-                if (dt_vcount)
-                    (*dt_vcount)++;
+                /* Continue loop */
 
                 continue;
             }
-            case SURFACE_TRACKING:
-            {
-                /* Do boundary conditions */
 
-                applyBoundaryConditions(&n->x, &n->y, &n->z, &n->u, &n->v, &n->w);
+            /* Move neutron to collision site */
 
-                /* Sample distance to next collision */
+            n->x += d * n->u;
+            n->y += d * n->v;
+            n->z += d * n->w;
 
-                double d = sampleDistanceToCollision(n);
+            /* Add to total distance */
 
-                if (d < 0.0)
-                {
-                    /* Neutron is outside the geometry */
+            dt += d;
 
-                    n->status = NEUTRON_DEAD_LEAKAGE;
-
-                    return (dt > 0.0) ? -dt : -1.0;
-                }
-
-                /* Get distance to nearest boundary */
-
-                double d0 = distanceToNearestBoundary(n->x, n->y, n->z, n->u, n->v, n->w);
-
-                /* Check if collision is beyond the boundary crossing */
-
-                if (isfinite(d0) && d0 < d)
-                {
-                    /* Move over boundary */
-
-                    double step = d0 + STEP_INTPL;
-
-                    n->x += n->u * step;
-                    n->y += n->v * step;
-                    n->z += n->w * step;
-
-                    /* Add to total distance */
-
-                    dt += step;
-
-                    /* Continue loop */
-
-                    continue;
-                }
-
-                /* Move neutron to collision site */
-
-                n->x += d * n->u;
-                n->y += d * n->v;
-                n->z += d * n->w;
-
-                /* Add to total distance */
-
-                dt += d;
-
-                return dt;
-            }
+            return dt;
         }
     }
 

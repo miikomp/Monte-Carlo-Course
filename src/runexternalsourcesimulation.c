@@ -141,7 +141,17 @@ int runExternalSourceSimulation(void)
                         cycle_scores.total_count += total_count;
 
                         if (d < 0.0)
-                            break;
+                        {
+                            if (n->status == NEUTRON_DEAD_LEAKAGE)
+                                cycle_scores.total_leakages++;
+                            else
+                            {
+                                n->status = NEUTRON_DEAD_TERMINATED;
+                                cycle_scores.total_terminated++;
+                            }
+                            continue;
+                        }
+                            
 
                         /* Score path length */
 
@@ -181,6 +191,7 @@ int runExternalSourceSimulation(void)
                         int nuc_idx = sampleCollisionNuclide(n);
                         if (nuc_idx < 0)
                         {
+                            cycle_scores.total_leakages++;
                             n->status = NEUTRON_DEAD_LEAKAGE;
                             continue;
                         }
@@ -192,6 +203,7 @@ int runExternalSourceSimulation(void)
                         int mt = sampleInteractionType(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
                         if (mt < 0)
                         {
+                            cycle_scores.total_leakages++;
                             n->status = NEUTRON_DEAD_LEAKAGE;
                             continue;
                         }

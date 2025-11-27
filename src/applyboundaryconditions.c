@@ -117,6 +117,7 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
 
             if (stype == SURF_SQR)
             {
+                const double EPS = 1.0e-12;
                 const double span_x = xmax - xmin;
                 const double span_y = ymax - ymin;
                 const double span_z = zmax - zmin;
@@ -127,6 +128,10 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
                     if (delta < 0.0)
                         delta += span_x;
                     *x = xmin + delta;
+                    if (*x < xmin + EPS)
+                        *x = xmin + EPS;
+                    else if (*x > xmax - EPS)
+                        *x = xmax - EPS;
                 }
 
                 if (span_y > 0.0)
@@ -135,6 +140,10 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
                     if (delta < 0.0)
                         delta += span_y;
                     *y = ymin + delta;
+                    if (*y < ymin + EPS)
+                        *y = ymin + EPS;
+                    else if (*y > ymax - EPS)
+                        *y = ymax - EPS;
                 }
 
                 if (span_z > 0.0)
@@ -143,6 +152,10 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
                     if (delta < 0.0)
                         delta += span_z;
                     *z = zmin + delta;
+                    if (*z < zmin + EPS)
+                        *z = zmin + EPS;
+                    else if (*z > zmax - EPS)
+                        *z = zmax - EPS;
                 }
 
                 return;
@@ -150,6 +163,7 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
 
             if (stype == SURF_HEXX)
             {
+                const double EPS = 1.0e-12;
                 const double cx = S->params[0];
                 const double cy = S->params[1];
                 const double a = S->params[2];
@@ -214,6 +228,17 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
 
                     *x = cx + dx;
                     *y = cy + dy;
+
+                    /* Nudge inside to avoid landing exactly on a boundary */
+                    if (*x < DATA.x_min + EPS)
+                        *x = DATA.x_min + EPS;
+                    else if (*x > DATA.x_max - EPS)
+                        *x = DATA.x_max - EPS;
+
+                    if (*y < DATA.y_min + EPS)
+                        *y = DATA.y_min + EPS;
+                    else if (*y > DATA.y_max - EPS)
+                        *y = DATA.y_max - EPS;
                 }
 
                 const double span_z = zmax - zmin;
@@ -223,6 +248,10 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
                     if (delta < 0.0)
                         delta += span_z;
                     *z = zmin + delta;
+                    if (*z < zmin + EPS)
+                        *z = zmin + EPS;
+                    else if (*z > zmax - EPS)
+                        *z = zmax - EPS;
                 }
 
                 return;
@@ -230,6 +259,7 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
 
             if (stype == SURF_HEXY)
             {
+                const double EPS = 1.0e-12;
                 const double cx = S->params[0];
                 const double cy = S->params[1];
                 const double a = S->params[2];
@@ -294,6 +324,17 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
 
                     *x = cx + dx;
                     *y = cy + dy;
+
+                    /* Nudge inside to avoid landing exactly on a boundary */
+                    if (*x < DATA.x_min + EPS)
+                        *x = DATA.x_min + EPS;
+                    else if (*x > DATA.x_max - EPS)
+                        *x = DATA.x_max - EPS;
+
+                    if (*y < DATA.y_min + EPS)
+                        *y = DATA.y_min + EPS;
+                    else if (*y > DATA.y_max - EPS)
+                        *y = DATA.y_max - EPS;
                 }
 
                 const double span_z = zmax - zmin;
@@ -303,6 +344,10 @@ void applyBoundaryConditions(double *x, double *y, double *z, double *u, double 
                     if (delta < 0.0)
                         delta += span_z;
                     *z = zmin + delta;
+                    if (*z < zmin + EPS)
+                        *z = zmin + EPS;
+                    else if (*z > zmax - EPS)
+                        *z = zmax - EPS;
                 }
 
                 return;

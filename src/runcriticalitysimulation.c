@@ -1,7 +1,7 @@
 #include "header.h"
 #include "detectorbuffer.h"
 
-int runCriticalitySimulation(void) 
+int runCriticalitySimulation(void)
 {
     /*
     1) On all but the first generation either:
@@ -42,7 +42,7 @@ int runCriticalitySimulation(void)
 
     /* Loop over generations (single-threaded) */
 
-    for (long g = 1; g <= GLOB.n_generations + GLOB.n_inactive; g++) 
+    for (long g = 1; g <= GLOB.n_generations + GLOB.n_inactive; g++)
     {
         DATA.cur_gen = (uint64_t)g;
 
@@ -52,10 +52,10 @@ int runCriticalitySimulation(void)
         memset(&gen_scores, 0, sizeof(TransportRunScores));
 
         /* On all but the first run, build a fission neutron bank from fission sites of last generation */
-        
-        if (g > 1) 
+
+        if (g > 1)
         {
-            if (buildFissionBank() != 0) 
+            if (buildFissionBank() != 0)
             {
                 fprintf(stderr, "[ERROR] Failed to build fission bank for generation %zu.\n", g);
                 return EXIT_FAILURE;
@@ -98,14 +98,14 @@ int runCriticalitySimulation(void)
                 /* Get neutron from bank */
 
                 Neutron *n = &DATA.bank[i];
-                if (n->status != NEUTRON_ALIVE) 
+                if (n->status != NEUTRON_ALIVE)
                     continue;
 
                 gen_scores.n_histories++;
 
                 /* Sample collisions until dead */
-                
-                while (n->status == NEUTRON_ALIVE) 
+
+                while (n->status == NEUTRON_ALIVE)
                 {
                     /* Add point to track segment array if plotting tracks */
 
@@ -141,7 +141,7 @@ int runCriticalitySimulation(void)
                         }
                         continue;
                     }
-                        
+
 
                     /* Score path length */
 
@@ -155,7 +155,7 @@ int runCriticalitySimulation(void)
                     }
 
                     /* Update time */
-        
+
                     double v = getVelocityCmPerS(n->E);
                     if (v > 0.0)
                     {
@@ -207,7 +207,7 @@ int runCriticalitySimulation(void)
                     if (MT_IS_ELASTIC_SCATTER(mt))
                     {
                         gen_scores.total_elastic_scatters++;
-                        
+
                         handleElasticScatter(n, &DATA.mats[n->mat_idx].nucs[nuc_idx].nuc_data);
                     }
                     else if (MT_IS_FISSION(mt))
@@ -275,7 +275,7 @@ int runCriticalitySimulation(void)
         {
             return EXIT_SUCCESS;
         }
-            
+
         /* ###################################################################################### */
         /* Store generation scores if in active cycle */
 
@@ -290,10 +290,10 @@ int runCriticalitySimulation(void)
         }
 
         /* Print generation summary */
-        
+
         double k_eff = (gen_scores.n_histories > 0) ? ((double)gen_scores.total_fission_yield / (double)gen_scores.n_histories) : 0.0;
         if (g > GLOB.n_inactive)
-            fprintf(stdout, "Generation %ld k-eff: %.6f\n", g - GLOB.n_inactive, k_eff);
+            fprintf(stdout, " k-eff: %.6f\n", k_eff);
         else
             fprintf(stdout, " keff: %.6lf\n", k_eff);
     }

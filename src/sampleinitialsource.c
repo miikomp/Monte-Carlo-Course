@@ -1,17 +1,19 @@
 #include "header.h"
 
+#define MAX_LOOPN 10000
+
 long sampleInitialSource(void) {
 
-    /* If bank capacity is zero, initialize it to a size corresponding 
+    /* If bank capacity is zero, initialize it to a size corresponding
        to the number of particles sized by a fixed factor */
 
-    if (DATA.bank_cap == 0) 
+    if (DATA.bank_cap == 0)
     {
         DATA.bank_cap = (size_t)fmax(GLOB.n_particles * GLOB.nbuf_factor, (double)MIN_BANK_SIZE);
         if (VERBOSITY >= 1)
             fprintf(stdout, "Allocating neutron bank with capacity for %.0E neutrons.\n", (double)DATA.bank_cap);
         DATA.bank = (Neutron*)calloc(DATA.bank_cap, sizeof(Neutron));
-        if (!DATA.bank) 
+        if (!DATA.bank)
         {
             fprintf(stderr,"[ERROR] Memory allocation failed.\n");
             return -1;
@@ -28,7 +30,7 @@ long sampleInitialSource(void) {
 
     /* Sample from a user defined neutron source */
 
-    if (GLOB.mode == RUNMODE_EXTERNAL_SOURCE) 
+    if (GLOB.mode == RUNMODE_EXTERNAL_SOURCE)
     {
         for (long i = 0; i < GLOB.n_particles; i++)
         {
@@ -59,7 +61,7 @@ long sampleInitialSource(void) {
 
             /* Get properties from source */
 
-            if (DATA.src_type == SRC_MONO_POINT) 
+            if (DATA.src_type == SRC_MONO_POINT)
             {
                 NeutronPointSource *src = &DATA.src->npoint;
 
@@ -112,7 +114,7 @@ long sampleInitialSource(void) {
                 int err;
                 long counter = 0, mat_idx;
                 double x, y, z, f;
-                do 
+                do
                 {
                     x = xmin + randd(&n->state) * dx;
                     y = ymin + randd(&n->state) * dy;
@@ -137,11 +139,11 @@ long sampleInitialSource(void) {
 
                 n->E = sampleMaxwellianEnergy(n, TNUC_FISSION);
             }
-        }   
+        }
     }
 
     /* Sample from fissile material (criticality simulation) */
-    
+
     else
     {
         long *mat_idxs = (long *)calloc(DATA.n_mats, sizeof(long));
@@ -167,7 +169,7 @@ long sampleInitialSource(void) {
 
             if (fissile)
                 mat_idxs[n_mat_idxs++] = m;
-            
+
         }
 
         if (n_mat_idxs <= 0)
@@ -203,15 +205,30 @@ long sampleInitialSource(void) {
 
             sampleNeutronDirection(n);
 
-
             /* Get bounds to sample in */
 
-            double xmin = DATA.x_min;
-            double xmax = DATA.x_max;
-            double ymin = DATA.y_min;
-            double ymax = DATA.y_max;
-            double zmin = DATA.z_min;
-            double zmax = DATA.z_max;
+            double xmin, xmax, ymin, ymax, zmin, zmax;
+
+            if (DATA.src_type == SRC_FISS_MAT)
+            {
+                NeutronFissionSource *src = &DATA.src->fission;
+
+                xmin = src->xmin;
+                xmax = src->xmax;
+                ymin = src->ymin;
+                ymax = src->ymax;
+                zmin = src->zmin;
+                zmax = src->zmax;
+            }
+            else
+            {
+                xmin = DATA.x_min;
+                xmax = DATA.x_max;
+                ymin = DATA.y_min;
+                ymax = DATA.y_max;
+                zmin = DATA.z_min;
+                zmax = DATA.z_max;
+            }
 
             double dx = xmax - xmin;
             double dy = ymax - ymin;
@@ -223,7 +240,7 @@ long sampleInitialSource(void) {
             long counter = 0;
             bool fissile;
             double x, y, z, f;
-            do 
+            do
             {
                 x = xmin + randd(&n->state) * dx;
                 y = ymin + randd(&n->state) * dy;
@@ -246,9 +263,9 @@ long sampleInitialSource(void) {
 
                 counter++;
             }
-            while ((counter < 1000) && (f > 0 || !fissile));
+            while ((counter < MAX_LOOPN) && (f > 0 || !fissile));
 
-            if (counter >= 1e3)
+            if (counter >= MAX_LOOPN)
                 return EXIT_FAILURE;
 
             n->x = x;

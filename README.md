@@ -51,13 +51,13 @@ Define on-demand cross-section renders of the model with the `plot` card in the 
 # plot <axis> <boundary-mode> <pixels> [min1 max1 min2 max2]
 plot 2 1 1000 -5.0 5.0 -5.0 5.0
 ```
-The `axis` selects the normal of the slice plane (1 = YZ, 2 = XZ, 3 = XY). The optional bounds restrict the plotting window, while the `boundary-mode` determines whether the image includes explicit boundaries for materials, cells or both (0 = None, 1 = Materials, 2 = Cells). Omitted boundaries fall back to automatic extents detected from the geometry. The `pixels` defines the image resolution along the long edge, aspect ratio of the boundaries is enforced. Multiple plot cards can be supplied to export several slices in one run. 
+The `axis` selects the normal of the slice plane (1 = YZ, 2 = XZ, 3 = XY). The optional bounds restrict the plotting window, while the `boundary-mode` determines whether the image includes explicit boundaries for materials, cells or both (0 = None, 1 = Materials, 2 = Cells). Omitted boundaries fall back to automatic extents detected from the geometry. The `pixels` defines the image resolution along the long edge, aspect ratio of the boundaries is enforced. Multiple plot cards can be supplied to export several slices in one run.
 
 ## Lattice definitions
 
 Replicate repeating universes with the `lat` card:
 ```Docker
-# lat <name> <type> <x0> <y0> <nx> <ny> <pitch> 
+# lat <name> <type> <x0> <y0> <nx> <ny> <pitch>
 lat CORE 1 0.0 0.0 17 17 1.26
 A A ...
 ```
@@ -80,6 +80,7 @@ Specify `s` for surface targets, then provide translations (`dx`, `dy`, `dz`) an
 - `-omp [N]` Where N specifies the number of threads to use
 - `-v [LEVEL]` Where LEVEL specifies the level of babble, 0 is default, 1 is increased, and 2 is debug output.
 - `-norun` Stops the calculation before the transport routines, used to check input for errors.
+- `-noplot` Skips geometry plots.
 - `-checkvolumes [MODE] [N]` Calculate material volumes. MODE 1 uses random points and 2 draws random lines across the geometry. N sets the number of samples.
 - `-tracks N` Draw N particle tracks onto geometry visualisation defined with the **plot** input option.
 
@@ -224,6 +225,6 @@ DONE.
 ```
 
 
-  
-   
-   
+
+
+

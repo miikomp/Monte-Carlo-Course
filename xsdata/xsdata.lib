@@ -7,9 +7,9 @@ ZA | Name | Temperature (K) | .dat path
 7014    N-14    300     ./libs/N14.dat
 8016    O-16    300     ./libs/O16.dat
 8016    O-16    600     ./libs/O16_600K.dat
-8016    O-16    900     ./libs/O16_900K.dat        
+8016    O-16    900     ./libs/O16_900K.dat
 26056   Fe-56   300     ./libs/Fe56.dat
-40090   Zr-nat  600     ./libs/Zrnat_600K.dat
+40000   Zr-nat  600     ./libs/Zrnat_600K.dat
 92235   U-235   300     ./libs/U235.dat
 92235   U-235   600     ./libs/U235_600K.dat
 92235   U-235   900     ./libs/U235_900K.dat

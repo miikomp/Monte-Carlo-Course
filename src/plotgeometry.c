@@ -67,7 +67,7 @@ long plotGeometry() {
                 return EXIT_FAILURE;
             }
         }
-        
+
         /* Calculate correct pixel counts to preserve aspect ratio */
 
         long pix = gpl->pixx;
@@ -95,7 +95,7 @@ long plotGeometry() {
         }
 
         /* Create colour palette, colour for each material + special colours for overlap, undefined and outside */
-        
+
         int *palette = calloc(DATA.n_mats + 3, sizeof(int));
         if (!palette)
         {
@@ -117,7 +117,7 @@ long plotGeometry() {
 
         size_t undefined_colour_idx = idx;
         palette[idx++] = gdImageColorAllocate(img, 0, 255, 0);
-        
+
         size_t outside_colour_idx = idx;
         palette[idx++] = gdImageColorAllocate(img, 0, 0, 0);
 
@@ -140,7 +140,7 @@ long plotGeometry() {
 
 
         /* Allocate buffer for mat or cell indeces of a single row to use for boundary checking */
-        
+
         long *prev_row = (long*)calloc(gpl->pixx, sizeof(long));
         memset(prev_row, -1, sizeof(long) * gpl->pixx);
 
@@ -244,7 +244,7 @@ long plotGeometry() {
         }
 
         /* If doing tracks, draw them onto the image now */
-        
+
         if (GLOB.trackplotmode && DATA.tracks != NULL && DATA.track_counts != NULL)
         {
             const size_t points_per_track = (size_t)(MAX_COLLISION_BINS + 1u);
@@ -316,22 +316,22 @@ long plotGeometry() {
                         int x2 = (int)lround(fx2);
                         int y2 = (int)lround(fy2);
 
-                        if (x1 < 0) 
+                        if (x1 < 0)
                             x1 = 0;
-                        if (x1 >= gpl->pixx) 
+                        if (x1 >= gpl->pixx)
                             x1 = gpl->pixx - 1;
-                        if (x2 < 0) 
+                        if (x2 < 0)
                             x2 = 0;
-                        if (x2 >= gpl->pixx) 
+                        if (x2 >= gpl->pixx)
                             x2 = gpl->pixx - 1;
 
-                        if (y1 < 0) 
+                        if (y1 < 0)
                             y1 = 0;
-                        if (y1 >= gpl->pixy) 
+                        if (y1 >= gpl->pixy)
                             y1 = gpl->pixy - 1;
-                        if (y2 < 0) 
+                        if (y2 < 0)
                             y2 = 0;
-                        if (y2 >= gpl->pixy) 
+                        if (y2 >= gpl->pixy)
                             y2 = gpl->pixy - 1;
 
                         gdImageLine(img, x1, y1, x2, y2, track_colour);
@@ -349,26 +349,26 @@ long plotGeometry() {
                     {
                         case PLOT_YZ:
                         {
-                            start_c1 = p_start[1]; 
+                            start_c1 = p_start[1];
                             start_c2 = p_start[2];
-                            end_c1   = p_end[1];   
+                            end_c1   = p_end[1];
                             end_c2   = p_end[2];
                             break;
                         }
                         case PLOT_XZ:
                         {
-                            start_c1 = p_start[0]; 
+                            start_c1 = p_start[0];
                             start_c2 = p_start[2];
-                            end_c1   = p_end[0];   
+                            end_c1   = p_end[0];
                             end_c2   = p_end[2];
                             break;
                         }
                         case PLOT_XY:
                         default:
                         {
-                            start_c1 = p_start[0]; 
+                            start_c1 = p_start[0];
                             start_c2 = p_start[1];
-                            end_c1   = p_end[0];   
+                            end_c1   = p_end[0];
                             end_c2   = p_end[1];
                             break;
                         }
@@ -377,17 +377,20 @@ long plotGeometry() {
                     double fx = (max1 - start_c1) / di - 0.5;
                     double fy = (max2 - start_c2) / dj - 0.5;
 
-                    if (isfinite(fx) && isfinite(fy))
+                    if (isfinite(fx) && isfinite(fy) &&
+                       (fx >= 0.0 && fx < (double)gpl->pixx &&
+                        fy >= 0.0 && fy < (double)gpl->pixy)
+                       )
                     {
                         int sx = (int)lround(fx);
                         int sy = (int)lround(fy);
-                        if (sx < 0) 
+                        if (sx < 0)
                             sx = 0;
-                        else if (sx >= gpl->pixx) 
+                        else if (sx >= gpl->pixx)
                             sx = gpl->pixx - 1;
-                        if (sy < 0) 
+                        if (sy < 0)
                             sy = 0;
-                        else if (sy >= gpl->pixy) 
+                        else if (sy >= gpl->pixy)
                             sy = gpl->pixy - 1;
 
                         gdImageFilledEllipse(img, sx, sy, mark_size, mark_size, start_colour);
@@ -396,19 +399,22 @@ long plotGeometry() {
                     fx = (max1 - end_c1) / di - 0.5;
                     fy = (max2 - end_c2) / dj - 0.5;
 
-                    if (isfinite(fx) && isfinite(fy))
+                    if (isfinite(fx) && isfinite(fy) &&
+                       (fx >= 0.0 && fx < (double)gpl->pixx &&
+                        fy >= 0.0 && fy < (double)gpl->pixy)
+                       )
                     {
                         int ex = (int)lround(fx);
                         int ey = (int)lround(fy);
-                        if (ex < 0) 
+                        if (ex < 0)
                             ex = 0;
-                        else if (ex >= gpl->pixx) 
+                        else if (ex >= gpl->pixx)
                             ex = gpl->pixx - 1;
-                        if (ey < 0) 
+                        if (ey < 0)
                             ey = 0;
-                        else if (ey >= gpl->pixy) 
+                        else if (ey >= gpl->pixy)
                             ey = gpl->pixy - 1;
-                        
+
                         gdImageFilledEllipse(img, ex, ey, mark_size, mark_size, end_colour);
                     }
 
@@ -423,7 +429,7 @@ long plotGeometry() {
             snprintf(filename, sizeof(filename), "%s_tracks%zu.png", GLOB.inputfname, g + 1);
         else
             snprintf(filename, sizeof(filename), "%s_geom%zu.png", GLOB.inputfname, g + 1);
-        
+
         FILE *fp = fopen(filename, "wb");
         if (!fp)
         {

@@ -7,9 +7,9 @@ int main(int argc, char **argv) {
 
     /* Check for valid usage of executable */
 
-    if (argc < 2) 
+    if (argc < 2)
     {
-        fprintf(stderr, "[ERROR] Usage: %s [OPTS] filename.\n", argv[0]);
+        fprintf(stderr, "[ERROR] Usage: %s [OPTS] <filename>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -39,12 +39,12 @@ int main(int argc, char **argv) {
     }
 
     /* Try to parse commandline arguments */
-    
-    for (long i = 1; i < argc - 1; i++) 
+
+    for (long i = 1; i < argc - 1; i++)
     {
-        if (!strcmp(argv[i], "-omp")) 
+        if (!strcmp(argv[i], "-omp"))
         {
-            if (i + 1 >= argc - 1) 
+            if (i + 1 >= argc - 1)
             {
                 fprintf(stderr, "[ERROR] Number of threads not given for \"%s\".\n", argv[i]);
                 return EXIT_FAILURE;
@@ -54,11 +54,11 @@ int main(int argc, char **argv) {
 
             GLOB.n_threads = (int)fmin((strtol(argv[++i], NULL, 10)), 16);
         }
-        else if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) 
+        else if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose"))
         {
             /* Verbosity level defaults to 1 if -v is given and 0 otherwise, 2 is maximum output */
 
-            if (i + 1 >= argc - 1) 
+            if (i + 1 >= argc - 1)
                 val = 1;
             else
                 val = (int)strtol(argv[++i], NULL, 10);
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
 
             VERBOSITY = val;
         }
-        else if (!strcmp(argv[i], "-norun") || !strcmp(argv[i], "--norun")) 
+        else if (!strcmp(argv[i], "-norun") || !strcmp(argv[i], "--norun"))
         {
             GLOB.norun = true;
         }
@@ -75,16 +75,16 @@ int main(int argc, char **argv) {
         {
             GLOB.noplot = true;
         }
-        else if (!strcmp(argv[i], "-checkvolumes") || !strcmp(argv[i], "--checkvolumes")) 
+        else if (!strcmp(argv[i], "-checkvolumes") || !strcmp(argv[i], "--checkvolumes"))
         {
-            if (i + 2 >= argc - 1) 
+            if (i + 2 >= argc - 1)
             {
                 fprintf(stderr, "[ERROR] Not enough arguments given for \"%s\".\n", argv[i]);
                 return EXIT_FAILURE;
             }
 
             long type = strtol(argv[++i], NULL, 10);
-            if (type < 1 || type > 2) 
+            if (type < 1 || type > 2)
             {
                 fprintf(stderr, "[ERROR] Invalid volume check type %ld given for \"%s\".\n", type, argv[i - 1]);
                 return EXIT_FAILURE;
@@ -94,12 +94,12 @@ int main(int argc, char **argv) {
             else
                 GLOB.n_lines = strtol(argv[++i], NULL, 10);
 
-            if (GLOB.n_points <= 0 && type == 1) 
+            if (GLOB.n_points <= 0 && type == 1)
             {
                 fprintf(stderr, "[ERROR] Number of random points must be positive.\n");
                 return EXIT_FAILURE;
             }
-            if (GLOB.n_lines <= 0 && type == 2) 
+            if (GLOB.n_lines <= 0 && type == 2)
             {
                 fprintf(stderr, "[ERROR] Number of random lines must be positive.\n");
                 return EXIT_FAILURE;
@@ -123,18 +123,18 @@ int main(int argc, char **argv) {
             GLOB.trackplotmode = true;
             GLOB.n_tracks = tracks;
         }
-        else 
+        else
         {
             fprintf(stderr, "[ERROR] Unknown commandline argument \"%s\".\n", argv[i]);
             return EXIT_FAILURE;
         }
-        
+
     }
 
     /* ########################################################################################## */
 
     /* Read input file */
-    
+
     fprintf(stdout, "\n------------------------\n");
     fprintf(stdout, "  Processing input\n");
     fprintf(stdout, "------------------------\n");
@@ -144,11 +144,11 @@ int main(int argc, char **argv) {
     fprintf(stdout, "DONE.\n");
     if (VERBOSITY >= 1)
         fprintf(stdout, "\nSuccesfully parsed %ld keyword arguments.\n", np);
-    
+
     /* Process input data */
     fprintf(stdout, "\nProcessing input data...\n");
 
-    if (processInput() != 0) 
+    if (processInput() != 0)
         return EXIT_FAILURE;
 
     fprintf(stdout, "DONE.\n");
@@ -160,10 +160,10 @@ int main(int argc, char **argv) {
         omp_set_num_threads(1);
     else
         omp_set_num_threads(GLOB.n_threads);
-    
+
     int nt = omp_get_max_threads();
     GLOB.n_threads = nt;
-        
+
 
     /* Disable dynamic teaming to not mess up thread-private things */
 
@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
     TempNucDataLib *lib = NULL;
     size_t nlib = 0;
 
-    if (processXsData(&lib, &nlib) != EXIT_SUCCESS) 
+    if (processXsData(&lib, &nlib) != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Could not process cross section library file at \"%s\".\n", GLOB.xslibpath);
         return EXIT_FAILURE;
@@ -190,7 +190,7 @@ int main(int argc, char **argv) {
 
     /* Resolve all materials using the temporary nuclide library */
 
-    if (resolveMaterials(lib, nlib) != EXIT_SUCCESS) 
+    if (resolveMaterials(lib, nlib) != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Could not resolve materials.\n");
         return EXIT_FAILURE;
@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
     nlib = 0;
 
     /* Compute macroscopic cross sections for all resolved materials and reaction modes */
-    
+
     if (computeMacroXs() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Failed to compute macroscopic cross sections.\n");
@@ -262,8 +262,8 @@ int main(int argc, char **argv) {
     }
 
     /* Plot geometry */
-    
-    if (plotGeometry() != EXIT_SUCCESS) 
+
+    if (plotGeometry() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Could not plot geometry.\n");
         return EXIT_FAILURE;
@@ -307,7 +307,7 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
     }
-    
+
     fprintf(stdout, "Clearing results...\n");
 
     size_t n_res = (GLOB.n_generations > 0) ? (size_t)GLOB.n_generations
@@ -330,7 +330,7 @@ int main(int argc, char **argv) {
 
     /* Resolve detectors */
 
-    if (resolveDetectors() != EXIT_SUCCESS) 
+    if (resolveDetectors() != EXIT_SUCCESS)
     {
         fprintf(stderr, "[ERROR] Could not resolve detectors.\n");
         return EXIT_FAILURE;
@@ -354,7 +354,7 @@ int main(int argc, char **argv) {
     /* Initialize look-up tables */
 
     initTrigTables();
-    
+
     /* If launched in check mode, exit now */
 
     if (GLOB.norun)
@@ -370,9 +370,9 @@ int main(int argc, char **argv) {
     GLOB.t0 = omp_get_wtime();
 
     /* --- Main loop --- */
-    
+
     /* Dispatch case to correct sub-routine */
-    
+
     if (GLOB.trackplotmode)
     {
         /* Allocate track coordinate array and adjust run parameters */
@@ -396,9 +396,9 @@ int main(int argc, char **argv) {
     switch (GLOB.mode) {
     case RUNMODE_EXTERNAL_SOURCE:
     {
-        /* 
+        /*
            Run the external source simulation:
-           Simulates a set number of cycles for a set number of neutrons. 
+           Simulates a set number of cycles for a set number of neutrons.
            Each cycle is independent of the last and last for the entire history of each neutron.
            For super critical systems a cut-off must be in place to avoid infinite loops.
         */
@@ -417,10 +417,10 @@ int main(int argc, char **argv) {
     }
     case RUNMODE_CRITICALITY:
     {
-        /* 
-           Run the criticality simulation: 
+        /*
+           Run the criticality simulation:
            Simulates a set number of generations so that each new generation is spawned from
-           the fission sites of the last generation. 
+           the fission sites of the last generation.
         */
         if (!GLOB.trackplotmode)
             fprintf(stdout, "Running criticality source simulation for %ld generations with %ld neutrons each.\n\n", GLOB.n_generations, GLOB.n_particles);
@@ -434,7 +434,7 @@ int main(int argc, char **argv) {
 
         break;
     }
-    default: 
+    default:
     {
         fprintf(stderr, "[ERROR] Mode %ld not implemented.\n", GLOB.mode);
         return EXIT_FAILURE;
@@ -472,7 +472,7 @@ int main(int argc, char **argv) {
     processDetectorResults();
 
     fprintf(stdout, "\nSimulation completed without errors.\n");
-    
+
 
     /* Prepare for termination */
 
